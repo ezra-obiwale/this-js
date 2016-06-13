@@ -1,0 +1,35 @@
+{
+	"status": true,
+	"data": [
+		{
+			"id": 1,
+			"name": "Ezra Obiwale",
+			"gender": "Male",
+			"hobbies": ["singing", "dancing"],
+			"socials": {
+				"Twitter": "http://twitter.com/ezraobiwale",
+				"LinkedIn": "http://linkedin.com/in/ezraobiwale",
+				"Facebook": "http://facebook.com/ezra.obiwale"
+			}
+		},
+		{
+			"id": 2,
+			"name": "Iroegbu Iroegbu",
+			"gender": "Male",
+			"hobbies": ["drinking coffee"],
+			"socials": {
+				"Twitter": "http://twitter.com/iroegbu"
+			}
+		},
+		{
+			"id": 3,
+			"name": "Chike Mgbemena",
+			"gender": "Male",
+			"hobbies": ["smoking pot", "arguing", "O boy!"],
+			"socials": {
+				"Twitter": "http://twitter.com/chike",
+				"Facebook": "http://facebook.com/chikem"
+			}
+		}
+	]
+}

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>ThisApp</title>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<style>
+			[this-type] {
+				display:none;
+			}
+			h1 {
+				margin:0;
+			}
+			ul {
+				padding-left:0;
+			}
+			li {
+				list-style: none;
+				margin-bottom:10px;
+			}
+			li:not(:last-child) {
+				border-bottom:1px solid #ccc;
+			}
+			body {
+				zoom: 87%;
+				background-color:#eee;
+			}
+			a {
+				text-decoration:none;
+			}
+			.btn {
+				margin:2px;
+				padding:5px 10px;
+				min-width:50px;
+				border:1px solid #ccc;
+				border-radius:10px;
+				text-align: center;
+			}
+			:focus {
+				outline:none;
+			}
+			#phone {
+				width:370px;
+				border:1px solid #ccc;
+				border-radius:10px;
+				background-color:#000;
+				color:#eee;
+				padding-top:10px;
+				position:relative;
+			}
+			#toolbar {
+				height:30px;
+				border-bottom:1px solid #aaa;
+				position:absolute;
+				left:5px;
+				width:360px;
+			}
+			#screen {
+				width:350px;
+				height:640px;
+				padding:5px;
+				padding-top:40px;
+				margin:5px;
+				color:#000;
+				background-color: #ffe;
+			}
+			#buttons {
+				height:80px;
+			}
+			header {
+				border-bottom:1px solid #000;
+				padding-bottom:10px;
+				position:relative;
+			}
+			header #title {
+				display:inline-block;
+				font-size:20px;
+				padding:0;
+			}
+			section {
+				padding-top:10px;
+			}
+			label {
+				width:30%;
+				display:inline-block;
+				text-align:right;
+				padding-right:10px;
+				margin-top:10px
+			}
+			label:after {
+				content:":"
+			}
+			input, select {
+				min-height: 25px;
+				padding:5px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="phone">
+			<div id="toolbar">
+				<span style="float:right;color:#000;font-size:25px">&square;&FilledSmallSquare;</span>
+			</div>
+			<div id="screen">
+				<header>
+					<a href="#" onclick="history.back();
+							return false;" class="btn" style="font-size:20px;margin-right:10px;">&larrhk;</a>
+					<h1 id="title"></h1>
+				</header>
+				<section></section>
+				<footer></footer>
+			</div>
+			<div id="buttons"></div>
+		</div>
+		<div this-type="page" this-title="Welcome" this-default-page this-id="welcome">
+			<ul>
+				<li>
+					<a class="btn" href="/view-devs" this-goto="devs">See our developers</a>
+				</li>
+			</ul>
+		</div>
+		<div this-type="page" this-title="Developers" this-id="devs">
+			<a href="users/" this-action="create" this-goto="user-form" class="btn">Add Developer</a>
+			<div this-load-collection="users"></div>
+		</div>
+		<div this-type="page" this-id="view-dev" this-title="Developer Infomation">
+			<div this-load-model="user"></div>
+		</div>
+		<ul this-id="users" this-type="collection" this-model="user" this-form="" this-url="users/">
+			<li style="font-weight: bolder;">
+				<a class="btn" href="users/{id}/" this-action="delete" style="float:right;color:darkred">delete</a>
+				<a class="btn" href="#" this-goto="view-dev" this-action="view" style="float:right;color:darkblue">view</a>
+				{name}<br />
+				<small style="font-style:italic;font-weight: normal">{gender}</small>
+			</li>
+		</ul>
+		<div this-id="user" this-url="users/{id}/" this-type="model" this-collection="users">
+			<a href="users/{id}/" this-action="delete" class="btn" style="float:right;background-color:lightcoral;color:darkred;">delete</a>
+			<a href="users/{id}/" this-action="update" this-goto="user-form" class="btn" style="float:right;background-color:lightblue;color:darkblue;">edit</a>
+			<span style="font-weight:bolder">{name}<br /><small style="font-style:italic;font-weight: normal">{gender}</small></span>
+			<h3><small>
+					Hobbies
+				</small></h3>
+			<ul id="hobbies">
+				<li id="hobby-{key}">{value}</li>
+			</ul>
+			<table>
+				<thead>
+					<tr>
+						<th colspan="2" style="text-align:left">Socials</th>
+					</tr>
+				</thead>
+				<tbody id="socials">
+					<tr>
+						<td>{key}</td>
+						<td><a target="blank" href="{value}">{value}</a></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<form this-title="New Developer" this-type="page" this-collection="users" this-model="user" this-id="user-form">
+			<label for="name">Full Name</label>
+			<input type="text" required="required" name="name" id="name" />
+			<label for="gender">Gender</label>
+			<select id="gender" name="gender">
+				<option>Male</option>
+				<option>Female</option>
+			</select>
+			<fieldset>
+				<legend>Hobbies</legend>
+				<label for="hobby-1">#1</label>
+				<input type="text" required="required" id="hobby-1" name="hobbies[]" />
+				<label for="hobby-2">#2</label>
+				<input type="text" id="hobby-2" name="hobbies[]" />
+				<label for="hobby-3">#3</label>
+				<input type="text" id="hobby-3" name="hobbies[]" />
+			</fieldset>
+			<fieldset>
+				<legend>Socials</legend>
+				<label for="linkedin">LinkedIn</label>
+				<input type="url" required="required" id="linkedin" name="socials[LinkedIn]" />
+				<label for="twitter">Twitter</label>
+				<input type="url" id="twitter" name="socials[Twitter]" />
+				<label for="facebook">Facebook</label>
+				<input type="url" id="facebook" name="socials[Facebook]" />
+			</fieldset>
+			<div style="text-align:center;margin-top:10px">
+				<button class="btn" style="width:100px;height:40px">SAVE</button>
+			</div>
+		</form>
+		<script src="jquery.min.js"></script>
+		<script src="this.js"></script>
+		<script>
+						function centralize() {
+							$('#phone').css('margin-left', ($(document).width()
+									- $('#phone').width()) / 2);
+						}
+						centralize();
+						$(window).resize(function () {
+							centralize();
+						});
+
+						ThisApp.container = 'section';
+						ThisApp.baseUrl = 'http://localhost/api/token/';
+						ThisApp.afterPageLoad = function () {
+							console.info('after page load');
+							document.title = $(this).attr('this-title');
+							$('header #title').html($(this).attr('this-title'));
+						};
+						ThisApp.init();
+		</script>
+	</body>
+</html>

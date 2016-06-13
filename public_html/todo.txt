@@ -1,0 +1,4 @@
+use href, if available, in link instead of page id
+work on history
+pagination in collection
+process variables in model containers too
