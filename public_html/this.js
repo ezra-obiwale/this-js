@@ -2,11 +2,7 @@
  * Created by Ezra Obiwale <contact@ezraobiwale.com> on 20-July-16.
  */
 (function () {
-	this.ThisApp = function (config) {
-		this.version = '1.0';
-		this.init(config);
-	};
-	this.ThisApp.prototype = {
+	var __ = {
 		anonymous: 0,
 		loading: 0,
 		processedPage: false,
@@ -559,6 +555,15 @@
 						.replace(new RegExp('{value}', 'g'), value));
 			});
 			return obj;
+		}
+	};
+	this.ThisApp = function (config) {
+		this.version = '1.0';
+		__.init(config);
+	};
+	this.ThisApp.prototype = {
+		clearCache: function () {
+			localStorage.clear();
 		}
 	};
 })(window);
