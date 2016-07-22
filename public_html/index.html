@@ -47,6 +47,7 @@
 				color:#eee;
 				padding-top:10px;
 				position:relative;
+				margin: auto;
 			}
 			#toolbar {
 				height:30px;
@@ -94,6 +95,13 @@
 				min-height: 25px;
 				padding:5px;
 			}
+			#home {
+				width:20%;
+				margin:auto;
+				border:1px solid #ccc;
+				height:92%;
+				border-radius:50%;
+			}
 		</style>
 	</head>
 	<body>
@@ -108,9 +116,12 @@
 					<h1 id="title"></h1>
 				</header>
 				<section></section>
-				<footer></footer>
+				<footer>
+				</footer>
 			</div>
-			<div id="buttons"></div>
+			<div id="buttons">
+				<div id="home"></div>
+			</div>
 		</div>
 		<div this-type="page" this-title="Welcome" this-default-page this-id="welcome">
 			<ul>
@@ -191,23 +202,16 @@
 		<script src="jquery.min.js"></script>
 		<script src="this.js"></script>
 		<script>
-						function centralize() {
-							$('#phone').css('margin-left', ($(document).width()
-									- $('#phone').width()) / 2);
-						}
-						centralize();
-						$(window).resize(function () {
-							centralize();
+						var app = new ThisApp({
+							container: 'section',
+							baseUrl: 'http://localhost/api/token/',
+							afterPageLoad: function () {
+								console.info('custom after page load');
+								document.title = $(this).attr('this-title');
+								$('header #title').html($(this).attr('this-title'));
+							}
 						});
-
-						ThisApp.container = 'section';
-						ThisApp.baseUrl = 'http://localhost/api/token/';
-						ThisApp.afterPageLoad = function () {
-							console.info('after page load');
-							document.title = $(this).attr('this-title');
-							$('header #title').html($(this).attr('this-title'));
-						};
-						ThisApp.init();
+						console.log(app);
 		</script>
 	</body>
 </html>
