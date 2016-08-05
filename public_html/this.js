@@ -8,7 +8,7 @@
 		processedPage: false,
 		init: function (config) {
 			this.setup(config);
-			if (config.container === '#this-app-container' && !$('#this-app-container').length)
+			if (this.config.container === '#this-app-container' && !$('#this-app-container').length)
 				$('body').prepend('<div id="this-app-container" />');
 			$('[this-type]').hide();
 
@@ -564,6 +564,7 @@
 	this.ThisApp.prototype = {
 		clearCache: function () {
 			localStorage.clear();
+			return __;
 		}
 	};
 })(window);
