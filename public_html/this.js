@@ -531,6 +531,7 @@
                 /**
                  * Creates a new element
                  * @param string str
+                 * @param string tag The tag to create
                  * @returns _
                  */
                 createElement: function (str) {
@@ -820,20 +821,22 @@
         },
         /**
          * Sets up the app header
-         * @param string template_id
+         * @param string component_id
          * @returns ThisApp
          */
-        header: function (template_id) {
-            this.header = this._('[this-type="template"] [this-id="' + template_id + '"]');
+        header: function (component_id) {
+            this.header = this._('component[this-id="' + component_id + '"], '
+                    + '[this-type="components"] [this-id="' + component_id + '"]');
             return this;
         },
         /**
          * Sets up the app footer
-         * @param string template_id
+         * @param string component_id
          * @returns ThisApp
          */
-        footer: function (template_id) {
-            this.footer = this._('[this-type="template"] [this-id="' + template_id + '"]');
+        footer: function (component_id) {
+            this.footer = this._('component[this-id="' + component_id + '"],'
+                    + '[this-type="components"] [this-id="' + component_id + '"]');
             return this;
         },
         /**
@@ -866,7 +869,8 @@
             }
             else {
                 this.loadPage(target_page || this.config.startWith ||
-                        this._('[this-type="pages"] [this-default-page]').attr('this-id'));
+                        this._('page[this-default-page]:not(.current), [this-type="pages"] [this-default-page]')
+                        .attr('this-id'));
             }
             return this;
         },
@@ -877,11 +881,15 @@
         setup: function () {
             this.tryCatch(function () {
                 this.__.debug = this.config.debug;
-                this._('[this-type="pages"],[this-type="templates"]').hide();
+                this._('page,[this-type="pages"],component,[this-type="components"],collection,model').hide();
                 if (this.config.titleContainer)
                     this.config.titleContainer = this._(this.config.titleContainer, this.config.debug);
                 var _this = this;
                 this.container
+                        .on('click', '[this-go-home', function (e) {
+                            _this.home();
+                            e.stop = true;
+                        })
                         // go back event
                         .on('click', '[this-go-back]', function (e) {
                             _this.back(e);
@@ -902,19 +910,23 @@
                          */
                         .on('click', '[this-goto][this-read]', function () {
                             var __this = _this._(this),
-                                    model = __this.closest('[this-type="model"]'),
-                                    collection = __this.closest('[this-type="collection"]'),
+                                    model = __this.closest('model,[this-type="model"]'),
+                                    collection = __this.closest('collection,[this-type="collection"]'),
                                     model_name = __this.attr('this-model') || collection.attr('this-model'),
                                     url = __this.attr('this-read') || model.attr('this-url') || '#',
                                     // new page template
-                                    page_template = _this._('[this-type="pages"] [this-id="'
+                                    page_template = _this._('page[this-id="' + __this.attr('this-goto')
+                                            + '"]:not(.current),[this-type="pages"] [this-id="'
                                             + __this.attr('this-goto') + '"]'),
                                     // the model container in the page template
-                                    page_template_model = page_template.find('[this-type="model"][this-id="'
-                                            + model_name + '"]'), // the model container placeholder in the page template
+                                    page_template_model = page_template.find('model[this-id="'
+                                            + model_name + '"],[this-type="model"][this-id="'
+                                            + model_name + '"]'),
+                                    // the model container placeholder in the page template
                                     // needed if exist instead of page_template_model
-                                    page_template_model_template = page_template.find('[this-template="'
-                                            + model_name + '"]'), model_id = __this.attr('this-model-id') || model.attr('this-mid');
+                                    page_template_model_template = page_template.find('[this-component="'
+                                            + model_name + '"]'), model_id = __this.attr('this-model-id')
+                                    || model.attr('this-mid');
                             if (page_template_model.length)
                                 page_template.model.attr('this-url', url).attr('this-mid', model_id);
                             else if (page_template_model_template.length)
@@ -937,7 +949,7 @@
                          */
                         .on('click', '[this-goto][this-update]', function () {
                             var __this = _this._(this),
-                                    model = __this.closest('[this-type="model"]'),
+                                    model = __this.closest('model,[this-type="model"]'),
                                     model_id = __this.attr('this-model-id') || model.attr('this-mid'),
                                     model_name = __this.attr('this-model') || model.attr('this-id'),
                                     collection = __this.attr('this-collection') ||
@@ -951,7 +963,9 @@
                                 tar += ';method:' + __this.attr('this-method');
                             if (model.attr('this-uid'))
                                 tar += ';model-uid:' + model.attr('this-uid');
-                            _this._('[this-type="pages"] [this-id="' + __this.attr('this-goto') + '"]')
+                            _this._('page[this-id="' + __this.attr('this-goto')
+                                    + '"]:not(.current),[this-type="pages"] [this-id="'
+                                    + __this.attr('this-goto') + '"]')
                                     .attr('this-tar', tar);
                         })
                         /*
@@ -989,13 +1003,13 @@
                          */
                         .on('click', '[this-goto][this-delete]', function () {
                             var __this = _this._(this),
-                                    model = __this.closest('[this-type="model"]'),
+                                    model = __this.closest('model,[this-type="model"]'),
                                     url = __this.attr('this-delete') || model.attr('this-url') || '#',
                                     collection = __this.attr('this-collection') ||
                                     model.attr('this-collection') ||
-                                    model.closest('[this-type="collection"').attr('this-id'),
+                                    model.closest('collection,[this-type="collection"').attr('this-id'),
                                     model_name = __this.attr('this-model') || model.attr('this-id') ||
-                                    __this.closest('[this-type="collection"]').attr('this-model'),
+                                    __this.closest('collection,[this-type="collection"]').attr('this-model'),
                                     uid = model.attr('this-uid') || collection.attr('this-model-uid');
                             tar = 'do:delete;uri:' + url + ';uid:' + uid;
                             if (model)
@@ -1016,7 +1030,8 @@
                             e.preventDefault();
                             _this.page.trigger('leave.page');
                             var __this = _this._(this),
-                                    page = _this._('[this-type="pages"] [this-type="page"][this-id="'
+                                    page = _this._('page[this-id="' + __this.attr('this-goto')
+                                            + '"]:not(.current),[this-type="pages"] [this-id="'
                                             + __this.attr('this-goto') + '"]'),
                                     tar = page.attr('this-tar') || '';
                             if (__this.attr('this-page-title'))
@@ -1028,7 +1043,6 @@
                             if (tar)
                                 page.attr('this-tar', tar);
                             _this.loadPage(__this.attr('this-goto'));
-                            e.stopPropagation();
                             e.stop = true;
                         })
                         /*
@@ -1052,7 +1066,7 @@
                                     .callable(__this.attr('this-call-before').call(__this)))
                                 return;
                             __this.trigger('before.delete');
-                            var model = __this.closest('[this-type="model"]'),
+                            var model = __this.closest('model,[this-type="model"]'),
                                     _do = __this.closest('[this-do="delete"]'),
                                     model_id = __this.attr('this-model') || model.attr('this-id') ||
                                     _do.attr('this-model'),
@@ -1180,6 +1194,9 @@
                 /*
                  * Back button event
                  */
+                this._('[this-go-home]').on('click', function (e) {
+                    _this.home();
+                });
                 this._('[this-go-back]').on('click', function (e) {
                     if (!e.stop)
                         _this.back(e);
@@ -1215,18 +1232,21 @@
          */
         loadPage: function (page) {
             this.firstPage = !this.container.html();
-            this.page = this._('[this-type="pages"] [this-id="' + page + '"]').clone();
+            this.page = this._('page[this-id="' + page + '"]:not(.current),[this-type="pages"] [this-id="'
+                    + page + '"]').clone();
             if (!this.page) {
                 this.container.trigger('page.not.found');
                 return;
             }
             var _this = this;
-            if (this.page.attr('this-type') === 'page') {
+            if (this.page.is('page') || this.page.attr('this-type') === 'page') {
                 this.page.trigger('page.before.load');
-                this.page = this.container.html(this.page).find('[this-type="page"]');
+                this.page = this.container.html(this.page.show()).find('page,[this-type="page"]');
                 if (this.page.attr('this-tar')) {
-                    this.doTar(this.page, this._('[this-type="pages"] [this-id="' + page
-                            + '"]'));
+                    var tmpl = this.doTar(this.page, this._('page[this-id="' + page
+                            + '"]:not(.current), [this-type="pages"] [this-id="' + page
+                            + '"]')).addClass('current');
+                    this.page.replaceWith(tmpl);
                     this.page = this.container.find('[this-id="' + page + '"]');
                 }
                 if (this.config.titleContainer)
@@ -1234,7 +1254,7 @@
                 if (this.page.attr('this-url')) {
                     this.request(this.page, function (data) {
                         _this._(this).html(data);
-                        _this.loadTemplates()
+                        _this.loadComponents()
                                 .loadCollections()
                                 .loadModels()
                                 .loadForms()
@@ -1242,7 +1262,7 @@
                     }, {}, 'text');
                 }
                 else {
-                    this.loadTemplates()
+                    this.loadComponents()
                             .loadCollections()
                             .loadModels()
                             .loadForms()
@@ -1250,8 +1270,7 @@
                 }
             }
             else {
-                this.error('Failed to load ' + this.page.attr('this-type') + ':'
-                        + this.page.attr('this-id') + ' as page');
+                this.error('Load page failed: ' + this.page.attr('this-id'));
                 this.page.trigger('page.load.failed');
             }
             return this;
@@ -1260,27 +1279,18 @@
          * Parses temporary attributes
          * @param _ __this
          * @param string template
-         * @returns _ __this
+         * @returns object _ The template object
          */
         doTar: function (__this, template) {
             var tar = __this.attr('this-tar').split(';'),
-                    _template = this._(template), attrs = {};
+                    _template = this._(template).clone();
             this.__.forEach(tar, function (i, v) {
                 var split = v.split(':');
                 if (split.length < 2)
                     return;
-                attrs['this-' + split[0]] = _template.attr('this-' + split[0]);
                 _template.attr('this-' + split[0], split[1]);
             });
-            _template.removeAttr('this-tar');
-            var _this = this._(__this).replaceWith(_template);
-            this.__.forEach(attrs, function (i, v) {
-                if (v === null)
-                    _template.removeAttr(i);
-                else
-                    _template.attr(i, v);
-            });
-            return _this;
+            return _template.removeAttr('this-tar');
         },
         /**
          * Loads all forms on the current page
@@ -1317,20 +1327,19 @@
             return this;
         },
         /**
-         * Loads all templates in the current page
+         * Loads all components in the current page
          * @returns ThisApp
          */
-        loadTemplates: function () {
+        loadComponents: function () {
             var _this = this;
-            this.container.find('[this-template]').each(function () {
+            this.container.find('[this-component]').each(function () {
                 var __this = _this._(this),
-                        template = _this._('[this-type="templates"] [this-id="'
-                                + __this.attr('this-template') + '"]');
+                        component = _this._('component[this-id="' + __this.attr('this-component')
+                                + '"]:not(.loaded),[this-type="components"] [this-id="'
+                                + __this.attr('this-component') + '"]').clone();
                 if (__this.attr('this-tar'))
-                    _this.doTar(__this, template);
-                else
-                    __this.replaceWith(template);
-                __this.trigger('template.loaded');
+                    component = _this.doTar(__this, component).addClass('loaded');
+                __this.replaceWith(component.show()).trigger('component.loaded');
             });
             return this;
         },
@@ -1341,7 +1350,7 @@
         loadCollections: function () {
             var _this = this,
                     ignore = _this.page.attr('this-ignore-cache') || '',
-                    collections = this.container.find('[this-type="collection"]')
+                    collections = this.container.find('collection,[this-type="collection"]')
                     .each(function () {
                         var __this = _this._(this),
                                 content = __this.html(),
@@ -1378,7 +1387,7 @@
         loadModels: function () {
             var _this = this,
                     ignore = this.page.attr('this-ignore-cache') || '',
-                    models = this.container.find('[this-type="model"]')
+                    models = this.container.find('model,[this-type="model"]')
                     .each(function () {
                         var __this = _this._(this),
                                 content = __this.html();
@@ -1510,7 +1519,8 @@
          */
         home: function () {
             this.loadPage(this.config.startWith ||
-                    this._('[this-type="pages"] [this-default-page]').attr('this-id'));
+                    this._('page[this-default-page]:not(.current),[this-type="pages"] [this-default-page]')
+                    .attr('this-id'));
             return this;
         },
         /**
@@ -1569,8 +1579,8 @@
                         'created': false,
                         'updated': false
                     },
-            models = this.page.find('[this-type="model"]');
-            this.page.find('[this-type="collection"]').each(function () {
+            models = this.page.find('model,[this-type="model"]');
+            this.page.find('collection,[this-type="collection"]').each(function () {
                 var _collection = _this._(this),
                         // The collection object of objects from cache
                         __collection = collection[_collection.attr('this-id')],
@@ -1600,7 +1610,7 @@
             models.each(function () {
                 var _model = _this._(this),
                         model_name = _model.attr('this-id') ||
-                        _model.closest('[this-type="collection"]').attr('this-model');
+                        _model.closest('collection,[this-type="collection"]').attr('this-model');
                 if (_model.attr('this-collection') && collection[_model.attr('this-collection')] &&
                         !collection[_model.attr('this-collection')]['data'][_model.attr('this-mid')] &&
                         models.length < 2) {
@@ -1683,16 +1693,16 @@
             this.__.forEach(targets, function (i, v) {
                 switch (target) {
                     case "page":
-                        selector += '[this-type="page"]';
+                        selector += 'page,[this-type="page"]';
                         break;
                     case "collection":
-                        selector += '[this-type="collection"]';
+                        selector += 'collection,[this-type="collection"]';
                         break;
                     case "model":
-                        selector += '[this-type="model"]';
+                        selector += 'model,[this-type="model"]';
                         break;
-                    case "template":
-                        selector += '[this-type="template"]';
+                    case "component":
+                        selector += 'component,[this-type="component"]';
                         break;
                     default:
                         var exp = v.split('#');
@@ -1879,7 +1889,7 @@
             if (container.attr('this-type') === 'model') {
                 container.attr('this-uid', id || 'id')
                         .attr('this-mid', data[id || 'id']);
-                container.html(_temp.html());
+                container.html(_temp.show().html());
             }
             else {
                 _temp.attr('this-mid', data[id || 'id'])
@@ -1887,8 +1897,9 @@
                         .attr('this-type', 'model')
                         .addClass('in-collection')
                         .attr('this-url', container.attr('this-url') + data[id || 'id']);
-                container.append(_temp);
+                container.append(_temp.show());
             }
+            container.show();
             return this;
         },
         /**

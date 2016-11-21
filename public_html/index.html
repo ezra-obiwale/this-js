@@ -128,10 +128,10 @@
             </div>
             <div this-type="page" this-title="Developers" this-id="devs">
                 <a href="users/" this-create="users/" this-model-uid="id" this-goto="user-form" class="btn">Add Developer</a>
-                <div this-template="users"></div>
+                <div this-component="users"></div>
             </div>
             <div this-type="page" this-id="view-dev" this-title="Developer Infomation">
-                <div this-template="user"></div>
+                <div this-component="user"></div>
             </div>
             <form this-title="New Developer" this-type="page" this-collection="users" this-model="user" this-id="user-form">
                 <label for="name">Full Name</label>
@@ -170,7 +170,7 @@
                 <button class="btn" this-delete>Continue</button>
             </div>
         </div>
-        <div this-type="templates">
+        <div this-type="components">
             <ul this-id="users" this-type="collection" this-model="user" this-url="users/"
                 this-model-uid="id">
                 <li style="font-weight: bolder;">
