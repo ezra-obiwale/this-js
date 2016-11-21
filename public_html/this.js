@@ -1357,8 +1357,8 @@
                                 cached = _this.cache('collection', __this.attr('this-id'));
                         __this.children().attr('this-cache', '').hide();
                         if (ignore.indexOf('collection.' + __this.attr('this-id')) === -1 && cached
-                                && ((cached.expiry && cached.expiry < Date.now())
-                                        || !cached.expiry)) {
+                                && ((cached.expires && cached.expires < Date.now())
+                                        || !cached.expires)) {
                             --_this.collections;
                             var data = {};
                             if (_this.config.dataKey)
@@ -1847,21 +1847,24 @@
                 container.trigger('invalid.response');
                 return;
             }
-            if (this.config.dataKey) {
-                data = data[this.config.dataKey];
-            }
             var variables = this.getVariables(content),
                     _data = {data: {}},
             type = container.attr('this-type'),
                     id = container.attr('this-id');
+            if (this.config.dataKey) {
+                if (type === 'collection' && data.expires)
+                    _data.expires = new Date(data.expires);
+                data = data[this.config.dataKey];
+            }
             if (this.__.isArray(data) || model === false) {
                 var _this = this;
                 this.__.forEach(data, function (i, v) {
                     _data.data[v[container.attr('this-model-uid') || 'id']] = v;
                     _this.doLoad(container, v, content, variables);
                 });
-                if (type === 'collection')
+                if (type === 'collection') {
                     _data.uid = container.attr('this-model-uid') || 'id';
+                }
             }
             else if (data) {
                 if (type === 'model' && container.attr('this-collection')) {
