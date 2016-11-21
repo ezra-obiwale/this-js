@@ -1,8 +1,0 @@
-CHECK MODEL WHEN EDITED AND RE-EDITED AFTER GOING BACK TO VIEW
-
-
-
-use href, if available, in link instead of page id
-pagination in collection
-collection search
-abstract away internal methods
