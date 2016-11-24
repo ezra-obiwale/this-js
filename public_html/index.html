@@ -122,7 +122,7 @@
             <div this-type="page" this-title="Welcome" this-default-page this-id="welcome">
                 <ul>
                     <li>
-                        <a class="btn" href="/view-devs" this-goto="devs">See our developers</a>
+                        <a class="btn" href="/view-devs" this-ignore-cache="collection.users" this-goto="devs">See our developers</a>
                     </li>
                 </ul>
             </div>
@@ -133,7 +133,7 @@
             <div this-type="page" this-id="view-dev" this-title="Developer Infomation">
                 <div this-component="user"></div>
             </div>
-            <form this-title="New Developer" this-type="page" this-collection="users" this-model="user" this-id="user-form">
+            <form method="post" enctype="multipart/form-data" this-title="New Developer" this-type="page" this-collection="users" this-model="user" this-id="user-form">
                 <label for="name">Full Name</label>
                 <input type="text" required="required" name="name" id="name" this-is="name" />
                 <label for="gender">Gender</label>
@@ -184,13 +184,13 @@
 				</ul>
 				<div this-id="user" this-type="model">
 					<hr />
-					<a href="users/{id}/" this-delete this-goto="confirm_delete" class="btn" style="float:right;background-color:lightcoral;color:darkred;">delete</a>
+					<a href="users/{id}/" this-delete class="btn" style="float:right;background-color:lightcoral;color:darkred;">delete</a>
 					<a href="users/{id}/" this-page-title="Edit Developer" this-update="users/{id}" this-goto="user-form" class="btn" style="float:right;background-color:lightblue;color:darkblue;">edit</a>
 					<span style="font-weight:bolder">{name}<br /><small style="font-style:italic;font-weight: normal">{gender}</small></span>
 					<h3>
 						<small>Hobbies</small>
 					</h3>
-					<ul this-loop="hobbies">
+					<ul this-loop="hobbies" this-filters="contains:">
 						<li id="hobby-{key}">{value}</li>
 					</ul>
 					<table>
@@ -213,6 +213,7 @@
 		<script>
 			var app = new ThisApp('section');
 			app.setBaseUrl('http://localhost/api/token/')
+//			app.setBaseUrl('http://api.dscribe-it.com/token/')
 					.setDataKey('data')
 					.setTitleContainer('#title')
 					.debug(true)
