@@ -66,8 +66,19 @@
 				 * @returns booelan
 				 */
 				contains: function (item, str) {
+					var _this = this;
 					return this.tryCatch(function () {
-						return item.indexOf(str) !== -1;
+						if (_this.isObject(item, true)) {
+							var found = false;
+							_this.forEach(item, function (i, v) {
+								if (_this.contains(v, str)) {
+									found = true;
+									return false;
+								}
+							});
+							return found;
+						}
+						return _this.isString(item) && item.indexOf(str) !== -1;
 					});
 				},
 				/**
@@ -1559,8 +1570,8 @@
 							_this.__.forEach(keys, function (i, key) {
 								if (filter)
 									filter += ' || ';
-								filter += '_this.__.contains(filters.lcase(model.' + key + '),"'
-										+ _search.val() + '")';
+								filter += '_this.__.contains(filters.lcase(model.' + key
+										+ '),filters.lcase("' + _search.val() + '"))';
 							});
 							_page.attr('this-tar', 'query:' + _search.val());
 							_collection.attr('this-filter', filter);
@@ -1806,7 +1817,7 @@
 									.attr('this-collection', __this.attr('this-id'))
 									.attr('this-bind', true);
 						}
-						if (_this.__.contains(ignore, 'collection.' + __this.attr('this-id')) && cached
+						if (!_this.__.contains(ignore, 'collection.' + __this.attr('this-id')) && cached
 								&& ((cached.expires && cached.expires < Date.now())
 										|| !cached.expires)) {
 							--_this.collections;
@@ -1852,7 +1863,7 @@
 			else
 				__this.parent().append('<div this-cache style="display:none">'
 						+ content + '</div>');
-			if (_this.__.contains(ignore, 'model.' + __this.attr('this-id'))) {
+			if (!_this.__.contains(ignore, 'model.' + __this.attr('this-id'))) {
 				var model;
 				if (__this.attr('this-collection')) {
 					model = this.getModelFromCollectionStore(__this.attr('this-mid'),
