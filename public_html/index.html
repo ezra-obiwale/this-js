@@ -127,8 +127,13 @@
                 </ul>
             </div>
             <div this-type="page" this-title="Developers" this-id="devs">
+				<form this-do="search" method="post">
+					<input name="query" type="search" this-search="users:name,hobbies,socials.LinkedIn,gender" placeholder="search list" />
+					<button class="btn">search</button>
+				</form>
+				<hr />
                 <a href="users/" this-create="users/" this-model-uid="id" this-goto="user-form" class="btn">Add Developer</a>
-                <div this-component="users"></div>
+                <div this-component="users" this-filter="collection.users:true"></div>
             </div>
             <div this-type="page" this-id="view-dev" this-title="Developer Infomation">
                 <div this-component="user"></div>
