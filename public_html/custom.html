@@ -140,7 +140,7 @@
         <div this-component="user"></div>
     </page>
     <page this-id="user-form" this-title="New Developer">
-        <form this-collection="users" this-model="user">
+        <form this-model="user">
             <label for="name">Full Name</label>
             <input type="text" required="required" name="name" id="name" this-is="name" />
             <label for="gender">Gender</label>
@@ -188,7 +188,7 @@
                 <small style="font-style:italic;font-weight: normal">{gender}</small>
             </div>
         </collection>
-        <model this-id="user" this-collection="users">
+        <model this-id="user">
             <a href="users/{id}/" this-delete this-goto="confirm_delete" class="btn"
                style="float:right;background-color:lightcoral;color:darkred;">delete</a>
             <a href="users/{id}/" this-page-title="Edit Developer" this-update="users/{id}"

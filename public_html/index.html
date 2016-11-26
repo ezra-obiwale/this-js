@@ -61,6 +61,7 @@
                 margin:5px;
                 color:#000;
                 background-color: #ffe;
+				overflow-y:auto;
             }
             #buttons {
                 height:80px;
@@ -138,36 +139,6 @@
             <div this-type="page" this-id="view-dev" this-title="Developer Infomation">
                 <div this-component="user"></div>
             </div>
-            <form method="post" enctype="multipart/form-data" this-title="New Developer" this-type="page" this-collection="users" this-model="user" this-id="user-form">
-                <label for="name">Full Name</label>
-                <input type="text" required="required" name="name" id="name" this-is="name" />
-                <label for="gender">Gender</label>
-                <select id="gender" this-is="gender" name="gender">
-                    <option>Male</option>
-                    <option>Female</option>
-                </select>
-                <fieldset>
-                    <legend>Hobbies</legend>
-                    <label for="hobby-1">#1</label>
-                    <input type="text" required="required" this-is="hobbies.0" id="hobby-1" name="hobbies[]" />
-                    <label for="hobby-2">#2</label>
-                    <input type="text" id="hobby-2" this-is="hobbies.1" name="hobbies[]" />
-                    <label for="hobby-3">#3</label>
-                    <input type="text" id="hobby-3" this-is="hobbies.2" name="hobbies[]" />
-                </fieldset>
-                <fieldset>
-                    <legend>Socials</legend>
-                    <label for="linkedin">LinkedIn</label>
-                    <input type="url" required="required" this-is="socials.LinkedIn" id="linkedin" name="socials[LinkedIn]" />
-                    <label for="twitter">Twitter</label>
-                    <input type="url" id="twitter" this-is="socials.Twitter" name="socials[Twitter]" />
-                    <label for="facebook">Facebook</label>
-                    <input type="url" id="facebook" this-is="socials.Facebook" name="socials[Facebook]" />
-                </fieldset>
-                <div style="text-align:center;margin-top:10px">
-                    <button class="btn" style="width:100px;height:40px">SAVE</button>
-                </div>
-            </form>
             <div this-type="page" this-title="Confirm Delete" this-id="confirm_delete" 
                  style="text-align:center">
                 <p>Are you sure you want to delete?</p>
@@ -182,7 +153,7 @@
                     <li style="font-weight: bolder;">
                         <a class="btn" href="users/{id}/" this-delete this-goto="confirm_delete"
                            style="float:right;color:darkred">delete</a>
-                        <a class="btn" href="#" this-read style="float:right;color:darkblue">view</a>
+                        <a class="btn" href="#" this-read this-bind="model.user" style="float:right;color:darkblue">view</a>
                         {name}<br />
                         <small style="font-style:italic;font-weight: normal">{gender}</small>
                     </li>
@@ -190,7 +161,7 @@
                 <div this-id="user" this-type="model">
                     <hr />
                     <a href="users/{id}/" this-delete class="btn" style="float:right;background-color:lightcoral;color:darkred;">delete</a>
-                    <a href="users/{id}/" this-page-title="Edit Developer" this-update="users/{id}" this-goto="user-form" class="btn" style="float:right;background-color:lightblue;color:darkblue;">edit</a>
+                    <a href="users/{id}/" this-page-title="Edit Developer" this-update="users/{id}" this-bind="user-form" class="btn" style="float:right;background-color:lightblue;color:darkblue;">edit</a>
                     <span style="font-weight:bolder">{name}<br /><small style="font-style:italic;font-weight: normal">{gender}</small></span>
                     <h3>
                         <small>Hobbies</small>
@@ -212,42 +183,74 @@
                         </tbody>
                     </table>
                 </div>	
+				<form method="post" enctype="multipart/form-data" this-title="New Developer"
+					  this-type="form" this-model="user" this-id="user-form">
+					<hr />
+					<label for="name">Full Name</label>
+					<input type="text" required="required" name="name" id="name" this-is="name" />
+					<label for="gender">Gender</label>
+					<select id="gender" this-is="gender" name="gender">
+						<option>Male</option>
+						<option>Female</option>
+					</select>
+					<fieldset>
+						<legend>Hobbies</legend>
+						<label for="hobby-1">#1</label>
+						<input type="text" required="required" this-is="hobbies.0" id="hobby-1" name="hobbies[]" />
+						<label for="hobby-2">#2</label>
+						<input type="text" id="hobby-2" this-is="hobbies.1" name="hobbies[]" />
+						<label for="hobby-3">#3</label>
+						<input type="text" id="hobby-3" this-is="hobbies.2" name="hobbies[]" />
+					</fieldset>
+					<fieldset>
+						<legend>Socials</legend>
+						<label for="linkedin">LinkedIn</label>
+						<input type="url" required="required" this-is="socials.LinkedIn" id="linkedin" name="socials[LinkedIn]" />
+						<label for="twitter">Twitter</label>
+						<input type="url" id="twitter" this-is="socials.Twitter" name="socials[Twitter]" />
+						<label for="facebook">Facebook</label>
+						<input type="url" id="facebook" this-is="socials.Facebook" name="socials[Facebook]" />
+					</fieldset>
+					<div style="text-align:center;margin-top:10px">
+						<button class="btn" style="width:100px;height:40px">SAVE</button>
+					</div>
+				</form>
             </div>
         </div>
         <script src="this.js"></script>
         <script>
-            var app = new ThisApp('section');
-            app.setBaseUrl('http://localhost/api/token/')
+			var app = new ThisApp('section');
+			app.setBaseUrl('http://localhost/api/token/')
 //			app.setBaseUrl('http://api.dscribe-it.com/token/')
-                    .setDataKey('data')
-                    .setTitleContainer('#title')
-                    .debug(true)
-                    .when('page.loaded', 'page', function () {
-                        //						console.log('Loaded Page: ' + app._(this).attr('this-id'));
-                    })
-                    .when('leave.page', 'page', function () {
-                        //						console.log('Leaving Page: ' + app._(this).attr('this-id'));
-                    })
-                    .when('loaded.cache', 'collection.users', function () {
-                        console.log('loaded cache');
-                    })
-                    .when('page.model.deleted', 'page', function () {
-                        alert('Page model deleted');
-                    })
-                    .on('form.submission.success', 'form', function (e) {
-                        alert('Save successful!');
-                    })
-                    .on('form.submission.error', 'form', function (e) {
-                        alert('Save failed!');
-                        console.log(e);
-                    })
-                    .on('delete.success', '.btn', function () {
-                        alert('deleted');
-                    })
-                    .on('delete.error', '.btn', function () {
-                        alert('not deleted');
-                    })
-                    .start();
+					.setDataKey('data')
+					.setTitleContainer('#title')
+					.debug(true)
+					.when('page.loaded', 'page', function () {
+						//						console.log('Loaded Page: ' + app._(this).attr('this-id'));
+					})
+					.when('leave.page', 'page', function () {
+						//						console.log('Leaving Page: ' + app._(this).attr('this-id'));
+					})
+					.when('loaded.cache', 'collection.users', function () {
+						console.log('loaded cache');
+					})
+					.when('page.model.deleted', 'page', function () {
+						alert('Page model deleted');
+					})
+					.on('form.submission.success', 'form', function (e) {
+						alert('Save successful!');
+					})
+					.on('form.submission.error', 'form', function (e) {
+						alert('Save failed!');
+						console.log(e);
+					})
+					.on('delete.success', '.btn', function () {
+						alert('deleted');
+					})
+					.on('delete.error', '.btn', function () {
+						alert('not deleted');
+					})
+					.start();
         </script>
     </body>
 </html>
