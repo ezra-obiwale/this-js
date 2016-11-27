@@ -1692,11 +1692,14 @@
 					_temp.find('[this-loop]').each(function () {
 						var __this = _this._(this),
 								_data = data[__this.attr('this-loop')],
-								content = __this.html();
+								content = __this.html(),
+								filter = __this.attr('this-filter');
 						__this.html('');
 						if (!_this.__.isObject(_data, true))
 							return;
 						_this.__.forEach(_data, function (i, v) {
+							if (filter.trim && !eval(filter.trim))
+								return;
 							__this.append(content.replace(/\{key\}/g, i).replace(/\{value\}/g, v));
 						});
 					});
@@ -1746,7 +1749,7 @@
 								_data.data[model[container.attr('this-model-uid') || 'id']] = model;
 							// evaluates filter
 							if (!_this.__.contains(ignore, 'collection.' + container.attr('this-id'))
-									&& filter && !eval(filter))
+									&& filter.trim() && !eval(filter.trim()))
 								return;
 							internal.call(_this, 'doLoad', container, model, content, variables);
 						});
