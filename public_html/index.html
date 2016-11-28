@@ -123,18 +123,18 @@
             <div this-type="page" this-title="Welcome" this-default-page this-id="welcome">
                 <ul>
                     <li>
-                        <a class="btn" href="/view-devs" this-ignore-cache="collection.users" this-goto="devs">See our developers</a>
+                        <a class="btn" href="/view-devs" this-ignore-cache="collection#users" this-goto="devs">See our developers</a>
                     </li>
                 </ul>
             </div>
             <div this-type="page" this-title="Developers" this-id="devs">
                 <form this-do="search" method="post">
-                    <input name="query" type="search" this-ignore-cache="collection.users" this-search="users:name,hobbies,socials,gender" placeholder="search list" />
+                    <input name="query" type="search" this-ignore-cache="collection#users" this-search="users:name,hobbies,socials,gender" placeholder="search list" />
                     <button class="btn">search</button>
                 </form>
                 <hr />
                 <a href="users/" this-create="users/" this-model-uid="id" this-goto="user-form" class="btn">Add Developer</a>
-                <div this-component="users" this-filter="collection.users:true"></div>
+                <div this-component="users" this-filter="collection#users:true"></div>
             </div>
             <div this-type="page" this-id="view-dev" this-title="Developer Infomation">
                 <div this-component="user"></div>
@@ -153,7 +153,7 @@
                     <li style="font-weight: bolder;">
                         <a class="btn" href="users/{id}/" this-delete this-goto="confirm_delete"
                            style="float:right;color:darkred">delete</a>
-                        <a class="btn" href="#" this-read this-bind="model.user" style="float:right;color:darkblue">view</a>
+                        <a class="btn" href="#" this-read this-bind="model#user" style="float:right;color:darkblue">view</a>
                         {name}<br />
                         <small style="font-style:italic;font-weight: normal">{gender}</small>
                     </li>
@@ -231,10 +231,10 @@
 					.when('leave.page', 'page', function () {
 						//						console.log('Leaving Page: ' + app._(this).attr('this-id'));
 					})
-					.when('loaded.cache', 'collection.users', function () {
+					.when('loaded.cache', 'collection#users', function () {
 						console.log('loaded cache');
 					})
-					.when('page.model.deleted', 'page', function () {
+					.when('page.model#deleted', 'page', function () {
 						alert('Page model deleted');
 					})
 					.on('form.submission.success', 'form', function (e) {

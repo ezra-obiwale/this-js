@@ -78,7 +78,7 @@
 		__this.tryCatch(function () {
 			httpRequest.upload.onprogress = function (e) {
 				if (e.lengthComputable) {
-					__this.callable(config.progress).call(httpRequest, e, e[this - loaded], e.total);
+					__this.callable(config.progress).call(httpRequest, e, e.loaded, e.total);
 				}
 			};
 		});
@@ -830,6 +830,8 @@
 				setup: function () {
 					this.tryCatch(function () {
 						this.__.debug = this.config.debug;
+						this.container.find('page,model,collection,theme,component,[this-type]')
+								.attr('this-loaded', '');
 						if (!this._('[this-type="pages"]').length) {
 							this._('body').append('<div this-type="pages" style="display:none"/>')
 									.find('[this-type="pages"]')
@@ -845,8 +847,11 @@
 								!this._('[this-type="themes"]').length) {
 							this._('body').append('<div this-type="themes" style="display:none"/>')
 									.find('[this-type="themes"]')
-									.append(this._('[this-type="theme"]'));
+									.append(this._('[this-type="theme"]:not([this-loaded])').hide());
 						}
+						this._('page:not([this-loaded]),model:not([this-loaded]),'
+								+ 'collection:not([this-loaded]),theme:not([this-loaded]),'
+								+ 'component:not([this-loaded]),[this-type]:not([this-loaded])').hide();
 						if (this.config.titleContainer)
 							this.config.titleContainer = this._(this.config.titleContainer,
 									this.config.debug);
@@ -1173,12 +1178,12 @@
 															}
 														}
 														if (!__this.hasAttr('this-binding') &&
-																!_this.closest('[this-binding]').length
+																!__this.closest('[this-binding]').length
 																&& creating)
 															_this.back();
 														else {
 															(__this.hasAttr('this-binding') ||
-																	_this.closest('[this-binding]').length);
+																	__this.closest('[this-binding]').length);
 															internal.call(_this, 'updatePage');
 														}
 													}
@@ -1232,13 +1237,13 @@
 									_this.__.forEach(keys, function (i, key) {
 										if (filter)
 											filter += ' || ';
-										filter += '_this.__.contains(filters.lcase(model.' + key
+										filter += '_this.__.contains(filters.lcase(model#' + key
 												+ '),filters.lcase("' + _search.val() + '"))';
 									});
 									_page.attr('this-tar', tar);
 									_collection.attr('this-filter', filter).attr('this-search', keys.join(','));
-									_component.attr('this-filter', 'collection.' + exp[0] + ':' + filter)
-											.attr('this-search', 'collection.' + exp[0] + ':' + keys.join(','));
+									_component.attr('this-filter', 'collection#' + exp[0] + ':' + filter)
+											.attr('this-search', 'collection#' + exp[0] + ':' + keys.join(','));
 									// same page and query. don't duplicate state
 									var replaceState = _this.page.attr('this-id') === goto &&
 											_this.page.attr('this-query') === _search.val().trim();
@@ -1413,6 +1418,7 @@
 								key = ___this.attr('this-is');
 						if (!key)
 							return;
+
 						var data = _this.__.extend({}, model),
 								keys = _this.__.contains(key, '.') ? keys = key.split('.') : keys = [key];
 						_this.__.forEach(keys, function (i, v) {
@@ -1453,8 +1459,8 @@
 										target = _this.__.arrayRemove(split, 0),
 										value = split.join(':'),
 										selector = '[this-id="' + target + '"]';
-								if (_this.__.contains(target, '.')) {
-									split = target.split('.');
+								if (_this.__.contains(target, '#')) {
+									split = target.split('#');
 									selector = split[0] + '[this-id="' + split[1] + '"],[this-type="' + split[0]
 											+ '"][this-id="' + split[1] + '"]';
 									collection_id = split[1];
@@ -1495,7 +1501,7 @@
 											.attr('this-collection', __this.attr('this-id'))
 											.attr('this-bind', true);
 								}
-								if (!_this.__.contains(ignore, 'collection.' + __this.attr('this-id'))
+								if (!_this.__.contains(ignore, 'collection#' + __this.attr('this-id'))
 										&& cached
 										&& ((cached.expires && cached.expires < Date.now())
 												|| !cached.expires)) {
@@ -1506,7 +1512,7 @@
 									else
 										data = cached.data;
 									internal.call(this, 'loadData', this, data, content, false, false);
-									__this.trigger('loaded.cache');
+									__this.trigger('cache.loaded');
 									internal.call(_this, 'pageLoaded', replaceState);
 								}
 								else {
@@ -1554,7 +1560,7 @@
 					else
 						__this.parent().append('<div this-cache="' + __this.attr('this-id')
 								+ '" style="display:none">' + content + '</div>');
-					if (!data && !_this.__.contains(ignore, 'model.' + __this.attr('this-id'))) {
+					if (!data && !_this.__.contains(ignore, 'model#' + __this.attr('this-id'))) {
 						data = internal.call(this, 'modelFromStore',
 								__this.attr('this-mid'), __this.attr('this-id'));
 						if (data)
@@ -1568,7 +1574,7 @@
 						}
 						internal.call(this, 'loadData', __this, data, content, true, false);
 						internal.call(this, 'pageLoaded', replaceState);
-						__this.trigger('loaded.cache');
+						__this.trigger('cache.loaded');
 						return;
 					}
 					this.request(this, function (data) {
@@ -1719,7 +1725,7 @@
 						if (!_this.__.isObject(_data, true))
 							return;
 						_this.__.forEach(_data, function (i, v) {
-							if (filter.trim && !eval(filter.trim))
+							if (filter && !eval(filter.trim()))
 								return;
 							__this.append(content.replace(/\{key\}/g, i).replace(/\{value\}/g, v));
 						});
@@ -1769,8 +1775,8 @@
 							if (save)
 								_data.data[model[container.attr('this-model-uid') || 'id']] = model;
 							// evaluates filter
-							if (!_this.__.contains(ignore, 'collection.' + container.attr('this-id'))
-									&& filter.trim() && !eval(filter.trim()))
+							if (!_this.__.contains(ignore, 'collection#' + container.attr('this-id'))
+									&& filter && !eval(filter.trim()))
 								return;
 							internal.call(_this, 'doLoad', container, model, content, variables);
 						});
@@ -1853,8 +1859,10 @@
 				 * @returns string
 				 */
 				getDeepValue: function (variable, data) {
-					var value = data, vars = variable.split('.');
+					var value = data, vars = __.isObject(variable, true) ? variable : variable.split('.');
 					__.forEach(vars, function (i, v) {
+						if (!value)
+							return false;
 						value = value[v];
 					});
 					return value || '';
@@ -2048,7 +2056,7 @@
 				 * @returns string
 				 */
 				selector: function (id, append) {
-					id = id.split('.');
+					id = id.split('#');
 					if (!append)
 						append = '';
 					return id.length > 1 ? '[this-type="' + id[0] + '"][this-id="' + id[1] + '"]'
@@ -2530,8 +2538,9 @@
 					this.page.removeAttr('this-tar');
 					this.page = _page;
 				}
+				else
+					this.page = this.page.clone();
 				this.page.trigger('page.before.load');
-				this.page = this.page.clone();
 				if (this.config.theme || this.page.attr('this-theme')) {
 					var theme = this.page.attr('this-theme') || this.config.theme,
 							_theme = this._('theme[this-id="' + theme + '"],'
