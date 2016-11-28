@@ -416,7 +416,6 @@
 						result = result.concat(Array.from(this.children));
 					});
 					return _(result, this.debug);
-					return _([], this.debug);
 				},
 				/**
 				 * Fetches the outer html of the first item
@@ -541,16 +540,12 @@
 					var result = [], _this = this;
 					this.each(function () {
 						if (_this.items.length > 1) {
-							Array.from(this.querySelectorAll(selector))
-									.map(function (v) {
-										this.push(v);
-									}, result);
+							result = result.concat(Array.from(this.querySelectorAll(selector)));
 						}
 						else
 							result = Array.from(this.querySelectorAll(selector));
 					});
 					return _(result, this.debug);
-					return _([], this.debug);
 				},
 				/**
 				 * Filters matched items through the given function
@@ -830,7 +825,7 @@
 				setup: function () {
 					this.tryCatch(function () {
 						this.__.debug = this.config.debug;
-						this.container.find('page,model,collection,theme,component,[this-type]')
+						this.container.find('page,model,collection,layout,component,[this-type]')
 								.attr('this-loaded', '');
 						if (!this._('[this-type="pages"]').length) {
 							this._('body').append('<div this-type="pages" style="display:none"/>')
@@ -843,14 +838,14 @@
 									.find('[this-type="components"]')
 									.append(this._('[this-type="component"]').hide());
 						}
-						if (this._('[this-type="theme"]').length &&
-								!this._('[this-type="themes"]').length) {
-							this._('body').append('<div this-type="themes" style="display:none"/>')
-									.find('[this-type="themes"]')
-									.append(this._('[this-type="theme"]:not([this-loaded])').hide());
+						if (this._('[this-type="layout"]').length &&
+								!this._('[this-type="layouts"]').length) {
+							this._('body').append('<div this-type="layouts" style="display:none"/>')
+									.find('[this-type="layouts"]')
+									.append(this._('[this-type="layout"]:not([this-loaded])').hide());
 						}
 						this._('page:not([this-loaded]),model:not([this-loaded]),'
-								+ 'collection:not([this-loaded]),theme:not([this-loaded]),'
+								+ 'collection:not([this-loaded]),layout:not([this-loaded]),'
 								+ 'component:not([this-loaded]),[this-type]:not([this-loaded])').hide();
 						if (this.config.titleContainer)
 							this.config.titleContainer = this._(this.config.titleContainer,
@@ -2339,9 +2334,9 @@
 			 */
 			loadFromState: true,
 			/**
-			 * The default theme for the application
+			 * The default layout for the application
 			 */
-			theme: null
+			layout: null
 		},
 		/**
 		 * Number of collections still loading
@@ -2477,12 +2472,12 @@
 			return this;
 		},
 		/**
-		 * Sets the default theme for the application
-		 * @param string theme
+		 * Sets the default layout for the application
+		 * @param string layout ID of the layout container
 		 * @returns ThisApp
 		 */
-		setTheme: function (theme) {
-			this.config.theme = theme;
+		setLayout: function (layout) {
+			this.config.layout = layout;
 			return this;
 		},
 		/**
@@ -2540,19 +2535,34 @@
 				}
 				else
 					this.page = this.page.clone();
-				this.page.trigger('page.before.load');
-				if (this.config.theme || this.page.attr('this-theme')) {
-					var theme = this.page.attr('this-theme') || this.config.theme,
-							_theme = this._('theme[this-id="' + theme + '"],'
-									+ '[this-type="theme"][this-id="' + theme + '"]'),
+				if (this.config.layout || this.page.attr('this-layout')) {
+					var layout = this.page.attr('this-layout') || this.config.layout,
+							_layout = this._('[this-type="layouts"] layout[this-id="' + layout + '"],'
+									+ '[this-type="layouts"] [this-type="layout"][this-id="'
+									+ layout + '"]'),
 							pageContent = this.page.html();
-					if (!_theme.length)
-						this.error('Theme [' + theme + '] not found!');
-					this.page.html(_theme).find('[this-content]').html(pageContent);
+					if (!_layout.length)
+						this.error('Layout [' + layout + '] not found!');
+					while (_layout.attr('this-extend')) {
+						var __layout = _layout.clone(),
+								_layout = this._('[this-type="layouts"] layout[this-id="'
+										+ __layout.attr('this-extend') + '"],'
+										+ '[this-type="layouts"] [this-type="layout"][this-id="'
+										+ __layout.attr('this-extend') + '"]');
+
+						if (!_layout.length) {
+							this.error('Layout [' + layout + '] not found!');
+							break;
+						}
+
+						_layout.find('[this-content]').replaceWith(__layout.show());
+					}
+					this.page.html(_layout.show()).find('[this-content]').replaceWith(pageContent);
 				}
-				this.page = this.container.append(this.page.attr('this-current', ''))
+				this.page = this.container.html(this.page.attr('this-current', ''))
 						.find('page[this-current]:not([this-dead]),[this-type="page"]'
 								+ '[this-current]:not([this-dead])');
+				this.page.trigger('page.before.load');
 				var transit = this.__.callable(this.config.transition, true),
 						wait;
 				if (transit)
