@@ -78,7 +78,7 @@
 		__this.tryCatch(function () {
 			httpRequest.upload.onprogress = function (e) {
 				if (e.lengthComputable) {
-					__this.callable(config.progress).call(httpRequest, e, e.loaded, e.total);
+					__this.callable(config.progress).call(httpRequest, e, e[this - loaded], e.total);
 				}
 			};
 		});
@@ -460,10 +460,12 @@
 						var __this = this,
 								doc = document.createElement(this.tagName);
 						if (content instanceof _) {
-							doc.innerHTML = content.outerHtml();
+							content.each(function () {
+								doc.appendChild(this);
+							});
 						}
-						else if (_this.isObject(this.content) && this.content['outerHTML']) {
-							doc.innerHTML = this.content.outerHTML;
+						else if (_this.isObject(content) && content['outerHTML']) {
+							doc.appendChild(content);
 						}
 						else {
 							doc.innerHTML = content;
@@ -489,10 +491,12 @@
 						var __this = this,
 								doc = document.createElement(this.tagName);
 						if (content instanceof _) {
-							doc.innerHTML = content.outerHtml();
+							content.each(function () {
+								doc.appendChild(this);
+							});
 						}
-						else if (_this.isObject(this.content) && this.content['outerHTML']) {
-							doc.innerHTML = this.content.outerHTML;
+						else if (_this.isObject(content) && content['outerHTML']) {
+							doc.appendChild(content);
 						}
 						else {
 							doc.innerHTML = content;
@@ -826,9 +830,26 @@
 				setup: function () {
 					this.tryCatch(function () {
 						this.__.debug = this.config.debug;
-						this._('page,collection,model,[this-type]').hide();
+						if (!this._('[this-type="pages"]').length) {
+							this._('body').append('<div this-type="pages" style="display:none"/>')
+									.find('[this-type="pages"]')
+									.append(this._('[this-type="page"]:not([this-loaded])').hide());
+						}
+						if (this._('[this-type="component"]').length &&
+								!this._('[this-type="components"]').length) {
+							this._('body').append('<div this-type="components" style="display:none"/>')
+									.find('[this-type="components"]')
+									.append(this._('[this-type="component"]').hide());
+						}
+						if (this._('[this-type="theme"]').length &&
+								!this._('[this-type="themes"]').length) {
+							this._('body').append('<div this-type="themes" style="display:none"/>')
+									.find('[this-type="themes"]')
+									.append(this._('[this-type="theme"]'));
+						}
 						if (this.config.titleContainer)
-							this.config.titleContainer = this._(this.config.titleContainer, this.config.debug);
+							this.config.titleContainer = this._(this.config.titleContainer,
+									this.config.debug);
 						var _this = this;
 						this.container
 								.on('click', '[this-go-home]', function (e) {
@@ -865,7 +886,7 @@
 											// new page template
 											page_template = _this._('page[this-id="' +
 													__this.attr('this-goto')
-													+ '"]:not(.current):not(.dead),[this-type="pages"]'
+													+ '"]:not([this-current]):not([this-dead]),[this-type="pages"]'
 													+ ' [this-id="' + __this.attr('this-goto') + '"]'),
 											// the model container in the page template
 											page_template_model = page_template.find('model[this-id="'
@@ -913,7 +934,7 @@
 									if (model.attr('this-uid'))
 										tar += ';model-uid:' + model.attr('this-uid');
 									var _target = _this._('page[this-id="' + __this.attr('this-goto')
-											+ '"]:not(.current):not(.dead),[this-type="pages"] [this-id="'
+											+ '"]:not([this-current]):not([this-dead]),[this-type="pages"] [this-id="'
 											+ __this.attr('this-goto') + '"]');
 									if (!_target.is('form'))
 										_target = _target.find('form');
@@ -984,7 +1005,7 @@
 									_this.page.trigger('leave.page');
 									var __this = _this._(this),
 											page = _this._('page[this-id="' + __this.attr('this-goto')
-													+ '"]:not(.current):not(.dead),[this-type="pages"]'
+													+ '"]:not([this-current]):not([this-dead]),[this-type="pages"]'
 													+ ' [this-id="' + __this.attr('this-goto') + '"]'),
 											tar = page.attr('this-tar') || '';
 									if (__this.attr('this-page-title'))
@@ -1077,7 +1098,7 @@
 									if (!bind)
 										return;
 									var _target = _this.page.find(internal
-											.call(_this, 'selector', bind, ':not(.in-collection)'));
+											.call(_this, 'selector', bind, ':not([this-in-collection])'));
 									if (!_target.length)
 										return;
 									_target.attr('this-model', (_model.attr('this-model')
@@ -1198,8 +1219,8 @@
 											goto = _form.attr('goto') ||
 											_form.closest('page,[this-type="page"]').attr('this-id'),
 											_page = _this._('page[this-id="' + goto
-													+ '"]:not(.current):not(.dead),[this-type="page"][this-id="'
-													+ goto + '"]:not(.current):not(.dead)'),
+													+ '"]:not([this-current]):not([this-dead]),[this-type="page"][this-id="'
+													+ goto + '"]:not([this-current]):not([this-dead])'),
 											_collection = _page.find(selector),
 											_component = _page.find('[this-component="' + exp[0] + '"]'),
 											filter = '',
@@ -1352,10 +1373,10 @@
 						}
 						if (!isPage) {
 							_this._('page[this-id="' + _this.page.attr('this-id')
-									+ '"]:not(.current):not(.dead) form:nth-child(' + (i + 1)
+									+ '"]:not([this-current]):not([this-dead]) form:nth-child(' + (i + 1)
 									+ '),[this-type="page"][this-id="'
 									+ _this.page.attr('this-id')
-									+ '"]:not(.current):not(.dead) form:nth-child(' + (i + 1) + ')')
+									+ '"]:not([this-current]):not([this-dead]) form:nth-child(' + (i + 1) + ')')
 									.removeAttr('this-tar');
 						}
 						internal.call(_this, 'doTar', __this, true);
@@ -1412,17 +1433,17 @@
 				 */
 				loadComponents: function () {
 					var _this = this;
-					this.container.find('[this-component]').each(function () {
+					this.page.find('[this-component]').each(function () {
 						var __this = _this._(this),
 								component = _this._('component[this-id="' + __this.attr('this-component')
-										+ '"]:not(.loaded),[this-type="component"][this-id="'
+										+ '"]:not([this-loaded]),[this-type="component"][this-id="'
 										+ __this.attr('this-component')
-										+ '"]:not(.loaded),[this-type="components"]>[this-id="'
+										+ '"]:not([this-loaded]),[this-type="components"]>[this-id="'
 										+ __this.attr('this-component') + '"]').clone(),
 								collection_id;
 						if (__this.attr('this-tar'))
 							internal.call(_this, 'doTar', component.attr('this-tar',
-									__this.attr('this-tar'))).addClass('loaded');
+									__this.attr('this-tar'))).attr('this-loaded');
 						_this.__.forEach(__this.attr(), function (i, attr) {
 							if (attr.name === 'this-component')
 								return;
@@ -1446,7 +1467,7 @@
 						});
 						if (!component.attr('this-type'))
 							component.attr('this-type', 'component');
-						__this.replaceWith(component).trigger('component.loaded');
+						__this.replaceWith(component.show()).trigger('component.loaded');
 					});
 					return this;
 				},
@@ -1565,7 +1586,7 @@
 				loadModels: function (replaceState) {
 					var _this = this,
 							models = this.container
-							.find('model:not(.in-collection),[this-type="model"]:not(.in-collection)')
+							.find('model:not([this-in-collection]),[this-type="model"]:not([this-in-collection])')
 							.each(function () {
 								internal.call(_this, 'loadModel', this, null, replaceState);
 							}).length;
@@ -1785,7 +1806,7 @@
 						_temp.attr('this-mid', data[id || 'id'])
 								.attr('this-uid', id || 'id')
 								.attr('this-type', 'model')
-								.addClass('in-collection')
+								.attr('this-in-collection', '')
 								.attr('this-url', container.attr('this-url') + data[id || 'id']);
 						if (container.attr('this-model'))
 							_temp.attr('this-id', container.attr('this-model'));
@@ -1893,7 +1914,7 @@
 										.attr('this-type', 'model')
 										.attr('this-id', model_name)
 										.attr('this-url', _collection.attr('this-url') + v)
-										.addClass('in-collection')
+										.attr('this-in-collection', '')
 										.outerHtml());
 								_this.__.arrayRemove(arr, i);
 							});
@@ -1923,7 +1944,7 @@
 													tmpl = internal.call(_this, 'parseData', v,
 															__model.siblings('[this-cache]').clone()
 															.removeAttr('this-cache').outerHtml());
-											if (__model.hasClass('in-collection')) {
+											if (__model.hasAttr('this-in-collection')) {
 												in_collection = true;
 											}
 											__model.html(tmpl.html());
@@ -1948,7 +1969,7 @@
 								_model.each(function () {
 									var __model = _this._(this);
 									__model.hide();
-									if (__model.hasClass('in-collection')) {
+									if (__model.hasAttr('this-in-collection')) {
 										if (!touched.deleted[model_name]) {
 											touched.deleted[model_name] = [];
 										}
@@ -2304,7 +2325,15 @@
 			/**
 			 * The options for the transition effect
 			 */
-			transitionOptions: {}
+			transitionOptions: {},
+			/**
+			 * Indicates whether to load 
+			 */
+			loadFromState: true,
+			/**
+			 * The default theme for the application
+			 */
+			theme: null
 		},
 		/**
 		 * Number of collections still loading
@@ -2431,6 +2460,24 @@
 			return this;
 		},
 		/**
+		 * Indicates whether the pages should be loaded from state if available. Default is TRUE
+		 * @param boolean load
+		 * @returns ThisApp
+		 */
+		loadFromState: function (load) {
+			this.config.loadFromState = load !== undefined ? load : true;
+			return this;
+		},
+		/**
+		 * Sets the default theme for the application
+		 * @param string theme
+		 * @returns ThisApp
+		 */
+		setTheme: function (theme) {
+			this.config.theme = theme;
+			return this;
+		},
+		/**
 		 * Initializes the app
 		 * @param object config
 		 * Keys include:
@@ -2446,12 +2493,12 @@
 			delete this._container;
 			internal.call(this, 'setup');
 			var target_page = location.hash.substr(1);
-			if (history.state && target_page === this.store('last_page')) {
+			if (this.config.loadFromState && history.state && target_page === this.store('last_page')) {
 				internal.call(this, 'restoreState', history.state);
 			}
 			else {
 				this.loadPage(target_page || this.config.startWith ||
-						this._('page[this-default-page]:not(.current):not(.dead), [this-type="pages"] [this-default-page]')
+						this._('page[this-default-page]:not([this-current]):not([this-dead]), [this-type="pages"] [this-default-page]')
 						.attr('this-id'));
 			}
 			return this;
@@ -2467,12 +2514,13 @@
 			this.firstPage = !this.container.html();
 			var oldPage = _();
 			if (this.page) {
-				oldPage = this.page.addClass('dead');
+				oldPage = this.page.attr('this-dead', '');
 			}
-			this.page = this._('page[this-id="' + page + '"]:not(.current):not(.dead),'
+			this.page = this._('page[this-id="' + page + '"]:not([this-current]):not([this-dead]),'
 					+ '[this-type="pages"]>[this-id="' + page + '"]');
-			if (!this.page) {
+			if (!this.page.length) {
 				this.container.trigger('page.not.found');
+				this.error('Page [' + page + '] not found');
 				return;
 			}
 			var _this = this;
@@ -2483,17 +2531,28 @@
 					this.page = _page;
 				}
 				this.page.trigger('page.before.load');
-				this.page = this.container.append(this.page.clone().addClass('current'))
-						.find('page.current:not(.dead),[this-type="page"].current:not(.dead)');
+				this.page = this.page.clone();
+				if (this.config.theme || this.page.attr('this-theme')) {
+					var theme = this.page.attr('this-theme') || this.config.theme,
+							_theme = this._('theme[this-id="' + theme + '"],'
+									+ '[this-type="theme"][this-id="' + theme + '"]'),
+							pageContent = this.page.html();
+					if (!_theme.length)
+						this.error('Theme [' + theme + '] not found!');
+					this.page.html(_theme).find('[this-content]').html(pageContent);
+				}
+				this.page = this.container.append(this.page.attr('this-current', ''))
+						.find('page[this-current]:not([this-dead]),[this-type="page"]'
+								+ '[this-current]:not([this-dead])');
 				var transit = this.__.callable(this.config.transition, true),
 						wait;
 				if (transit)
-					wait = transit.call(null, oldPage.removeClass('.current'), this.page,
+					wait = transit.call(null, oldPage.removeAttr('this-current'), this.page,
 							this.config.transitionOptions);
 				else if (this.__.isString(this.config.transition)) {
 					if (!transition[this.config.transition])
 						this.config.transition = 'show';
-					wait = transition[this.config.transition](oldPage.removeClass('.current'), this.page,
+					wait = transition[this.config.transition](oldPage.removeAttr('this-current'), this.page,
 							this.config.transitionOptions);
 				}
 				setTimeout(function () {
@@ -2531,7 +2590,7 @@
 		 */
 		home: function () {
 			this.loadPage(this.config.startWith ||
-					this._('page[this-default-page]:not(.current):not(.dead),[this-type="pages"] [this-default-page]')
+					this._('page[this-default-page]:not([this-current]):not([this-dead]),[this-type="pages"] [this-default-page]')
 					.attr('this-id'));
 			return this;
 		},
@@ -2560,12 +2619,12 @@
 			return this;
 		},
 		/**
-		 * Listens to the given event on the given target
+		 * A shortcut to method on()
 		 * @param string event
 		 * @param string target ID of the page to target. It could also be in forms TYPE or TYPE#ID e.g
 		 * collection#users. This means the target is a collection of id `users`. Target all collection
 		 * by specifying only collection
-		 * Multiple elements may be targeted by separating them with a comma.
+		 * Multiple elements may be targeted by separating their selectors by a comma.
 		 * @param function callback
 		 * @returns ThisApp
 		 */
@@ -2607,7 +2666,8 @@
 		/**
 		 * Adds general event listeners
 		 * @param string event
-		 * @param string selector
+		 * @param string selector Multiple elements may be targeted by separating their selectors
+		 * by a comma.
 		 * @param function callback
 		 * @returns ThisApp
 		 */
