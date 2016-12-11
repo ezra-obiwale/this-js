@@ -927,10 +927,12 @@
 					this.tryCatch(function () {
 						var _this = this;
 						this.__.__proto__.debug = this.config.debug;
-						this.__.forEach(this.config.paths, function (i, v) {
-							if (!v.endsWith('/') && i !== 'ext')
-								_this.config.paths[i] = v + '/';
-						});
+						if (this.config.paths) {
+							this.__.forEach(this.config.paths, function (i, v) {
+								if (!v.endsWith('/') && i !== 'ext')
+									_this.config.paths[i] = v + '/';
+							});
+						}
 						if (!this.notFound)
 							this.notFound = function () {
 								if (_this.firstPage) {
@@ -1971,6 +1973,10 @@
 				 * @returns {void}
 				 */
 				fullyFromURL: function (type, id, success, error) {
+					if (!this.config.paths) {
+						this.__.callable(error).call(this);
+						return;
+					}
 					var _this = this,
 							url = this.config.paths[type + 's'] + id + this.config.paths.ext;
 					if (this.config.debug)
@@ -3797,6 +3803,8 @@
 		 * @returns {ThisApp}
 		 */
 		setPathsExtension: function (ext) {
+			if (!this.config.paths)
+				this.config.paths = {};
 			if (!ext.startsWith('.'))
 				ext = '.' + ext;
 			this.config.paths.ext = ext;
@@ -3809,6 +3817,8 @@
 		 * @returns {ThisApp}
 		 */
 		setPagesPath: function (path) {
+			if (!this.config.paths)
+				this.config.paths = {};
 			this.__proto__.config.paths.pages = path;
 			return this;
 		},
@@ -3819,6 +3829,8 @@
 		 * @returns {ThisApp}
 		 */
 		setLayoutsPath: function (path) {
+			if (!this.config.paths)
+				this.config.paths = {};
 			this.__proto__.config.paths.layouts = path;
 			return this;
 		},
@@ -3829,6 +3841,8 @@
 		 * @returns {ThisApp}
 		 */
 		setComponentsPath: function (path) {
+			if (!this.config.paths)
+				this.config.paths = {};
 			this.__proto__.config.paths.components = path;
 			return this;
 		},
@@ -3896,7 +3910,7 @@
 				return this;
 			}
 			if (!newPage.length) {
-				if (this.config.paths.pages) {
+				if (this.config.paths && this.config.paths.pages) {
 					var _this = this;
 					internal.fullyFromURL.call(this, 'page', page, function (elem) {
 						internal.pageFound.call(_this, elem, replaceInState);
