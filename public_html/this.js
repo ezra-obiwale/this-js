@@ -2257,6 +2257,15 @@
 							!this.__proto__.components) {
 						var _this = this;
 						this.container.find('[this-inline-code]').each(function () {
+							var __this = _this._(this);
+							__this.replaceWith(_this._('<code this-code />').html(__this.html()));
+						});
+						this.container.find('[this-block-code]').each(function () {
+							var __this = _this._(this);
+							__this.replaceWith(_this._('<pre />').html(__this.html()))
+									.innerWrap('<code this-code />');
+						});
+						this.container.find('[this-code]').each(function () {
 							var __this = _this._(this),
 									tags = internal.parseBrackets.call(_this, '<', '>', __this.html()),
 									content = __this.html();
@@ -2264,19 +2273,8 @@
 								content = content
 										.replace(v, '&lt;' + v.substr(1, v.length - 2) + '&gt;');
 							});
-							__this.replaceWith(_this._('<code />').html(content));
-						});
-						this.container.find('[this-block-code]').each(function () {
-							var __this = _this._(this),
-									tags = internal.parseBrackets
-									.call(_this, '<', '>', __this.html()),
-									content = __this.html();
-							_this.__.forEach(tags, function (i, v) {
-								content = content
-										.replace(v, '&lt;' + v.substr(1, v.length - 2) + '&gt;');
-							});
-							__this.replaceWith(_this._('<pre />').html(content))
-									.innerWrap('<code />');
+							content = content.replace(/\n/g, '<br/>').replace(/\s/g, '&nbsp;');
+							__this.html(content).removeAttr('this-code');
 						});
 						delete this.firstPage;
 						this.page.trigger('page.loaded');
