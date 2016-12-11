@@ -679,6 +679,7 @@
 				 */
 				replaceWith: function (content) {
 					var replaced = [];
+					content = _(content, this.debug);
 					this.each(function () {
 						var _content = content.items[0];
 						if (!_content)
@@ -2254,11 +2255,29 @@
 				pageLoaded: function (replaceState) {
 					if (!this.__proto__.collections && !this.__proto__.models &&
 							!this.__proto__.components) {
-						this.container.find('[this-inline-code]').innerWrap('<code/>')
-								.removeAttr('this-inline-code');
-						this.container.find('[this-block-code]').innerWrap('<pre/>')
-								.removeAttr('this-block-code')
-								.children('pre').innerWrap('<code />');
+						var _this = this;
+						this.container.find('[this-inline-code]').each(function () {
+							var __this = _this._(this),
+									tags = internal.parseBrackets.call(_this, '<', '>', __this.html()),
+									content = __this.html();
+							_this.__.forEach(tags, function (i, v) {
+								content = content
+										.replace(v, '&lt;' + v.substr(1, v.length - 2) + '&gt;');
+							});
+							__this.replaceWith(_this._('<code />').html(content));
+						});
+						this.container.find('[this-block-code]').each(function () {
+							var __this = _this._(this),
+									tags = internal.parseBrackets
+									.call(_this, '<', '>', __this.html()),
+									content = __this.html();
+							_this.__.forEach(tags, function (i, v) {
+								content = content
+										.replace(v, '&lt;' + v.substr(1, v.length - 2) + '&gt;');
+							});
+							__this.replaceWith(_this._('<pre />').html(content))
+									.innerWrap('<code />');
+						});
 						delete this.firstPage;
 						this.page.trigger('page.loaded');
 						internal.saveState.call(this, replaceState);
