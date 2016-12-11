@@ -1153,8 +1153,8 @@
 									if (!__this.attr('this-goto'))
 										return;
 									_this.page.trigger('page.leave');
-									var go = __this.attr('this-goto').split('#'),
-											goto = go[0],
+									var goto = internal.pageIDFromLink.call(this,
+											__this.attr('this-goto')),
 											page = _this._('page[this-id="' + goto
 													+ '"]:not([this-current]):not([this-dead]),[this-type="pages"]'
 													+ ' [this-id="' + goto + '"]'),
@@ -1170,7 +1170,6 @@
 												__this.attr('this-ignore-cache');
 									if (tar)
 										page.attr('this-tar', tar);
-									this.pageTarget = go[1];
 									_this.loadPage(goto);
 									e.stop = true;
 								})
@@ -1488,6 +1487,26 @@
 					});
 					this.__proto__.running = true;
 					return this;
+				},
+				/**
+				 * Parses the url hash
+				 * @returns {string} Target page ID
+				 */
+				pageIDFromLink: function (link) {
+					if (link.startsWith('#'))
+						link = link.substr(1);
+					var parts = link.split('&');
+					if (parts.length > 1)
+						this.target_on_page = parts[1];
+					return parts[0];
+				},
+				/**
+				 * Scrolls to the target on page
+				 * @returns {void}
+				 */
+				resolveTargetOnPage: function () {
+					// @todo
+					delete this.target_on_page;
 				},
 				/**
 				 * Binds the target to the model
@@ -2047,7 +2066,8 @@
 							if (!_layout.length) {
 								internal.fullyFromURL.call(this, 'layout', layout,
 										function (_layout) {
-											_layout.find('[this-content]').html(_this.page);
+											_layout.removeAttr('this-url')
+													.find('[this-content]').html(_this.page);
 											if (_layout.attr('this-extends'))
 												internal.extendLayout
 														.call(_this, _layout, replaceInState);
@@ -2065,8 +2085,10 @@
 								if (_layout.attr('this-url')) {
 									this.request(_layout.attr('this-url'),
 											function (data) {
-												_layout.removeAttr('this-url').html(data)
-														.find('[this-content]').html(_this.page);
+												_layout.removeAttr('this-url')
+														.html(data)
+														.find('[this-content]')
+														.html(_this.page);
 												if (_layout.attr('this-extends'))
 													internal.extendLayout.call(_this, _layout, replaceInState);
 												else
@@ -2111,7 +2133,8 @@
 					if (!_layout.length) {
 						internal.fullyFromURL.call(this, 'layout', __layout.attr('this-extends'),
 								function (_layout) {
-									_layout.find('[this-content]').html(__layout);
+									_layout.removeAttr('this-url')
+											.find('[this-content]').html(__layout);
 									if (_layout.attr('this-extends'))
 										internal.extendLayout
 												.call(_this, _layout, replaceInState);
@@ -2130,18 +2153,16 @@
 						if (_layout.attr('this-url')) {
 							this.request(_layout.attr('this-url'),
 									function (data) {
-										_layout.attr('this-id', __layout.attr('this-id'))
-												.removeAttr('this-url')
+										_layout.removeAttr('this-url')
 												.html(data)
 												.find('[this-content]')
-												.removeAttr('this-content')
-												.html(__layout.removeAttr('this-id')
-														.removeAttr('this-type').show());
+												.html(__layout.show());
 										if (_layout.attr('this-extends')) {
 											internal.extendLayout.call(_this, _layout, replaceInState);
 										}
 										else {
-											internal.finalizePageLoad.call(_this, _layout, replaceInState);
+											internal.finalizePageLoad.call(_this, _layout,
+													replaceInState);
 										}
 									},
 									function () {
@@ -2149,11 +2170,8 @@
 									{}, 'text');
 						}
 						else {
-							_layout.attr('this-id', __layout.attr('this-id'))
-									.find('[this-content]')
-									.removeAttr('this-content')
-									.html(__layout.removeAttr('this-id')
-											.removeAttr('this-type').show());
+							_layout.find('[this-content]')
+									.html(__layout.removeAttr('this-extends').show());
 							if (_layout.attr('this-extends')) {
 								internal.extendLayout.call(this, _layout, replaceInState);
 							}
@@ -3827,7 +3845,7 @@
 			this.container = this._(this.config.container).html('');
 			this.firstPage = true;
 			internal.setup.call(this);
-			var target_page = location.hash.substr(1);
+			var target_page = internal.pageIDFromLink.call(this, location.hash);
 			if (this.config.loadFromState && history.state && target_page === this.store('last_page')) {
 				internal.restoreState.call(this, history.state);
 			}
