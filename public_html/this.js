@@ -1529,14 +1529,10 @@
                         this.error('Model to bind to does not have an id');
                         return;
                     }
-                    _target.attr('this-mid', _model.attr('this-mid'))
-                            .attr('this-uid', _model.attr('this-uid'))
-                            .attr('this-url', _model.attr('this-url'));
-                    if (!ignoreCache) {
-                        model = internal.modelFromStore.call(_this, _model.attr('mid'), model_name);
-                    }
+                    if (!ignoreCache)
+                        model = this.collection(model_name).model(_model.attr('mid'));
                     if (model) {
-                        internal.bindData.call(_this, model, _target);
+                        model.bind(_target);
                         _target.trigger('variables.binded', {
                             data: model
                         });
@@ -1550,18 +1546,6 @@
                             });
                         });
                     }
-                    return this;
-                },
-                /**
-                 * Binds the data to the target
-                 * @param object data
-                 * @param _ _target
-                 * @returns ThisApp
-                 */
-                bindData: function (data, _target) {
-                    internal.loadModel.call(this, _target, data, true);
-                    internal.loadForms.call(this, _target.is('form') ? _target
-                            : _target.find('form'), data);
                     return this;
                 },
                 /**
@@ -1743,8 +1727,10 @@
                                     + '[this-type="collection"]:not([this-loaded]):not([this-cache])');
                     this.__proto__.collections += collections.length;
                     collections.each(function () {
-                        var __this = _this._(this).addClass('loading'),
-                                content = __this.html(),
+                        var __this = _this._(this).addClass('loading');
+                        if (__this.children().length > 1)
+                            __this.innerWrap('<div/>');
+                        var content = __this.html(),
                                 cached = internal.cache.call(_this, 'model',
                                         __this.attr('this-id')),
                                 model_name = __this.attr('this-model');
@@ -1752,11 +1738,16 @@
                         if (!_this._('collection[this-id="' + __this.attr('this-id') +
                                 '"]:not(.loading),[this-type="collection"][this-id="'
                                 + __this.attr('this-id') + '"]:not(.loading)').length) {
-                            _this.page.append(__this.clone().removeAttr('this-loaded')
-                                    .removeClass('loading').attr('this-cache', '').hide());
+                            var cache = __this.removeAttr('this-loaded')
+                                    .removeClass('loading').attr('this-cache', '').hide().outerHtml()
+                                    .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
+                            _this.page.append(cache);
                         }
                         __this.removeClass('loading');
-                        __this.children().attr('this-cache', __this.attr('this-model') || '').hide();
+                        __this.html(__this.children().attr('this-cache', __this.attr('this-model') || '')
+                                .hide().outerHtml()
+                                .replace(/\(\{/g, '__obrace2__')
+                                .replace(/\}\)/g, '__cbrace2__'));
                         if (model_name && _this.page.find('model[this-id="' + model_name
                                 + '"],[this-type="model"][this-id="' + model_name
                                 + '"]').length) {
@@ -1804,16 +1795,16 @@
                 },
                 /**
                  * Loads a model on the current page
-                 * @param object _model
+                 * @param {HTMLElement}|{_} target
                  * @param boolean binding Indicates whether to currently binding model to a collection
                  * @param boolean replaceState Indicates whether to overwrite current state
                  *  after loading model
                  * @returns void
                  */
-                loadModel: function (_model, data, replaceState) {
-                    var __this = this._(_model),
+                loadModel: function (target, data, replaceState) {
+                    var __this = this._(target),
                             ignore = this.page.attr('this-ignore-cache') || '',
-                            content = __this.html(),
+                            content = __this.outerHtml(),
                             _this = this;
                     if (!data && !__this.attr('this-url')) {
                         this.__proto__.models--;
@@ -1822,11 +1813,15 @@
                     if (__this.attr('this-tar'))
                         internal.doTar.call(this, __this);
                     if (__this.siblings('[this-cache="' + __this.attr('this-id') + '"]').length) {
+                        // necessary in case of binding and target has already been used
                         content = __this.siblings('[this-cache="' + __this.attr('this-id') + '"]').html();
                     }
-                    else
+                    else // keep a copy for later use
                         __this.parent().append('<div this-cache="' + __this.attr('this-id')
-                                + '" style="display:none">' + content + '</div>');
+                                + '" style="display:none">'
+                                + content.replace(/\(\{/g, '__obrace2__')
+                                .replace(/\}\)/g, '__cbrace2__')
+                                + '</div>');
                     if (!data && !_this.__.contains(ignore, 'model#' + __this.attr('this-id'))) {
                         data = internal.modelFromStore.call(this,
                                 __this.attr('this-mid'), __this.attr('this-id'));
@@ -2128,6 +2123,7 @@
                  */
                 extendLayout: function (_layout, replaceInState) {
                     var __layout = _layout.clone(), _this = this;
+                    _layout.removeAttr('this-extends');
                     // get existing layout in container
                     _layout = this.container.find('layout[this-id="'
                             + __layout.attr('this-extends')
@@ -2206,9 +2202,11 @@
                     }
                     else
                         this.container.html(this.page);
-                    this.page = this.container.find('page:not([this-dead]),'
-                            + '[this-type="page"]:not([this-dead])')
-                            .attr('this-current', '').show();
+                    this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
+                            + '"]:not([this-dead]),'
+                            + '[this-type="page"][this-id="' + this.page.attr('this-id')
+                            + '"]:not([this-dead])')
+                            .attr('this-current', '').removeAttr('this-layout').show();
                     var transit = this.__.callable(this.config.transition, true), wait;
                     if (transit)
                         wait = transit.call(null, _this.oldPage.removeAttr('this-current'), this.page,
@@ -2277,12 +2275,15 @@
                             content = content.replace(/\n/g, '<br/>').replace(/\s/g, '&nbsp;');
                             __this.html(content).removeAttr('this-code');
                         });
+//                        this.container.find('[this-cache]').each(function () {
+//                            var __this = _this._(this);
+//                        });
                         this.container
                                 .html(internal.processExpressions.call(this, this.container.html()));
                         delete this.firstPage;
                         this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
-                                + '"][this-loaded], [this-type="page"][this-id="'
-                                + this.page.attr('this-id') + '"][this-loaded]');
+                                + '"][this-loaded]:not([this-dead]), [this-type="page"][this-id="'
+                                + this.page.attr('this-id') + '"][this-loaded]:not([this-dead])');
                         this.page.trigger('page.loaded');
                         internal.saveState.call(this, replaceState);
                     }
@@ -2339,7 +2340,7 @@
                                         index: index,
                                         model: model
                                     });
-                            internal.doLoad.call(_this, container, model, _content, variables);
+                            internal.doLoad.call(_this, container, model, _content, variables, false);
                         });
                         if (container.attr('this-type') === 'collection') {
                             _data.uid = container.attr('this-model-uid') || 'id';
@@ -2347,12 +2348,13 @@
                         }
                     }
                     else if (data && model) {
-                        if (container.attr('this-type') === 'model' && container.attr('this-id')) {
+                        if (save !== false && container.attr('this-type') === 'model'
+                                && container.attr('this-id')) {
                             save_as = container.attr('this-id');
                         }
                         if (save)
                             _data.data[data[container.attr('this-uid') || 'id']] = data;
-                        internal.doLoad.call(this, container, data, content, variables);
+                        internal.doLoad.call(this, container, data, content, variables, true);
                     }
                     container.show();
                     if (this.config.cacheData && save !== false)
@@ -2361,13 +2363,16 @@
                 },
                 /**
                  * Does the loading
-                 * @param object container
+                 * @param {HTMLElement}|{_} container
                  * @param object data
                  * @param string content
                  * @param array variables
+                 * @param {boolean} expressions Indicates whether to process expressions or not
                  * @returns ThisApp
                  */
-                doLoad: function (container, data, content, variables) {
+                doLoad: function (container, data, content, variables, expressions) {
+                    if (expressions)
+                        content = internal.processExpressions.call(this, content, data);
                     container = this._(container);
                     var _temp = internal.parseData.call(this, data, content, variables),
                             id = container.attr('this-model-uid') || 'id';
@@ -2444,12 +2449,9 @@
                     var _this = this,
                             exps = internal.getExpressions.call(this, content);
                     this.__.forEach(exps, function (i, v) {
-                        try {
+                        _this.tryCatch(function () {
                             content = content.replace(v, eval(v.trim().substr(2, v.trim().length - 4)));
-                        }
-                        catch (e) {
-                            _this.error(e.message);
-                        }
+                        });
                     });
                     return content;
                 },
@@ -2463,7 +2465,10 @@
                 parseData: function (data, content, variables) {
                     if (!variables)
                         variables = internal.parseBrackets.call(this, '{{', '}}', content);
-                    var _temp = this.__.isObject(content) ? content :
+                    if (this.__.isString(content))
+                        content = content.replace(/__obrace2__/g, '({').replace(/__cbrace2__/g, '})');
+                    var _temp = this.__.isObject(content) ?
+                            content :
                             this._('<div/>')
                             .html(content),
                             _this = this;
@@ -2507,7 +2512,9 @@
                         });
                         __this.removeAttr('this-each');
                     });
-                    _temp.html(internal.fillVariables.call(this, variables, data, _temp.html()));
+                    content = internal.inLoop.call(this, data, 'true', _temp.html());
+                    content = internal.processExpressions.call(this, content, data);
+                    _temp.html(internal.fillVariables.call(this, variables, data, content));
                     var children = _temp.children();
                     if (children.length === 1)
                         _temp = children;
@@ -2657,7 +2664,9 @@
                         this.page.trigger('page.leave');
                     }
                     this.container.html(state.content);
-                    this.page = this.container.find('[this-id="' + state.id + '"]');
+                    this.page = this.container.find('page[this-id="' + state.id
+                            + '"][this-loaded]:not([this-dead]),[this-type="page"][this-id="' + state.id
+                            + '"][this-loaded]:not([this-dead])');
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(state.title);
                     this.store('last_page', state.id);
@@ -3355,6 +3364,21 @@
                             return false;
                         }
                         return true;
+                    },
+                    /**
+                     * Binds the model to the given element
+                     * @param {string}|{HTMLElement}|{_} elem
+                     * @returns {Model}
+                     */
+                    bind: function (elem) {
+                        elem = this.app._(elem);
+                        elem.attr('this-mid', this.attributes[this.uid])
+                                .attr('this-uid', this.uid)
+                                .attr('this-url', this.url);
+                        internal.loadModel.call(this.app, elem, this.attributes, true);
+                        internal.loadForms.call(this.app, elem.is('form') ? elem
+                                : elem.find('form'), this.attributes);
+                        return this;
                     }
                 });
                 if (__.isObject(attributes)) {
