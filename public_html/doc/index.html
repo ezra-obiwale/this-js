@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="">
+        <meta name="author" content="Ezra Obiwale">
+        <link rel="icon" href="./assets/img/logo-white-2.png">
+
+        <title>ThisJS - Documentation</title>
+
+        <!-- Bootstrap core CSS -->
+        <link href="./assets/css/bootstrap.min.css" rel="stylesheet">
+
+        <!-- Custom styles for this template -->
+        <link href="./assets/css/cover.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="site-wrapper">
+            <div class="site-wrapper-inners">
+                <div class="container" id="container" this-app-container></div>
+                <div class="mastfoot text-center">
+                    <div class="inner cover">
+                        <p style="color:#fff">ThisJS <span style="color:#aaa">by</span> <a tabindex="-1" target="_blank" href="http://ezraobiwale.com">Ezra Obiwale</a> <span style="color:#aaa">.</span> &copy; 2016</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Bootstrap core JavaScript
+        ================================================== -->
+        <!-- Placed at the end of the document so the pages load faster -->
+        <script src="./assets/js/jquery.js"></script>
+        <script src="./assets/js/bootstrap.min.js"></script>
+        <script src="../this.js"></script>
+        <!--<script src="../this.min.js"></script>-->
+        <script>
+            var app = new ThisApp({
+                container: '#container'
+            });
+            app.setLayout('main')
+                    .debug(true)
+                    .setBaseUrl('http://localhost/thisjs/public_html/doc/json/')
+                    .when('page.loaded', 'page', function () {
+                        app.container.find('.nav.masthead-nav li.active:not(.leave)')
+                                .removeClass('active');
+                        app.container.find('.nav.masthead-nav li.leave')
+                                .removeClass('leave');
+                        app.container.find('a[this-goto="' + app.page.attr('this-id') + '"]')
+                                .parent().addClass('active');
+                        if (app.__.contains(location.search, 'advanced')) {
+                            app.page.find('a#toggle-internal').removeClass('hidden');
+                        }
+                    })
+                    .on('click', '#nav a', function () {
+                        var _ul = app._(this).parent().addClass('active')
+                                .siblings().removeClass('active')
+                                .closest('ul');
+                        app.page.find('a#toggle-internal').attr('toggle', 'Show Public')
+                                .html('Show Internal');
+                        app.page.find('#internal').addClass('hidden');
+                        app.container.find('.masthead-nav [this-goto="' + _ul.data('with') + '"]')
+                                .parent().addClass('active leave');
+                        var collection = app._(this).closest('[this-content]').find('[this-type="collection"]');
+                        if (!app._(this).attr('id'))
+                            collection.children('li:not(.internal)')
+                                    .removeClass('hidden');
+                        else {
+                            collection.children('li').addClass('hidden');
+                            collection.children('li.' + app._(this).attr('id')
+                                    + ':not(.internal)').removeClass('hidden');
+                        }
+                    })
+                    .on('click', 'a[href="#"]', function (e) {
+                        e.preventDefault();
+                    })
+                    .on('click', 'a#toggle-internal', function () {
+                        var content = app._(this).data('toggle');
+                        app._(this).data('toggle', app._(this).html()).html(content);
+                        app.page.find('ul[this-id="attributes"] li, #internal').toggleClass('hidden');
+                    })
+                    .start('attributes');
+        </script>
+    </body>
+</html>
+</html>
