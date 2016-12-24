@@ -283,6 +283,20 @@
             "on": "pages",
             "links": ["this-type"]
         },
+        "this-load-css": {
+            "id": "this-load-css",
+            "value": "string",
+            "description": "Loads the given css file into the page.",
+            "on": "pages",
+            "links": ["javascript&config"]
+        },
+        "this-load-js": {
+            "id": "this-load-js",
+            "value": "string",
+            "description": "Loads the given js file into the page",
+            "on": "pages",
+            "links": ["javascript&config"]
+        },
         "this-loaded": {
             "id": "this-loaded",
             "description": "Indicates a loaded feature e.g. page, collection, model, etc",
