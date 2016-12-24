@@ -1,0 +1,12 @@
+check working without cache: cacheData(false)
+
+collection pagination
+stash away components and pages from dom
+Use FormData on form submission
+Check CORS
+Subpage targeting [this-goto="page&sub"] without damaging the url
+
+
+Write documentation
+    - Make header fixed
+Write tests
