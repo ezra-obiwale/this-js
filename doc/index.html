@@ -35,12 +35,10 @@
         <script src="../this.js"></script>
         <!--<script src="../this.min.js"></script>-->
         <script>
-            var app = new ThisApp({
-                container: '#container'
-            });
+            var app = new ThisApp();
             app.setLayout('main')
                     .debug(true)
-                    .setBaseUrl('http://localhost/thisjs/public_html/doc/json/')
+                    .setBaseUrl('http://localhost/thisjs/doc/json/')
                     .when('page.loaded', 'page', function () {
                         app.container.find('.nav.masthead-nav li.active:not(.leave)')
                                 .removeClass('active');

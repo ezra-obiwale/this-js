@@ -1753,19 +1753,24 @@
                     var _this = this,
                             pathConfig = this.config.paths[type + 's'],
                             url = pathConfig.dir + id + pathConfig.ext;
-                    this.request(url, function (data) {
-                        var elem = _this.__.createElement(data);
-                        if (!elem.length || elem.length > 1 ||
-                                (!elem.is(type) && elem.attr('this-type') !== type)) {
-                            elem = _this._('<div this-type="' + type + '" this-id="'
-                                    + id + '" />')
-                                    .html(data);
-                        }
-                        elem.attr('this-id', id);
-                        _this.__.callable(success).call(this, elem);
-                    }, function (e) {
-                        _this.__.callable(error).call(this, e);
-                    }, {}, 'text');
+                    this.request(url,
+                            function (data) {
+                                var elem = _this.__.createElement(data);
+                                if (type !== 'component') {
+                                    if (!elem.length || elem.length > 1 ||
+                                            (!elem.is(type) && elem.attr('this-type') !== type))
+                                    {
+                                        elem = _this._('<div this-type="' + type + '" this-id="'
+                                                + id + '" />')
+                                                .html(data);
+                                    }
+                                    elem.attr('this-id', id);
+                                }
+                                _this.__.callable(success).call(this, elem);
+                            },
+                            function (e) {
+                                _this.__.callable(error).call(this, e);
+                            }, {}, 'text');
                 },
                 /**
                  * Called when the target page is not found a page
@@ -2082,15 +2087,15 @@
                     components.each(function () {
                         var __this = _this._(this);
                         if (__this.attr('this-url')) {
-                            var url = __this.attr('this-url');
-                            if (_this.config.paths && _this.config.paths.components)
-                                url = _this.config.paths.components + url;
-                            _this.request(url, function (data) {
-                                internal.loadComponent.call(_this, __this, _this._(data), callback);
-                            },
-                                    function () {
-                                        _this.__.callable(callback).call(_this);
-                                    }, {}, 'text');
+                            internal.fullyFromURL
+                                    .call(_this, 'component', __this.attr('this-url'),
+                                            function (data) {
+                                                internal.loadComponent
+                                                        .call(_this, __this, _this._(data), callback);
+                                            },
+                                            function () {
+                                                _this.__.callable(callback).call(_this);
+                                            });
                         }
                         else {
                             var component = _this._('component[this-id="'
