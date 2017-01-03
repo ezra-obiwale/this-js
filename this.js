@@ -3426,7 +3426,8 @@
                                                     __data = internal.canContinue
                                                     .call(_this, in_collection ?
                                                             'collection.model.render'
-                                                            : 'model.render', [data]);
+                                                            : 'model.render', [data]),
+                                                    _clone = __model.siblings('[this-cache]').clone();
                                             if (!__data) {
                                                 if (in_collection)
                                                     _model.parent().trigger('collection.model.render.canceled');
@@ -3436,9 +3437,25 @@
                                             }
                                             else if (_this.__.isObject(__data))
                                                 v = __data;
+                                            // replace clone model collections with existing
+                                            // model collections
+                                            _clone.find('collection,[this-type="collection"]')
+                                                    .each(function () {
+                                                        var _cl_col = _this._(this),
+                                                                // loaded collection
+                                                                selector = 'collection[this-id="'
+                                                                + _cl_col.attr('this-id') + '"],'
+                                                                + '[this-type="collection"][this-id="'
+                                                                + _cl_col.attr('this-id') + '"]',
+                                                                _rl_col = _model.find(selector);
+                                                        if (_rl_col.length)
+                                                            _cl_col.replaceWith(_rl_col.clone());
+                                                        else
+                                                            _cl_col.remove();
+                                                    });
                                             var tmpl = internal.parseData.call(_this, v,
-                                                    __model.siblings('[this-cache]').clone()
-                                                    .removeAttr('this-cache').outerHtml(), null, id);
+                                                    _clone.removeAttr('this-cache').outerHtml(),
+                                                    null, false, true);
                                             __model.html(tmpl.html()).show();
                                         });
                             });
