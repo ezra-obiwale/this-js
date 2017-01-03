@@ -50,7 +50,7 @@
 
         },
         "this-code": {
-            "description": "Indicates that the content should be parsed as code by replacing < with &lt; and > with &gt;",
+            "description": "Indicates that the content should be parsed as code by replacing < with &amp;lt; and > with &amp;gt;",
             "links": ["this-inline-code", "this-block-code"]
         },
         "this-component": {
@@ -80,6 +80,16 @@
             "description": "Indicates the current page",
             "internal": true,
             "on": "pages"
+        },
+        "this-data": {
+            "id": "this-data",
+            "value": "string - model property name",
+            "on": "collections",
+            "description": "This attaches the given property name to the collection, which is in a model",
+            "links": [{
+                    "label": "Collection in Model",
+                    "goto": "collections&in-model"
+                }]
         },
         "this-dead": {
             "id": "this-dead",

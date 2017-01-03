@@ -1,12 +1,10 @@
-check doc page arrangement on page load without hash vs with hash
-
 collection pagination
 stash away components and pages from dom
 Use FormData on form submission
 Check CORS
-Subpage targeting [this-goto="page&sub"] without damaging the url
 
 
+Further minimize JS
 Write documentation
     - Make header fixed
 Write tests
