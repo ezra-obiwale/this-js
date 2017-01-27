@@ -191,6 +191,16 @@
             ],
             "links": ["this-type", "this-each"]
         },
+        "this-form": {
+            "id": "this-form",
+            "value": "string",
+            "description": [
+                "This is the id of the form to target",
+                "Combined with `this-create`, clicking the element prepares and opens the given form for model creation."
+            ],
+            "on": "link elements",
+            "links": ["this-create", "this-id"]
+        },
         "this-go-back": {
             "id": "this-go-back",
             "description": "Navigates the app back in history",
@@ -297,21 +307,28 @@
             "id": "this-load-css",
             "value": "string",
             "description": "Loads the given css file into the page.",
-            "on": "pages",
+            "on": "pages, layouts",
             "links": ["javascript&config"]
         },
         "this-load-js": {
             "id": "this-load-js",
             "value": "string",
-            "description": "Loads the given js file into the page",
-            "on": "pages",
+            "description": "Loads the given js file after the page has been loaded",
+            "on": "pages, layouts",
+            "links": ["javascript&config"]
+        },
+        "this-load-js-first": {
+            "id": "this-load-js-first",
+            "value": "string",
+            "description": "Loads the given js file before the page is loaded",
+            "on": "pages, layouts",
             "links": ["javascript&config"]
         },
         "this-loaded": {
             "id": "this-loaded",
-            "description": "Indicates a loaded feature e.g. page, collection, model, etc",
+            "description": "Indicates a loaded element",
             "internal": true,
-            "on": "pages, components",
+            "on": "layouts, pages, components, collections, models, links, scripts",
             "links": ["this-model", "this-type"]
         },
         "this-mid": {
@@ -373,9 +390,25 @@
         "this-reload": {
             "id": "this-reload",
             "value": "string",
-            "description": "When clicked, the target should be reloaded. To be reloaded, `this-attributes` must be applied",
+            "description": [
+                "When clicked, the target should be reloaded. To be reloaded, `this-attributes` must be applied",
+                "If no value is specified, the page, layouts and all resources are reloaded"
+            ],
             "on": "link elements",
-            "links": ["this-attributes"]
+            "links": ["this-attributes", "this-reload-page", "this-reload-layouts"]
+        },
+        "this-reload-page": {
+            "id": "this-reload-page",
+            "description": "Reloads the page only",
+            "on": "link elements",
+            "links": ["this-attributes", "this-reload", "this-reload-layouts"]
+        },
+        "this-reload-layouts": {
+            "id": "this-reload-layouts",
+            "value": "string",
+            "description": "Reloads the page and loaded layouts",
+            "on": "link elements",
+            "links": ["this-attributes", "this-reload", "this-reload-page"]
         },
         "this-search": {
             "id": "this-search",
@@ -443,6 +476,27 @@
             "description": "The url to the resource to load into the element or to send the form data to",
             "links": ["this-model"],
             "on": "models, collections, forms"
+        },
+        "this-with-css": {
+            "id": "this-with-css",
+            "description": "Indicates that the elem has custom css files loaded with it",
+            "on": "layouts, pages",
+            "links": ["this-load-css"],
+            "internal": true
+        },
+        "this-with-first-js": {
+            "id": "this-with-first-js",
+            "description": "Indicates that the elem has custom js files loaded with it before the page was loaded",
+            "on": "layouts, pages",
+            "links": ["this-load-js-first"],
+            "internal": true
+        },
+        "this-with-js": {
+            "id": "this-with-js",
+            "description": "Indicates that the elem has custom js files loaded with it after the page was loaded",
+            "on": "layouts, pages",
+            "links": ["this-load-js"],
+            "internal": true
         }
     },
     "expires": 1800

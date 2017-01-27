@@ -1,5 +1,5 @@
 collection pagination
-stash away components and pages from dom
+stash away templates from dom, probably in the localStorage
 Use FormData on form submission
 Check CORS
 
@@ -8,6 +8,7 @@ Further minimize JS
 Write documentation
     - Make header fixed
 Write tests
+use indexdb for caching
 
 
 before

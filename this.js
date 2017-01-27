@@ -92,8 +92,259 @@
         return httpRequest;
     },
             __ = Object.create({
-                items: [],
                 debug: true,
+                items: [],
+                /**
+                 * Adds the given class to matched elements
+                 * @param string className
+                 * @returns _
+                 */
+                addClass: function (className) {
+                    var _this = this;
+                    return this.each(function () {
+                        var __this = this;
+                        _this.forEach(className.split(' '), function (i, v) {
+                            __this.classList.add(v);
+                        });
+                    });
+                },
+                /**
+                 * Adds an element after the current elements or fetches the sibling after current
+                 * items
+                 * @param {_}|{HTMLElement}|{String} elem
+                 * @returns {_}
+                 */
+                after: function (elem) {
+                    if (!elem) {
+                        // Fetch next sibling
+                        var siblings = [];
+                        this.each(function () {
+                            if (this.nextElementSibling)
+                                siblings.push(this.nextElementSibling);
+                        });
+                        return _(siblings, this.debug);
+                    }
+                    if (!(elem instanceof _))
+                        elem = _(elem, this.debug);
+                    if (!elem.length)
+                        return this;
+                    return this.each(function () {
+                        var _this = this;
+                        elem.each(function () {
+                            _this.insertAdjacentElement('afterEnd', this);
+                        });
+                    });
+                },
+                /**
+                 * Sends an AJAX request
+                 * @param object config
+                 * Keys include:
+                 * type (string): GET | POST | PATCH | PUT | DELETE
+                 * url (string): The url to connect to. Default is current url
+                 * data (string|object}: The data to send with the request
+                 * success (function): Function to call when a success response is gotten. The response data
+                 * is passed as a parameter
+                 * error (function) : Function to call when error occurs
+                 * complete (function): Function to call when a response has been received, error or success.
+                 * @returns ajax object
+                 */
+                ajax: function (config) {
+                    config = this.extend({
+                        type: 'get',
+                        url: location.href,
+                        data: {},
+                        success: function (data) {
+                        },
+                        error: function () {
+                        },
+                        complete: function () {
+                        }
+                    }, config);
+                    return Ajax(config, this);
+                },
+                /**
+                 * Append content to the elements
+                 * @param mixed content
+                 * @returns __
+                 */
+                append: function (content) {
+                    if (!content)
+                        return this;
+                    var _content = content;
+                    if (!(content instanceof _))
+                        _content = _(content, this.debug);
+                    if (!_content.length && this.isString(content))
+                        _content = this.createElement(null, 'span').items[0].innerHTML = content;
+                    if (!_content.length)
+                        return this;
+                    return this.each(function () {
+                        var _this = this;
+                        _content.each(function () {
+                            _this.insertAdjacentElement('beforeEnd', this);
+                        });
+                    });
+                },
+                /**
+                 * Removes the item at the given index from the given array
+                 * @param array array
+                 * @param integer index
+                 * @returns mixed The removed item
+                 */
+                arrayRemoveIndex: function (array, index) {
+                    return this.tryCatch(function () {
+                        return array.splice(index, 1)[0];
+                    });
+                },
+                /**
+                 * Removes the given item from the given array
+                 * @param array array
+                 * @param mixed item
+                 * @param boolean all Indicates whether to remove all occurrences
+                 * @returns array|index Index if removing just one
+                 */
+                arrayRemoveValue: function (array, item, all) {
+                    return this.tryCatch(function () {
+                        var index = array.indexOf(item);
+                        if (index < 0) {
+                            index = array.indexOf(parseInt(item));
+                        }
+                        if (!all) {
+                            return index > -1 ? [this.arrayRemoveIndex(array, index)] : [];
+                        }
+                        else {
+                            while (index > -1) {
+                                this.arrayRemoveIndex(array, index);
+                                index = array.indexOf(item);
+                                if (index < 0)
+                                    index = array.indexOf(parseInt(item));
+                            }
+                        }
+                        return array;
+                    });
+                },
+                /**
+                 * Sets or gets the attr of the elements
+                 * @param string attr
+                 * @param mixed val
+                 * @returns __|string
+                 */
+                attr: function (attr, val) {
+                    return this.tryCatch(function () {
+                        if (val !== undefined || __.isObject(attr)) {
+                            this.each(function () {
+                                if (__.isObject(attr)) {
+                                    var __this = this;
+                                    __.forEach(attr, function (i, v) {
+                                        __this.setAttribute(i, v);
+                                    });
+                                }
+                                else
+                                    this.setAttribute(attr, val);
+                            });
+                            return this;
+                        }
+                        if (!this.items.length)
+                            return null;
+                        return attr ? this.items[0].getAttribute(attr)
+                                : Array.from(this.items[0].attributes);
+                    });
+                },
+                /**
+                 * Adds an element before the current elements or fetches the sibling before current 
+                 * items
+                 * @param {_}|{HTMLElement}|{String} elem
+                 * @returns {_}
+                 */
+                before: function (elem) {
+                    if (!elem) {
+                        // Fetch previous sibling
+                        var siblings = [];
+                        this.each(function () {
+                            if (this.previousElementSibling)
+                                siblings.push(this.previousElementSibling);
+                        });
+                        return _(siblings, this.debug);
+                    }
+                    if (!(elem instanceof _))
+                        elem = _(elem, this.debug);
+                    if (!elem.length)
+                        return this;
+                    return this.each(function () {
+                        var _this = this;
+                        elem.each(function () {
+                            _this.insertAdjacentElement('beforeBegin', this);
+                        });
+                    });
+                },
+                /**
+                 * Fetches the callable function
+                 * @param function|string callback
+                 * @param boolean nullable Indicates if to return nullable instead of empty function if 
+                 * not callable
+                 * @returns function
+                 */
+                callable: function (callback, nullable) {
+                    if (this.isFunction(callback)) {
+                        return callback;
+                    }
+                    else if (this.isString(callback)) {
+                        var split = callback.split('.'), func = window;
+                        for (var i = 0; i < split.length; i++) {
+                            if (!func[split[i]]) {
+                                return this.callable(null, true);
+                            }
+                            func = func[split[i]];
+                        }
+                        return func === window ? this.callable(null, true) : this.callable(func);
+                    }
+                    else if (!nullable) {
+                        return function () {
+                        };
+                    }
+                },
+                /**
+                 * Gets the immediate descendants of the current items
+                 * @param string selector
+                 * @returns _
+                 */
+                children: function (selector) {
+                    var result = [];
+                    this.each(function () {
+                        if (selector) {
+                            var id = false;
+                            if (!this.id) {
+                                this.id = 'rANd' + Math.ceil(Math.random() * 100);
+                                id = true;
+                            }
+                            result = result.concat(Array.from(document.querySelectorAll('#'
+                                    + this.id + '>' + selector)));
+                            if (id)
+                                this.removeAttribute('id');
+                            return;
+                        }
+                        result = result.concat(Array.from(this.children));
+                    });
+                    return _(result, this.debug);
+                },
+                /**
+                 * Clones the first item
+                 * @returns _
+                 */
+                clone: function () {
+                    return this.tryCatch(function () {
+                        return _(this.items.length ? this.items[0].cloneNode(true) : [], this.debug);
+                    });
+                },
+                /**
+                 * Finds the closest object of the given selector
+                 * @param string selector
+                 * @returns _
+                 */
+                closest: function (selector) {
+                    return this.tryCatch(function () {
+                        return _(this.items.length ? this.items[0].closest(selector) : [], this.debug);
+                    });
+                },
                 /**
                  * A shortcut for indexOf. Checks if the given item has the given string
                  * @param string|array item
@@ -133,254 +384,31 @@
                     });
                 },
                 /**
-                 * Fetches the callable function
-                 * @param function|string callback
-                 * @param boolean nullable Indicates if to return nullable instead of empty function if 
-                 * not callable
-                 * @returns function
-                 */
-                callable: function (callback, nullable) {
-                    if (this.isFunction(callback)) {
-                        return callback;
-                    }
-                    else if (this.isString(callback)) {
-                        var split = callback.split('.'), func = window;
-                        for (var i = 0; i < split.length; i++) {
-                            if (!func[split[i]]) {
-                                return this.callable(null, true);
-                            }
-                            func = func[split[i]];
-                        }
-                        return func === window ? this.callable(null, true) : this.callable(func);
-                    }
-                    else if (!nullable) {
-                        return function () {
-                        };
-                    }
-                },
-                /**
-                 * Loops through found elements and calls the given callback on each
-                 * @param function|string callback
-                 * The function receives two parameters: index and item
-                 * The this object is also the item
-                 * @returns __
-                 */
-                each: function (callback) {
-                    return this.forEach(this.items, callback);
-                },
-                /**
-                 * Loops through the given array or object and calls the given callback on each item
-                 * @param array|object items
-                 * @param function|string callback
-                 * The function receives two parameters: index and item
-                 * The this object is also the item
-                 * @returns __
-                 */
-                forEach: function (items, callback) {
-                    return this.tryCatch(function () {
-                        if (this.isObject(items) && items instanceof _)
-                            items = items.items;
-                        if (this.isArray(items))
-                            items.every(function (v, i) {
-                                return false !== this.callable(callback).call(v, i, v);
-                            }.bind(this));
-                        else {
-                            for (var a in items) {
-                                if (!items.hasOwnProperty(a))
-                                    continue;
-                                if (false === this.callable(callback).call(items[a], a, items[a]))
-                                    break;
-                            }
-                        }
-                        return this;
-                    });
-                    return this;
-                },
-                /**
-                 * Checks if the given item is an object
-                 * @param mixed item
-                 * @param boolean allowArray Indicates wether to return array as object too
-                 * @returns boolean
-                 */
-                isObject: function (item, allowArray) {
-                    return typeof item === 'object' && (allowArray || !Array.isArray(item));
-                },
-                /**
-                 * Checks if the given item is an array
-                 * @param mixed item
-                 * @returns boolean
-                 */
-                isArray: function (item) {
-                    return typeof item === 'object' && Array.isArray(item);
-                },
-                /**
-                 * Checks if the given item is a string
-                 * @param mixed item
-                 * @returns boolean
-                 */
-                isString: function (item) {
-                    return typeof item === 'string';
-                },
-                /**
-                 * Checks whether the given item is boolean
-                 * @param {mixed} item
-                 * @returns {Boolean}
-                 */
-                isBoolean: function (item) {
-                    return item === true || item === false;
-                },
-                /**
-                 * Checks if the given item is a function
-                 * @param mixed item
-                 * @returns boolean
-                 */
-                isFunction: function (item) {
-                    return typeof item === 'function';
-                },
-                /**
-                 * Removes the given item from the given array
-                 * @param array array
-                 * @param mixed item
-                 * @param boolean all Indicates whether to remove all occurrences
-                 * @returns array|index Index if removing just one
-                 */
-                arrayRemoveValue: function (array, item, all) {
-                    return this.tryCatch(function () {
-                        var index = array.indexOf(item);
-                        if (index < 0) {
-                            index = array.indexOf(parseInt(item));
-                        }
-                        if (!all) {
-                            return index > -1 ? [this.arrayRemoveIndex(array, index)] : [];
-                        }
-                        else {
-                            while (index > -1) {
-                                this.arrayRemoveIndex(array, index);
-                                index = array.indexOf(item);
-                                if (index < 0)
-                                    index = array.indexOf(parseInt(item));
-                            }
-                        }
-                        return array;
-                    });
-                },
-                /**
-                 * Removes the item at the given index from the given array
-                 * @param array array
-                 * @param integer index
-                 * @returns mixed The removed item
-                 */
-                arrayRemoveIndex: function (array, index) {
-                    return this.tryCatch(function () {
-                        return array.splice(index, 1)[0];
-                    });
-                },
-                /**
-                 * Checks if the given item exists in the given object
-                 * @param {mixed} item
-                 * @param {object}|{array} object
-                 * @returns {Boolean}
-                 */
-                inObject: function (item, object) {
-                    var is = false;
-                    this.forEach(object, function (i, v) {
-                        if (v === item) {
-                            is = true;
-                            return false;
-                        }
-                    });
-                    return is;
-                },
-                /**
-                 * Checks if the given key exists in the given object
-                 * @param {integer}|{string} key
-                 * @param {object}|{array} object
-                 * @returns {Boolean}
-                 */
-                keyExists: function (key, object) {
-                    return object.hasOwnProperty(key);
-                },
-                /**
-                 * Shows the matched elements
-                 * @returns __
-                 */
-                show: function () {
-                    return this.each(function () {
-                        if (this.style.display === 'none')
-                            this.style.display = 'inherit';
-                    });
-                },
-                /**
-                 * Hides the matched elements
-                 * @returns __
-                 */
-                hide: function () {
-                    return this.each(function () {
-                        this.style.display = 'none';
-                    });
-                },
-                /**
-                 * Toggles display of matched elements
+                 * Creates a new element
+                 * @param string str
+                 * @param string tag The tag to create
                  * @returns _
                  */
-                toggle: function () {
-                    var _this = this;
-                    this.each(function () {
-                        if (this.style.display === 'none') {
-                            _(this, _this.debug).show();
-                        }
-                        else {
-                            _(this, _this.debug).hide();
-                        }
-                    });
-                    return this;
+                createElement: function (str, tag) {
+                    var d = document.createElement(tag || 'div');
+                    if (!str)
+                        return _(d, this.debug);
+                    d.innerHTML = str;
+                    return _(Array.from(d.children), this.debug);
                 },
                 /**
-                 * Checks if an attribute exists
-                 * @param string attr
-                 * @returns booelan
+                 * Sets or retrieves a style of the current item(s)
+                 * @param {string} attr
+                 * @param {string} val
+                 * @returns {_}
                  */
-                hasAttr: function (attr) {
-                    return this.tryCatch(function () {
-                        return this.attr(attr) !== null;
-                    });
-                },
-                /**
-                 * Sets or gets the attr of the elements
-                 * @param string attr
-                 * @param mixed val
-                 * @returns __|string
-                 */
-                attr: function (attr, val) {
-                    return this.tryCatch(function () {
-                        if (val !== undefined) {
-                            this.each(function () {
-                                this.setAttribute(attr, val);
-                            });
-                            return this;
-                        }
-                        if (!this.items.length)
-                            return null;
-                        return attr ? this.items[0].getAttribute(attr)
-                                : Array.from(this.items[0].attributes);
-                    });
-                },
-                /**
-                 * Removes the give attr from elements
-                 * @param string attr
-                 * @returns ThisApp
-                 */
-                removeAttr: function (attr) {
-                    var _this = this;
+                css: function (attr, val) {
+                    if (!attr && this.items.length)
+                        return this.items[0].style;
+                    else if (!val && this.items.length)
+                        return this.items[0].style[attr];
                     return this.each(function () {
-                        var __this = this;
-                        if (!attr) {
-                            _this.forEach(Array.from(this.attributes), function () {
-                                __this.removeAttribute(this.name);
-                            });
-                            return;
-                        }
-                        this.removeAttribute(attr);
+                        this.style[attr] = val;
                     });
                 },
                 /**
@@ -405,6 +433,26 @@
                     }, function () {
                         return value;
                     });
+                },
+                /**
+                 * Loops through found elements and calls the given callback on each
+                 * @param function|string callback
+                 * The function receives two parameters: index and item
+                 * The this object is also the item
+                 * @returns __
+                 */
+                each: function (callback) {
+                    return this.forEach(this.items, callback);
+                },
+                /**
+                 * Logs the error message
+                 * @param string message
+                 * @returns _
+                 */
+                error: function (message) {
+                    if (this.debug)
+                        console.error(message);
+                    return this;
                 },
                 /**
                  * Clones a new object from the given objects. There can be as many as possible objects to 
@@ -437,193 +485,104 @@
                     return newObject;
                 },
                 /**
-                 * Sends an AJAX request
-                 * @param object config
-                 * Keys include:
-                 * type (string): GET | POST | PATCH | PUT | DELETE
-                 * url (string): The url to connect to. Default is current url
-                 * data (string|object}: The data to send with the request
-                 * success (function): Function to call when a success response is gotten. The response data
-                 * is passed as a parameter
-                 * error (function) : Function to call when error occurs
-                 * complete (function): Function to call when a response has been received, error or success.
-                 * @returns ajax object
+                 * Filters matched items through the given function
+                 * @param function func parameters include index and value
+                 * @returns _ Object containing matched items
                  */
-                ajax: function (config) {
-                    config = this.extend({
-                        type: 'get',
-                        url: location.href,
-                        data: {},
-                        success: function (data) {
-                        },
-                        error: function () {
-                        },
-                        complete: function () {
-                        }
-                    }, config);
-                    return Ajax(config, this);
+                filter: function (func) {
+                    var _this = this,
+                            filtered = this.items.filter(function (v, i) {
+                                func = _this.callable(func);
+                                return func ? func.call(v, i, v) : true;
+                            });
+                    return _(filtered, this.debug);
                 },
                 /**
-                 * Adds an event listener
-                 * @param string event
-                 * @param function callback
-                 * @returns __
-                 */
-                on: function (event, selector, callback) {
-                    if (arguments.length === 2) {
-                        callback = selector;
-                        selector = null;
-                    }
-                    var _this = this;
-                    return this.each(function () {
-                        var target = this;
-                        _this.forEach(event.split(','), function (i, v) {
-                            target.addEventListener(v.trim(), function (e) {
-                                if (selector && e.target && !e.target.matches(selector)) {
-                                    return;
-                                }
-                                _this.callable(callback).apply(e.target, Array.from(arguments));
-                            }, false);
-                        });
-                    });
-                    return this;
-                },
-                /**
-                 * Triggers the given event on current items
-                 * @param string event
-                 * @param object data custom data to add to the event object
-                 * @returns __
-                 */
-                trigger: function (event, detail) {
-                    var data = {
-                        detail: detail,
-                        cancelable: true,
-                        bubbles: true
-                    }, ev = new CustomEvent(event, data);
-                    return this.each(function () {
-                        this.dispatchEvent(ev);
-                    });
-                },
-                /**
-                 * Gets the immediate descendants of the current items
+                 * Searches the current items for elements that match the given selector
                  * @param string selector
                  * @returns _
                  */
-                children: function (selector) {
-                    var result = [];
+                find: function (selector) {
+                    var result = [], _this = this;
                     this.each(function () {
-                        if (selector) {
-                            var id = false;
-                            if (!this.id) {
-                                this.id = 'rANd' + Math.ceil(Math.random() * 100);
-                                id = true;
-                            }
-                            result = result.concat(Array.from(document.querySelectorAll('#'
-                                    + this.id + '>' + selector)));
-                            if (id)
-                                this.removeAttribute('id');
-                            return;
+                        if (_this.items.length > 1) {
+                            result = result.concat(Array.from(this.querySelectorAll(selector)));
                         }
-                        result = result.concat(Array.from(this.children));
+                        else
+                            result = Array.from(this.querySelectorAll(selector));
                     });
                     return _(result, this.debug);
                 },
                 /**
-                 * Adds an element before the current elements or fetches the sibling before current 
-                 * items
-                 * @param {_}|{HTMLElement}|{String} elem
-                 * @returns {_}
-                 */
-                before: function (elem) {
-                    if (!elem) {
-                        // Fetch previous sibling
-                        var siblings = [];
-                        this.each(function () {
-                            if (this.previousElementSibling)
-                                siblings.push(this.previousElementSibling);
-                        });
-                        return _(siblings, this.debug);
-                    }
-                    if (!(elem instanceof _))
-                        elem = _(elem, this.debug);
-                    if (!elem.length)
-                        return this;
-                    return this.each(function () {
-                        var _this = this;
-                        elem.each(function () {
-                            _this.insertAdjacentElement('beforeBegin', this);
-                        });
-                    });
-                },
-                /**
-                 * Adds an element after the current elements or fetches the sibling after current
-                 * items
-                 * @param {_}|{HTMLElement}|{String} elem
-                 * @returns {_}
-                 */
-                after: function (elem) {
-                    if (!elem) {
-                        // Fetch next sibling
-                        var siblings = [];
-                        this.each(function () {
-                            if (this.nextElementSibling)
-                                siblings.push(this.nextElementSibling);
-                        });
-                        return _(siblings, this.debug);
-                    }
-                    if (!(elem instanceof _))
-                        elem = _(elem, this.debug);
-                    if (!elem.length)
-                        return this;
-                    return this.each(function () {
-                        var _this = this;
-                        elem.each(function () {
-                            _this.insertAdjacentElement('afterEnd', this);
-                        });
-                    });
-                },
-                wrap: function (elem) {
-                    var _this = this,
-                            elem = _(elem, this.debug);
-                    return this.each(function () {
-                        _(this, _this.debug).before(elem)
-                                .before().html(this);
-                    });
-                },
-                /**
-                 * Wraps the content of the matched elements with the given elem
-                 * @param {string} elem
-                 * @returns {_}
-                 */
-                innerWrap: function (elem) {
-                    var _this = this;
-                    return this.each(function () {
-                        var __this = _(this);
-                        __this.html(_(elem, _this.debug).html(__this.html()));
-                    });
-                },
-                /**
-                 * Fetches the outer html of the first item
-                 * @returns string
-                 */
-                outerHtml: function () {
-                    return this.tryCatch(function () {
-                        return this.items.length ? this.items[0].outerHTML : '';
-                    });
-                },
-                /**
-                 * Set or get the text content of an element
-                 * @param mixed content
+                 * Loops through the given array or object and calls the given callback on each item
+                 * @param array|object items
+                 * @param function|string callback
+                 * The function receives two parameters: index and item
+                 * The this object is also the item
                  * @returns __
                  */
-                text: function (content) {
-                    if (content === undefined) {
-                        return this.tryCatch(function () {
-                            return this.items.length ? this.items[0].innerText : '';
-                        });
-                    }
+                forEach: function (items, callback) {
+                    return this.tryCatch(function () {
+                        if (this.isObject(items) && items instanceof _)
+                            items = items.items;
+                        if (this.isArray(items))
+                            items.every(function (v, i) {
+                                return false !== this.callable(callback).call(v, i, v);
+                            }.bind(this));
+                        else {
+                            for (var a in items) {
+                                if (!items.hasOwnProperty(a))
+                                    continue;
+                                if (false === this.callable(callback).call(items[a], a, items[a]))
+                                    break;
+                            }
+                        }
+                        return this;
+                    });
+                    return this;
+                },
+                /**
+                 * Fetches the item at the given index
+                 * @param int index
+                 * @returns mixed
+                 */
+                get: function (index) {
+                    return this.items[index];
+                },
+                /**
+                 * Checks if an attribute exists
+                 * @param string attr
+                 * @returns booelan
+                 */
+                hasAttr: function (attr) {
+                    return this.tryCatch(function () {
+                        return this.attr(attr) !== null;
+                    });
+                },
+                /**
+                 * Checks whether
+                 * @param string className
+                 * @returns boolean
+                 */
+                hasClass: function (className) {
+                    var has = true,
+                            _this = this;
+                    this.each(function () {
+                        if (!this.classList.length ||
+                                !_this.contains(Array.from(this.classList), className)) {
+                            has = false;
+                            return false;
+                        }
+                    });
+                    return has;
+                },
+                /**
+                 * Hides the matched elements
+                 * @returns __
+                 */
+                hide: function () {
                     return this.each(function () {
-                        this.innerText = content;
+                        this.style.display = 'none';
                     });
                 },
                 /**
@@ -648,6 +607,153 @@
                     });
                 },
                 /**
+                 * Wraps the content of the matched elements with the given elem
+                 * @param {string} elem
+                 * @returns {_}
+                 */
+                innerWrap: function (elem) {
+                    var _this = this;
+                    return this.each(function () {
+                        var __this = _(this);
+                        __this.html(_(elem, _this.debug).html(__this.html()));
+                    });
+                },
+                /**
+                 * Checks if the items are of the given selector
+                 * @param string selector
+                 * @param {Boolean} checkIdOnly Indicates to check the this-id of element
+                 * @returns Boolean
+                 */
+                is: function (selector, checkIdOnly) {
+                    if (!this.items.length)
+                        return false;
+                    if (checkIdOnly && this.items[0].getAttribute('this-id') === selector)
+                        return true;
+                    var el = this.items[0];
+                    return (el.matches || el.matchesSelector || el.msMatchesSelector
+                            || el.mozMatchesSelector || el.webkitMatchesSelector
+                            || el.oMatchesSelector).call(el, selector);
+                },
+                /**
+                 * Checks if the given item is an array
+                 * @param mixed item
+                 * @returns boolean
+                 */
+                isArray: function (item) {
+                    return typeof item === 'object' && Array.isArray(item);
+                },
+                /**
+                 * Checks whether the given item is boolean
+                 * @param {mixed} item
+                 * @returns {Boolean}
+                 */
+                isBoolean: function (item) {
+                    return item === true || item === false;
+                },
+                /**
+                 * Checks if the given item is a function
+                 * @param mixed item
+                 * @returns boolean
+                 */
+                isFunction: function (item) {
+                    return typeof item === 'function';
+                },
+                /**
+                 * Checks if the given item is an object
+                 * @param mixed item
+                 * @param boolean allowArray Indicates wether to return array as object too
+                 * @returns boolean
+                 */
+                isObject: function (item, allowArray) {
+                    return typeof item === 'object' && (allowArray || !Array.isArray(item));
+                },
+                /**
+                 * Checks if the given item is a string
+                 * @param mixed item
+                 * @returns boolean
+                 */
+                isString: function (item) {
+                    return typeof item === 'string';
+                },
+                /**
+                 * Checks if the given item exists in the given object
+                 * @param {mixed} item
+                 * @param {object}|{array} object
+                 * @returns {Boolean}
+                 */
+                inObject: function (item, object) {
+                    var is = false;
+                    this.forEach(object, function (i, v) {
+                        if (v === item) {
+                            is = true;
+                            return false;
+                        }
+                    });
+                    return is;
+                },
+                /**
+                 * Checks if the given key exists in the given object
+                 * @param {integer}|{string} key
+                 * @param {object}|{array} object
+                 * @returns {Boolean}
+                 */
+                keyExists: function (key, object) {
+                    return object.hasOwnProperty(key);
+                },
+                /**
+                 * Adds an event listener
+                 * @param string event
+                 * @param function callback
+                 * @returns __
+                 */
+                on: function (event, selector, callback) {
+                    if (arguments.length === 2) {
+                        callback = selector;
+                        selector = null;
+                    }
+                    var _this = this;
+                    return this.each(function () {
+                        var target = this;
+                        _this.forEach(event.split(','), function (i, v) {
+                            target.addEventListener(v.trim(), function (e) {
+                                // get target from event
+                                var _target = e.target;
+                                // target is not selector
+                                if (selector && _target && !_target.matches(selector)) {
+                                    // find target from parents
+                                    _target = _target.closest(selector);
+                                    // target still not found
+                                    if (!_target)
+                                        return; // ignore callback
+                                }
+                                // apply callback on target
+                                _this.callable(callback).apply(_target, Array.from(arguments));
+                            }, false);
+                        });
+                    });
+                    return this;
+                },
+                /**
+                 * Fetches the outer html of the first item
+                 * @returns string
+                 */
+                outerHtml: function () {
+                    return this.tryCatch(function () {
+                        return this.items.length ? this.items[0].outerHTML : '';
+                    });
+                },
+                /**
+                 * Fetches the parent of the current items
+                 * @returns _
+                 */
+                parent: function () {
+                    var parents = [];
+                    this.each(function () {
+                        parents.push(this.parentElement);
+                    });
+                    return _(parents, this.debug);
+                },
+                /**
                  * Prepend content to the elements
                  * @param mixed content
                  * @returns __
@@ -663,27 +769,37 @@
                     if (!_content.length)
                         return this;
                     return this.each(function () {
-                        this.insertAdjacentElement('afterBegin', _content.items[0]);
+                        var _this = this;
+                        _content.each(function () {
+                            _this.insertAdjacentElement('afterBegin', this);
+                        });
                     });
                 },
                 /**
-                 * Append content to the elements
-                 * @param mixed content
+                 * Sets or gets the given property
+                 * @param string prop
+                 * @param mixed value
                  * @returns __
                  */
-                append: function (content) {
-                    if (!content)
-                        return this;
-                    var _content = content;
-                    if (!(content instanceof _))
-                        _content = _(content, this.debug);
-                    if (!_content.length && this.isString(content))
-                        _content = this.createElement(null, 'span').items[0].innerHTML = content;
-                    if (!_content.length)
-                        return this;
-                    return this.each(function () {
-                        this.insertAdjacentElement('beforeEnd', _content.items[0]);
+                prop: function (prop, value) {
+                    return this.tryCatch(function () {
+                        if (value) {
+                            this.each(function (i, v) {
+                                v[prop] = value;
+                            });
+                            return this;
+                        }
+                        return prop && this.items.length ? this.items[0][prop] : null;
                     });
+                },
+                /**
+                 * Calls the given function when the dom has been fully loaded
+                 * @param {function} callback
+                 * @returns {_}
+                 */
+                ready: function (callback) {
+                    _(document, this.debug).on('DOMContentLoaded', callback);
+                    return this;
                 },
                 /**
                  * Removes an element from the DOM
@@ -698,71 +814,41 @@
                     return _(removed, this.debug);
                 },
                 /**
-                 * Clones the first item
-                 * @returns _
+                 * Removes the given attr(s) from elements
+                 * @param {string}|{array} attr
+                 * @returns ThisApp
                  */
-                clone: function () {
-                    return this.tryCatch(function () {
-                        return _(this.items.length ? this.items[0].cloneNode(true) : [], this.debug);
-                    });
-                },
-                /**
-                 * Searches the current items for elements that match the given selector
-                 * @param string selector
-                 * @returns _
-                 */
-                find: function (selector) {
-                    var result = [], _this = this;
-                    this.each(function () {
-                        if (_this.items.length > 1) {
-                            result = result.concat(Array.from(this.querySelectorAll(selector)));
-                        }
-                        else
-                            result = Array.from(this.querySelectorAll(selector));
-                    });
-                    return _(result, this.debug);
-                },
-                /**
-                 * Filters matched items through the given function
-                 * @param function func parameters include index and value
-                 * @returns _ Object containing matched items
-                 */
-                filter: function (func) {
-                    var _this = this,
-                            filtered = this.items.filter(function (v, i) {
-                                func = _this.callable(func);
-                                return func ? func.call(v, i, v) : true;
+                removeAttr: function (attr) {
+                    var _this = this;
+                    if (attr && !__.isArray(attr)) {
+                        attr = [attr];
+                    }
+                    return this.each(function () {
+                        var __this = this;
+                        if (!attr) {
+                            _this.forEach(Array.from(this.attributes), function () {
+                                __this.removeAttribute(this.name);
                             });
-                    return _(filtered, this.debug);
-                },
-                /**
-                 * Finds the closest object of the given selector
-                 * @param string selector
-                 * @returns _
-                 */
-                closest: function (selector) {
-                    return this.tryCatch(function () {
-                        return _(this.items.length ? this.items[0].closest(selector) : [], this.debug);
+                            return;
+                        }
+                        __.forEach(attr, function (i, v) {
+                            __this.removeAttribute(v);
+                        });
                     });
                 },
                 /**
-                 * Fetches the parent of the current items
+                 * Removes the given class from matched elements
+                 * @param string className
                  * @returns _
                  */
-                parent: function () {
-                    var parents = [];
-                    this.each(function () {
-                        parents.push(this.parentElement);
+                removeClass: function (className) {
+                    var _this = this;
+                    return this.each(function () {
+                        var __this = this;
+                        _this.forEach(className.split(' '), function (i, v) {
+                            __this.classList.remove(v);
+                        });
                     });
-                    return _(parents, this.debug);
-                },
-                /**
-                 * Fetches the item at the given index
-                 * @param int index
-                 * @returns mixed
-                 */
-                get: function (index) {
-                    return this.items[index];
                 },
                 /**
                  * Replaces current items with the given content
@@ -784,13 +870,79 @@
 //                    return _(replaced, this.debug);
                 },
                 /**
-                 * Logs the error message
-                 * @param string message
+                 * Fetches all siblings of matched elements
+                 * @param string selector
                  * @returns _
                  */
-                error: function (message) {
-                    if (this.debug)
-                        console.error(message);
+                siblings: function (selector) {
+                    var siblings = [];
+                    this.each(function () {
+                        var rId = false;
+                        if (!this.id) {
+                            this.id = 'rANd' + Math.ceil(Math.random() * 100);
+                            rId = true;
+                        }
+                        siblings = siblings.concat(_(this.parentElement, this.debug)
+                                .children((selector || '') + ':not(#' + this.id + ')').items);
+                        if (rId)
+                            this.removeAttribute('id');
+                    });
+                    return _(siblings, this.debug);
+                },
+                /**
+                 * Shows the matched elements
+                 * @returns __
+                 */
+                show: function () {
+                    return this.each(function () {
+                        if (this.style.display === 'none')
+                            this.style.display = 'inherit';
+                    });
+                },
+                /**
+                 * Set or get the text content of an element
+                 * @param mixed content
+                 * @returns __
+                 */
+                text: function (content) {
+                    if (content === undefined) {
+                        return this.tryCatch(function () {
+                            return this.items.length ? this.items[0].innerText : '';
+                        });
+                    }
+                    return this.each(function () {
+                        this.innerText = content;
+                    });
+                },
+                /**
+                 * Toggles display of matched elements
+                 * @returns _
+                 */
+                toggle: function () {
+                    var _this = this;
+                    this.each(function () {
+                        if (this.style.display === 'none') {
+                            _(this, _this.debug).show();
+                        }
+                        else {
+                            _(this, _this.debug).hide();
+                        }
+                    });
+                    return this;
+                },
+                /**
+                 * Toggles an element class
+                 * @param {string} className
+                 * @returns {_}
+                 */
+                toggleClass: function (className) {
+                    return this.each(function () {
+                        var _this = _(this);
+                        if (_this.hasClass(className))
+                            _this.removeClass(className);
+                        else
+                            _this.addClass(className);
+                    });
                     return this;
                 },
                 /**
@@ -814,141 +966,20 @@
                     });
                 },
                 /**
-                 * Creates a new element
-                 * @param string str
-                 * @param string tag The tag to create
-                 * @returns _
-                 */
-                createElement: function (str, tag) {
-                    var d = document.createElement(tag || 'div');
-                    if (!str)
-                        return _(d, this.debug);
-                    d.innerHTML = str;
-                    return _(Array.from(d.children), this.debug);
-                },
-                /**
-                 * Checks if the items are of the given selector
-                 * @param string selector
-                 * @returns Boolean
-                 */
-                is: function (selector) {
-                    if (!this.items.length)
-                        return false;
-                    var el = this.items[0];
-                    return (el.matches || el.matchesSelector || el.msMatchesSelector || el.mozMatchesSelector || el.webkitMatchesSelector || el.oMatchesSelector).call(el, selector);
-                },
-                /**
-                 * Sets the value of a form element
-                 * @param mixed value
-                 * @returns __|string
-                 */
-                val: function (value) {
-                    var val;
-                    this.each(function () {
-                        if (value) {
-                            this.value = value;
-                            return;
-                        }
-                        val = this.value;
-                    });
-                    return value ? this : val;
-                },
-                /**
-                 * Sets or gets the given property
-                 * @param string prop
-                 * @param mixed value
+                 * Triggers the given event on current items
+                 * @param string event
+                 * @param object data custom data to add to the event object
                  * @returns __
                  */
-                prop: function (prop, value) {
-                    return this.tryCatch(function () {
-                        if (value) {
-                            this.each(function (i, v) {
-                                v[prop] = value;
-                            });
-                            return this;
-                        }
-                        return prop && this.items.length ? this.items[0][prop] : null;
-                    });
-                },
-                /**
-                 * Adds the given class to matched elements
-                 * @param string className
-                 * @returns _
-                 */
-                addClass: function (className) {
-                    var _this = this;
+                trigger: function (event, detail) {
+                    var data = {
+                        detail: detail,
+                        cancelable: true,
+                        bubbles: true
+                    }, ev = new CustomEvent(event, data);
                     return this.each(function () {
-                        var __this = this;
-                        _this.forEach(className.split(' '), function (i, v) {
-                            __this.classList.add(v);
-                        });
+                        this.dispatchEvent(ev);
                     });
-                },
-                /**
-                 * Removes the given class from matched elements
-                 * @param string className
-                 * @returns _
-                 */
-                removeClass: function (className) {
-                    var _this = this;
-                    return this.each(function () {
-                        var __this = this;
-                        _this.forEach(className.split(' '), function (i, v) {
-                            __this.classList.remove(v);
-                        });
-                    });
-                },
-                /**
-                 * Checks whether
-                 * @param string className
-                 * @returns boolean
-                 */
-                hasClass: function (className) {
-                    var has = true,
-                            _this = this;
-                    this.each(function () {
-                        if (!this.classList.length ||
-                                !_this.contains(Array.from(this.classList), className)) {
-                            has = false;
-                            return false;
-                        }
-                    });
-                    return has;
-                },
-                /**
-                 * Toggles an element class
-                 * @param {string} className
-                 * @returns {_}
-                 */
-                toggleClass: function (className) {
-                    return this.each(function () {
-                        var _this = _(this);
-                        if (_this.hasClass(className))
-                            _this.removeClass(className);
-                        else
-                            _this.addClass(className);
-                    });
-                    return this;
-                },
-                /**
-                 * Fetches all siblings of matched elements
-                 * @param string selector
-                 * @returns _
-                 */
-                siblings: function (selector) {
-                    var siblings = [];
-                    this.each(function () {
-                        var rId = false;
-                        if (!this.id) {
-                            this.id = 'rANd' + Math.ceil(Math.random() * 100);
-                            rId = true;
-                        }
-                        siblings = siblings.concat(_(this.parentElement, this.debug)
-                                .children((selector || '') + ':not(#' + this.id + ')').items);
-                        if (rId)
-                            this.removeAttribute('id');
-                    });
-                    return _(siblings, this.debug);
                 },
                 /**
                  * Calls the given function in a try...catch block and outputs any errors to the console if 
@@ -967,6 +998,35 @@
                         else
                             return this.callable(catchCallback).call(this, e);
                     }
+                },
+                /**
+                 * Sets the value of a form element
+                 * @param mixed value
+                 * @returns __|string
+                 */
+                val: function (value) {
+                    var val;
+                    this.each(function () {
+                        if (value) {
+                            this.value = value;
+                            return;
+                        }
+                        val = this.value;
+                    });
+                    return value ? this : val;
+                },
+                /**
+                 * 
+                 * @param {_}|{HTMLElement elem
+                 * @returns {_}
+                 */
+                wrap: function (elem) {
+                    var _this = this,
+                            elem = _(elem, this.debug);
+                    return this.each(function () {
+                        _(this, _this.debug).before(elem)
+                                .before().html(this);
+                    });
                 }
             }),
             /**
@@ -1006,733 +1066,10 @@
                 this.length = this.items.length;
                 return this;
             },
+            /**
+             * Internal (hidden) methods
+             */
             internal = Object.create({
-                /**
-                 * Checks beforeCallbacks for the given action to determine if the action should
-                 * be continued
-                 * @param {String} action
-                 * @param {Array} params Parameters to pass to the callback
-                 * @returns {Boolean}
-                 */
-                canContinue: function (action, params) {
-                    var response = this.__.callable(this.beforeCallbacks[action])
-                            .apply(this, params);
-                    if (response)
-                        return response;
-                    else
-                        return response !== false;
-                },
-                /**
-                 * Setups the app events
-                 * @returns ThisApp
-                 */
-                setup: function () {
-                    this.tryCatch(function () {
-                        var _this = this;
-                        this.__.__proto__.debug = this.config.debug;
-                        if (this.config.paths) {
-                            this.__.forEach(this.config.paths, function (i, v) {
-                                if (_this.__.isString(v) && !v.endsWith('/'))
-                                    _this.config.paths[i] += '/';
-                                else if (_this.__.isObject(v))
-                                    if (v.dir && !v.dir.endsWith('/'))
-                                        _this.config.paths[i].dir += '/';
-                            });
-                        }
-                        if (!this.notFound)
-                            this.notFound = function () {
-                                if (_this.firstPage) {
-                                    if (_this.store('last_page')) {
-                                        var last_page = _this.store('last_page');
-                                        _this.store('last_page', null);
-                                        _this.loadPage(last_page);
-                                    }
-                                    else if (_this.config.startWith) {
-                                        if (this._('page[this-id="' + _this.config.startWith
-                                                + '"]:not([this-current]):not([this-dead]),'
-                                                + '[this-type="pages"]>[this-id="'
-                                                + _this.config.startWith + '"]').length)
-                                            _this.loadPage(_this.config.startWith);
-                                    }
-                                    else {
-                                        var startWith = _this._('[this-default-page]');
-                                        if (startWith.length)
-                                            _this.loadPage(startWith.attr('this-id'));
-                                    }
-                                }
-                            };
-                        // look for the app container
-                        this.container = this._('[this-app-container]');
-                        // use the body tag if no container is set
-                        if (!this.container.length)
-                            this.container = this._('body');
-
-                        if (!this._('[this-type="pages"]').length) {
-                            this._('body').append('<div this-type="pages" style="display:none"/>')
-                                    .find('[this-type="pages"]')
-                                    .append(this._('[this-type="page"]:not([this-loaded])')
-                                            .hide());
-                        }
-                        if (this._('[this-type="component"]').length &&
-                                !this._('[this-type="components"]').length) {
-                            this._('body').append('<div this-type="components" style="display:none"/>')
-                                    .find('[this-type="components"]')
-                                    .append(this._('[this-type="component"]').hide());
-                        }
-                        if (this._('[this-type="layout"]').length &&
-                                !this._('[this-type="layouts"]').length) {
-                            this._('body').append('<div this-type="layouts" style="display:none"/>')
-                                    .find('[this-type="layouts"]')
-                                    .append(this._('[this-type="layout"]:not([this-loaded])').hide());
-                        }
-                        this._('page:not([this-loaded]),model:not([this-loaded]),'
-                                + 'collection:not([this-loaded]),layout:not([this-loaded]),'
-                                + 'component:not([this-loaded]),[this-type]:not([this-loaded])')
-                                .hide();
-                        if (this.config.titleContainer)
-                            this.config.titleContainer = this._(this.config.titleContainer,
-                                    this.config.debug);
-                        this.container
-                                .on('click', '[this-reload]', function (e) {
-                                    e.preventDefault();
-                                    var __this = _this._(this);
-                                    // Attribute `this-reload` must not be empty
-                                    if (!__this.attr('this-reload')) {
-                                        _this.error('What to reload isn\'t specified.');
-                                        return;
-                                    }
-                                    // reload value
-                                    var reload = __this.attr('this-reload'),
-                                            // reload template
-                                            toReload = _this._(internal.selector
-                                                    .call(_this, reload, ':not([this-loaded])')),
-                                            // reload target
-                                            _reload = _this.page.find(internal.selector
-                                                    .call(_this, reload, '[this-loaded]'));
-                                    if (!toReload.length) {
-                                        _this.error('Reload target not found');
-                                        return;
-                                    }
-                                    if (__this.attr('this-attributes'))
-                                        _this.__.forEach(__this.attr('this-attributes').split(';'),
-                                                function (i, v) {
-                                                    var attr = v.split(':'),
-                                                            name = _this.__.arrayRemoveIndex(attr, 0);
-                                                    attr = attr.join(':');
-                                                    toReload.attr(name, attr);
-                                                });
-                                    _reload.replaceWith(toReload.clone().removeAttr('this-cache'));
-                                    internal.loadCollection.call(_this, _reload, true);
-                                })
-                                .on('click', '[this-go-home]', function (e) {
-                                    _this.home();
-                                    e.stop = true;
-                                })
-                                /* go back event */
-                                .on('click', '[this-go-back]', function (e) {
-                                    _this.back(e);
-                                    e.stop = true;
-                                })
-                                /* go forward event */
-                                .on('click', '[this-go-forward]', function (e) {
-                                    _this.forward(e);
-                                    e.stop = true;
-                                })
-                                /*
-                                 * READ event
-                                 * 
-                                 * Target must have attributes `this-read` and `this-goto`. Attribute 
-                                 * `this-read` may have the url of the model as its value.
-                                 * Optionally, target should also have attributes `this-model` and `this-mid`.
-                                 * The are required if target isn't in a model container.
-                                 */
-                                .on('click', '[this-goto][this-read]', function (e) {
-                                    var __this = _this._(this),
-                                            _model = __this.closest('model,[this-type="model"]'),
-                                            model_id = _model.attr('this-mid'),
-                                            url = __this.attr('this-read') || _model.attr('this-url')
-                                            || '#',
-                                            goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    // keep attributes for page
-                                    _this.tar['page#' + goto] = {
-                                        reading: true,
-                                        url: url
-                                    };
-
-                                    // use the last part of the read url if available as the model's id
-                                    if (__this.attr('this-read')) {
-                                        var split = __this.attr('this-read').split('/');
-                                        model_id = split[split.length - 1];
-                                    }
-                                    _this.tar['page#' + goto]['mid'] = model_id;
-                                })
-                                /*
-                                 * UPDATE event
-                                 * 
-                                 * Target must have attributes `this-update` and `this-goto`. `this-update`
-                                 * may have the url of the model as its value.
-                                 * 
-                                 * If target isn't in a model container or intends to update another model 
-                                 * other than it's container model, it must also have attributes `this-model`
-                                 * and `this-mid`.
-                                 * If model is a part of a collection, target must also have attribute.
-                                 */
-                                .on('click', '[this-goto][this-update]', function () {
-                                    var __this = _this._(this),
-                                            model = __this.closest('model,[this-type="model"]'),
-                                            model_id = model.attr('this-mid'),
-                                            model_name = __this.attr('this-model')
-                                            || model.attr('this-id'),
-                                            url = __this.attr('this-update')
-                                            || model.attr('this-url') || '#',
-                                            goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
-                                        "do": "update",
-                                        mid: model_id,
-                                        action: url,
-                                        model: model_name
-                                    };
-                                    if (model.attr('this-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = model.attr('this-uid');
-                                })
-                                /*
-                                 * CREATE event
-                                 * 
-                                 * Target must have attributes `this-goto` and `this-create`. Attributes
-                                 * `this-create` must have the url of the collection as its value.
-                                 * 
-                                 * If CREATION must update model, then attributes 
-                                 * `this-model` must be provided unless the target
-                                 * form already has the required attributes.
-                                 */
-                                .on('click', '[this-goto][this-create]', function () {
-                                    var __this = _this._(this),
-                                            url = __this.attr('this-create') || '#',
-                                            goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
-                                        "do": "create",
-                                        action: url
-                                    };
-                                    if (__this.attr('this-model'))
-                                        _this.tar['page#' + goto]['model'] = __this.attr('this-model');
-                                    if (__this.attr('this-model-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = __this
-                                                .attr('this-model-uid');
-                                })
-                                /*
-                                 * DELETE event - Show Page
-                                 * 
-                                 * Target must have attributes `this-goto` and `this-delete`. Attributes
-                                 * `this-delete` must have the url of the model as its value.
-                                 * 
-                                 * If DELETE must update model, then attributes 
-                                 * `this-model` may be provided if target isn't
-                                 * in a model container or target page doesn't have these attributes.
-                                 */
-                                .on('click', '[this-goto][this-delete]', function () {
-                                    var __this = _this._(this),
-                                            model = __this.closest('model,[this-type="model"]'),
-                                            url = __this.attr('this-delete')
-                                            || model.attr('this-url') || '#',
-                                            model_name = __this.attr('this-model')
-                                            || model.attr('this-id'),
-                                            uid = model.attr('this-uid'),
-                                            goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
-                                        "do": "delete",
-                                        action: url,
-                                        uid: uid
-                                    };
-                                    if (model)
-                                        _this.tar['page#' + goto]['model'] = model_name;
-                                })
-                                /*
-                                 * Load page
-                                 * 
-                                 * Target must have attribute `this-goto`
-                                 * 
-                                 * Event page.leave is triggered
-                                 */
-                                .on('click', '[this-goto]', function (e) {
-                                    e.preventDefault();
-                                    var __this = _this._(this);
-                                    if (!__this.attr('this-goto'))
-                                        return;
-                                    _this.page.trigger('page.leave');
-                                    var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto'));
-                                    if (!_this.tar['page#' + goto])
-                                        _this.tar['page#' + goto] = {};
-                                    if (__this.attr('this-page-title'))
-                                        _this.tar['page#' + goto]['title'] =
-                                                __this.attr('this-page-title');
-                                    if (__this.attr('this-run'))
-                                        _this.tar['page#' + goto]['run'] = __this.attr('this-run');
-                                    if (__this.attr('this-ignore-cache'))
-                                        _this.tar['page#' + goto]['ignore-cache'] =
-                                                __this.attr('this-ignore-cache');
-                                    _this.loadPage(goto);
-                                    e.stop = true;
-                                })
-                                /*
-                                 * DELETE event
-                                 * 
-                                 * This is where the actual DELETE request is sent.
-                                 * 
-                                 * Target must have attribute `this-delete` which may contain 
-                                 * the url of the model.
-                                 * 
-                                 * If DELETE must update model and/or collection, then attributes 
-                                 * `this-model` must be provided if target isn't
-                                 *  within a model or page loaded as a result of a previous 
-                                 *  delete click.
-                                 */
-                                .on('click', '[this-delete]', function (e) {
-                                    if (e.stop)
-                                        return;
-                                    e.preventDefault();
-                                    var __this = _this._(this);
-                                    var _model = __this.closest('model,[this-type="model"]'),
-                                            _do = __this.closest('[this-do="delete"]'),
-                                            __model = new Model(_model.attr('this-mid'), {}, {
-                                                app: _this,
-                                                name: __this.attr('this-model') ||
-                                                        _model.attr('this-id') ||
-                                                        _do.attr('this-model'),
-                                                uid: _model.attr('this-uid') ||
-                                                        _do.attr('this-uid') || 'id',
-                                                url: __this.attr('this-delete') ||
-                                                        _model.attr('this-url') ||
-                                                        _do.attr('this-action')
-                                            });
-                                    if (!internal.canContinue
-                                            .call(this, 'model.delete',
-                                                    [__model, _model.items[0]])) {
-                                        _model.trigger('delete.canceled');
-                                        return;
-                                    }
-                                    __model.remove(false, function (data) {
-                                        var model = _this.config.dataKey ?
-                                                data[_this.config.dataKey] : data;
-                                        if (model) {
-                                            if (_this.page.attr('this-do') === 'delete')
-                                                _this.back();
-                                            else {
-                                                _this.page.find('[this-binding]').hide();
-                                            }
-                                            __this.trigger('delete.success', {
-                                                response: this,
-                                                responseData: data
-                                            });
-                                        }
-                                        else
-                                            __this.trigger('delete.failed',
-                                                    {
-                                                        response: this,
-                                                        responseData: data
-                                                    });
-                                    },
-                                            function () {
-                                                __this.trigger('delete.error', {
-                                                    response: this
-                                                });
-                                            },
-                                            function () {
-                                                __this.trigger('delete.complete', {
-                                                    response: this
-                                                });
-                                            });
-                                })
-                                /*
-                                 * Click event
-                                 * Bind model to target
-                                 */
-                                .on('click', '[this-bind]', function (e) {
-                                    e.preventDefault();
-                                    var __this = _this._(this),
-                                            bind = __this.attr('this-bind'),
-                                            _model = __this.closest('model,[this-type="model"],'
-                                                    + '[this-model]');
-                                    if (!bind)
-                                        return;
-                                    var _target = _this.page.find(internal.selector
-                                            .call(_this, bind,
-                                                    ':not([this-in-collection]):not([this-cache])'));
-                                    if (!_target.length)
-                                        return;
-                                    _target.attr('this-model', (_model.attr('this-model')
-                                            || _model.attr('this-id'))).attr('this-binding', '');
-                                    if (__this.hasAttr('this-read'))
-                                        _this.page.find('[this-model="' + (_model.attr('this-model')
-                                                || _model.attr('this-id')) + '"][this-binding]').hide();
-                                    if (__this.hasAttr('this-update'))
-                                        _target.attr('this-tar', 'do:update');
-                                    if (__this.hasAttr('this-create'))
-                                        _target.attr('this-tar', 'do:create');
-                                    internal.bindToModel.call(_this, _target, _model,
-                                            __this.attr('this-cache'));
-                                })
-                                /*
-                                 * Click event
-                                 * Toggles target on and off
-                                 */
-                                .on('click', '[this-toggle]', function (e) {
-                                    e.preventDefault();
-                                    _this.container.find(internal.selector.call(_this,
-                                            _this._(this).attr('this-toggle'))).toggle();
-                                    internal.saveState.call(_this, true);
-                                })
-                                /*
-                                 * Hides target elements
-                                 */
-                                .on('click', '[this-hide]', function (e) {
-                                    e.preventDefault();
-                                    _this.container.find(internal.selector.call(_this,
-                                            _this._(this).attr('this-hide'))).hide();
-                                    internal.saveState.call(_this, true);
-                                })
-                                /*
-                                 * Shows target elements
-                                 */
-                                .on('click', '[this-show]', function (e) {
-                                    e.preventDefault();
-                                    var __this = _this._(this),
-                                            _target = _this.container.find(internal.selector.call(_this,
-                                                    __this.attr('this-show')));
-                                    if (__this.attr('this-create')) {
-                                        _this.page.find('[this-binding]').hide();
-                                        var form = _target.is('form[this-model="'
-                                                + __this.attr('this-model') + '"]') ? _target :
-                                                _target.find('form[this-model="'
-                                                        + __this.attr('this-model') + '"]');
-                                        form.attr('this-do', 'create').attr('this-url',
-                                                __this.attr('this-create')).attr('this-binding', '');
-                                        if (__this.attr('this-model-uid'))
-                                            form.attr('this-model-uid', __this.attr('this-model-uid'));
-                                        form.removeAttr('this-mid');
-                                        if (form.length)
-                                            form.get(0).reset();
-                                    }
-                                    _target.show();
-                                    internal.saveState.call(_this, true);
-                                })
-                                /*
-                                 * CREATE and UPDATE events
-                                 * Form submission
-                                 * 
-                                 */
-                                .on('submit', 'form[this-do="create"]:not([this-ignore-submit]),'
-                                        + ' form[this-do="update"]:not([this-ignore-submit])',
-                                        function (e) {
-                                            e.preventDefault();
-                                            var data = {},
-                                                    __this = _this._(this),
-                                                    creating = __this.attr('this-do') === 'create',
-                                                    method = creating ? 'post' : 'put';
-                                            if (!this.reportValidity()) {
-                                                __this.trigger('form.invalid.submission');
-                                                return;
-                                            }
-                                            __this.trigger('form.valid.submission');
-                                            // parse form elements' data into data object
-                                            _this.__.forEach(Array.from(this.elements),
-                                                    function () {
-                                                        if (!this.name)
-                                                            return;
-                                                        if (this.name.indexOf('[]') !== -1) {
-                                                            var name = this.name.replace('[]', '');
-                                                            if (!data[name]) {
-                                                                data[name] = [];
-                                                            }
-                                                            data[name].push(this.value);
-                                                        }
-                                                        else if (this.name.indexOf('[') !== -1) {
-                                                            var exp = this.name.replace(']', '').split('['),
-                                                                    _data = data,
-                                                                    lastKey = exp.pop();
-                                                            _this.__.forEach(exp, function (i, v) {
-                                                                if (!_data[v])
-                                                                    _data[v] = {};
-                                                                _data = _data[v];
-                                                            });
-                                                            _data[lastKey] = this.value;
-                                                        }
-                                                        else {
-                                                            data[this.name] = this.value;
-                                                        }
-                                                    });
-                                            var id = null;
-                                            if (__this.attr('this-mid'))
-                                                id = __this.attr('this-mid');
-                                            else if (_this.page.attr('this-mid'))
-                                                id = _this.page.attr('this-mid');
-                                            var _model = new Model(id, data, {
-                                                app: _this,
-                                                name: __this.attr('this-model') ||
-                                                        _this.page.attr('this-model'),
-                                                uid: __this.attr('this-uid') ||
-                                                        __this.attr('this-model-uid') ||
-                                                        _this.page.attr('this-model-uid'),
-                                                url: __this.attr('this-action') ||
-                                                        __this.attr('this-url') ||
-                                                        _this.page.attr('this-action') ||
-                                                        _this.page.attr('this-url'),
-                                                method: method
-                                            });
-                                            if (!internal.canContinue
-                                                    .call(this, creating ? 'model.create'
-                                                            : 'model.update',
-                                                            [_model])) {
-                                                __this.trigger(creating ? 'model.create.canceled'
-                                                        : 'model.update.canceled');
-                                                return;
-                                            }
-                                            _model.save(_model.url === null, function (data) {
-                                                var model = _this.config.dataKey ?
-                                                        data[_this.config.dataKey] : data;
-                                                if (model) {
-                                                    if (creating) {
-                                                        __this.items[0].reset();
-                                                        if (!__this.hasAttr('this-binding') &&
-                                                                !__this.closest('[this-binding]')
-                                                                .length)
-                                                            _this.back();
-                                                        // hide creation form if binding
-                                                        else if (__this.hasAttr('this-binding'))
-                                                            __this.hide();
-                                                    }
-
-                                                    __this.trigger('form.submission.success',
-                                                            {
-                                                                response: this,
-                                                                responseData: data,
-                                                                method: method.toUpperCase()
-                                                            });
-                                                }
-                                                else {
-                                                    __this.trigger('form.submission.failed',
-                                                            {
-                                                                response: this,
-                                                                responseData: data,
-                                                                method: method.toUpperCase()
-                                                            });
-                                                }
-                                            },
-                                                    function () {
-                                                        __this.trigger('form.submission.error',
-                                                                {
-                                                                    response: this,
-                                                                    method: method.toUpperCase()
-                                                                });
-                                                    },
-                                                    function () {
-                                                        __this.trigger('form.submission.complete',
-                                                                {
-                                                                    response: this,
-                                                                    method: method.toUpperCase()
-                                                                });
-                                                    });
-                                        })
-                                /*
-                                 * Search Event
-                                 * Form submissiom 
-                                 */
-                                .on('submit', 'form[this-do="search"]', function (e) {
-                                    e.preventDefault();
-                                    var _form = _this._(this),
-                                            _search = _form.find('[this-search]');
-                                    if (!_search.attr('this-search')) {
-                                        _this.error('Invalid search target');
-                                        return;
-                                    }
-                                    var exp = _search.attr('this-search').split(':'),
-                                            selector = 'collection[this-id="' + exp[0]
-                                            + '"],[this-type="collection"][this-id="' + exp[0] + '"]',
-                                            keys = exp[1],
-                                            page = _form.attr('this-type') === 'page' ?
-                                            _form : _form.closest('page,[this-type="page"]'),
-                                            goto = _form.attr('goto') || page.attr('this-id'),
-                                            filter = '', _collection,
-                                            /* same page and query. don't duplicate state */
-                                            replaceState = _this.page.attr('this-id') === goto &&
-                                            _this.page.attr('this-query') === _search.val().trim();
-                                    if (keys)
-                                        keys = keys.split(',');
-                                    _this.__.forEach(keys, function (i, key) {
-                                        if (filter)
-                                            filter += ' || ';
-                                        filter += '_this.__.contains(filters.lcase(model#' + key
-                                                + '),filters.lcase("' + _search.val() + '"))';
-                                    });
-
-                                    // reload only the collection
-                                    if (_form.attr('this-reload')) {
-                                        _collection = page.find(internal.selector.call(_this,
-                                                _form.attr('this-reload'), ':not([this-cache])'));
-                                        _collection.attr('this-filter', filter).attr('this-search',
-                                                keys.join(','));
-                                        page.attr('this-query', _search.val().trim());
-                                        internal.loadCollection.call(_this, _collection, replaceState);
-                                    }
-                                    // load a page and the collection in it
-                                    else {
-                                        goto = internal.pageIDFromLink.call(this, goto);
-                                        var _page = _this._('page[this-id="' + goto
-                                                + '"]:not([this-current]):not([this-dead]),'
-                                                + '[this-type="page"][this-id="'
-                                                + goto + '"]:not([this-current]):not([this-dead])'),
-                                                _component = _page.find('[this-component="'
-                                                        + exp[0] + '"]');
-                                        _component.attr('this-filter', 'collection#' + exp[0] + ':'
-                                                + filter).attr('this-search', 'collection#'
-                                                + exp[0] + ':' + keys.join(','));
-                                        _this.tar['page#' + goto] = {
-                                            query: _search.val().trim()
-                                        };
-                                        if (_search.attr('this-ignore-cache'))
-                                            _this.tar['page#' + goto]['ignore-cache'] =
-                                                    _search.attr('this-ignore-cache');
-                                        _collection = _page.find(selector);
-                                        _collection.attr('this-filter', filter).attr('this-search',
-                                                keys.join(','));
-                                        _this.loadPage(goto, replaceState);
-                                    }
-                                });
-                        /*
-                         * Home button event for buttons outside the container
-                         */
-                        this._('[this-go-home]').on('click', function (e) {
-                            _this.home();
-                        });
-                        /*
-                         * Back button event for buttons outside the container
-                         */
-                        this._('[this-go-back]').on('click', function (e) {
-                            if (!e.stop)
-                                _this.back(e);
-                        });
-                        /*
-                         * Forward button event for buttons outside the container
-                         */
-                        this._('[this-go-forward]').on('click', function (e) {
-                            if (!e.stop)
-                                _this.forward(e);
-                        });
-                        /*
-                         * State resuscitation
-                         */
-                        this._(window).on('popstate', function (e) {
-                            if (e.state)
-                                internal.restoreState.call(_this, e.state);
-                        });
-                        /*
-                         * Container events activation
-                         */
-                        this.__.forEach(this.events, function () {
-                            _this.container.on(this.event, this.selector, this.callback);
-                        });
-                    });
-                    this.__proto__.running = true;
-                    return this;
-                },
-                /**
-                 * Watches an element (collection | model) for updates
-                 * @param {_} elem
-                 * @returns {ThisApp}
-                 */
-                watch: function (elem) {
-                    elem = this._(elem);
-                    if (!elem.attr('this-id') || this.watching[elem.attr('this-id')]
-                            || !elem.attr('this-url'))
-                        return this;
-                    var isCollection = internal.is.call(this, 'collection', elem),
-                            model_name = elem.attr('this-model') || elem.attr('this-id');
-                    this.watching[elem.attr('this-id')] = {
-                        type: isCollection ? 'collection' : 'model',
-                        url: elem.attr('this-url'),
-                        mid: elem.attr('this-mid')
-                    };
-                    this.__.callable(this.watchCallback)(elem.attr('this-url'),
-                            function (resp) {
-                                // save model to collection
-                                var action = this.store(resp.event) || {};
-                                switch (resp.event) {
-                                    case 'created':
-                                        internal.modelToStore
-                                                .call(this, model_name, resp.id, resp.data,
-                                                        elem.attr('this-uid') ||
-                                                        elem.attr('this-model-uid'));
-                                        if (!action[model_name])
-                                            action[model_name] = [];
-                                        /* Remove model uid if exists to avoid duplicates */
-                                        action[model_name] = this.__
-                                                .arrayRemoveValue(action[model_name], resp.id, true);
-                                        action[model_name].push(resp.id);
-                                        break;
-                                    case 'updated':
-                                        var data = resp.data, id = resp.id;
-                                        // if update model, id is model attribute. Update real model
-                                        if (!isCollection && elem.attr('this-mid')) {
-                                            delete data[elem.attr('this-uid') || 'id'];
-                                            var _data = {};
-                                            _data[id] = data;
-                                            data = _data;
-                                            id = elem.attr('this-mid');
-                                        }
-                                        data = internal.modelToStore
-                                                .call(this, model_name, id, data,
-                                                        elem.attr('this-uid') ||
-                                                        elem.attr('this-model-uid'));
-                                        if (!action[model_name])
-                                            action[model_name] = {};
-                                        action[model_name][id] = data;
-                                        break;
-                                    case 'deleted':
-                                        internal.removeModelFromStore.call(this, model_name, resp.id);
-                                        if (!action[model_name])
-                                            action[model_name] = [];
-                                        /* Indicate model as deleted */
-                                        action[model_name] = this.__
-                                                .arrayRemoveValue(action[model_name], resp.id, true);
-                                        action[model_name].push(resp.id);
-                                        break;
-                                }
-                                this.store(resp.event, action);
-                                // update current page
-                                internal.updatePage.call(this);
-                                elem.trigger('updated', {
-                                    event: resp.event,
-                                    response: resp
-                                });
-                            }.bind(this));
-                    return this;
-                },
-                /**
-                 * Parses the url hash
-                 * @returns {string} Target page ID
-                 */
-                pageIDFromLink: function (link) {
-                    if (link.startsWith('#'))
-                        link = link.substr(1);
-                    var parts = link.split('&');
-                    if (parts.length > 1)
-                        this.target_on_page = parts[1];
-                    return parts[0];
-                },
-                /**
-                 * Scrolls to the target on page
-                 * @returns {void}
-                 */
-                resolveTargetOnPage: function () {
-                    if (!this.target_on_page)
-                        return this;
-                    this._('#' + this.target_on_page).trigger('click');
-                    delete this.target_on_page;
-                },
                 /**
                  * Binds the target to the model
                  * @param _ _target
@@ -1749,14 +1086,12 @@
                         return;
                     }
                     if (!ignoreCache)
-                        model = this.collection(model_name).model(_model.attr('mid'));
+                        model = this.collection(model_name).model(_model.attr('this-mid'));
                     if (model) {
                         model.bind(_target);
                         _target.trigger('variables.binded', {
                             data: model
                         });
-                        // @todo: should save state?!
-                        internal.saveState.call(this, true);
                     }
                     else {
                         var _this = this;
@@ -1772,8 +1107,6 @@
                             _target.trigger('variables.binded', {
                                 data: data
                             });
-                            // @todo: should save state?!
-                            internal.saveState.call(_this, true);
                         });
                     }
                     return this;
@@ -1820,6 +1153,21 @@
                     return this;
                 },
                 /**
+                 * Checks beforeCallbacks for the given action to determine if the action should
+                 * be continued
+                 * @param {String} action
+                 * @param {Array} params Parameters to pass to the callback
+                 * @returns {Boolean}
+                 */
+                canContinue: function (action, params) {
+                    var response = this.__.callable(this.beforeCallbacks[action])
+                            .apply(this, params);
+                    if (response)
+                        return response;
+                    else
+                        return response !== false;
+                },
+                /**
                  * Removes the given object from cache
                  * @param object model
                  * @param string type
@@ -1840,344 +1188,53 @@
                     return this.store(type.toLowerCase(), data);
                 },
                 /**
-                 * Fetches a model from a collection store
-                 * @param string model_id
-                 * @param string collection_id
-                 * @returns object|null
+                 * Fetches the debug level
+                 * @returns {Number}
                  */
-                modelFromStore: function (model_id, model_name) {
-                    return this.tryCatch(function () {
-                        var _collection = internal.cache.call(this, 'model', model_name);
-                        return _collection && _collection.length && ((_collection.expires
-                                && _collection.expires > Date.now())
-                                || !_collection.expires) ? _collection.data[model_id] : null;
-                    });
+                debugLevel: function () {
+                    if (this.__.isBoolean(this.config.debug))
+                        return this.config.debug ? 3 : 0;
+                    return this.config.debug;
                 },
                 /**
-                 * Saves a model to a collection store
-                 * @param string|int model_id
-                 * @param object model
-                 * @param string model_name
-                 * @param string uid
-                 * @returns object|null
-                 */
-                modelToStore: function (model_name, model_id, model, uid) {
-                    return this.tryCatch(function () {
-                        var collection = internal.cache.call(this, 'model', model_name)
-                                || {data: {}, uid: uid, length: 0};
-                        if (!model_id)
-                            model_id = model[collection.uid || uid];
-                        model = this.__.extend(collection.data[model_id], model, true);
-                        collection.data[model_id] = model;
-                        internal.cache.call(this, 'model', model_name, collection, false);
-                        return model;
-                    });
-                },
-                /**
-                 * Removes a model from the given collection
-                 * @param string model_name
-                 * @param string model_id
+                 * Does the loading
+                 * @param {HTMLElement}|{_} container
+                 * @param object data
+                 * @param string content
+                 * @param array variables
+                 * @param {boolean} isModel Indicates whether loading a model or not
                  * @returns ThisApp
                  */
-                removeModelFromStore: function (model_name, model_id) {
-                    this.tryCatch(function () {
-                        var collection = internal.cache.call(this, 'model', model_name);
-                        delete collection.data[model_id];
-                        internal.cache.call(this, 'model', model_name, collection);
-                        return this;
-                    });
-                },
-                /**
-                 * Loads a type fully from URL
-                 * @param {string} type page || layout || component
-                 * @param {string} id
-                 * @param {boolean} replaceInState
-                 * @returns {void}
-                 */
-                fullyFromURL: function (type, id, success, error) {
-                    if (!this.config.paths) {
-                        this.__.callable(error).call(this);
-                        return;
+                doLoad: function (container, data, content, variables, isModel, level) {
+                    if (isModel)
+                        content = internal.processExpressions.call(this, content, data);
+                    container = this._(container).hide();
+                    var _temp = internal.parseData.call(this, data, content, variables, false, isModel),
+                            id = container.attr('this-model-uid') || container.attr('this-uid')
+                            || 'id';
+                    while (level) {
+                        _temp = _temp.children();
+                        level--;
                     }
-                    var _this = this,
-                            pathConfig = this.config.paths[type + 's'],
-                            url = pathConfig.dir + id + pathConfig.ext;
-                    this.request(url,
-                            function (data) {
-                                var elem = _this.__.createElement(data);
-                                if (type !== 'component') {
-                                    if (!elem.length || elem.length > 1 ||
-                                            (!elem.is(type) && elem.attr('this-type') !== type))
-                                    {
-                                        elem = _this._('<div this-type="' + type + '" this-id="'
-                                                + id + '" />')
-                                                .html(data);
-                                    }
-                                    elem.attr('this-id', id);
-                                }
-                                _this.__.callable(success).call(this, elem);
-                            },
-                            function (e) {
-                                _this.__.callable(error).call(this, e);
-                            }, {}, 'text');
-                },
-                /**
-                 * Called when the target page is not found a page
-                 * @param {string} page Page ID
-                 * @returns {ThisApp}
-                 */
-                notAPage: function (page) {
-                    this.error('Page [' + page + '] not found');
-                    if (this.__.isString(this.notFound)) {
-                        page = this._(internal.selector.call(this, this.notFound
-                                .startsWith('page#') ? this.notFound : 'page#' + this.notFound,
-                                ':not([this-current]):not([this-dead])'));
-                        if (!page.length) {
-                            return this.error('Page [' + this.notFound + '] also not found');
-                        }
-                        internal.pageFound.call(this, page, true);
-                        return this;
-                    }
-                    else
-                        return this.__.callable(this.notFound).call(this, page);
-                },
-                /**
-                 * Called when the target page is found
-                 * @param {boolean} replaceInState
-                 * @returns {void}
-                 */
-                pageFound: function (page, replaceInState) {
-                    if (internal.is.call(this, 'page', page)) {
-                        if (!internal.canContinue.call(this, 'page.load', [page.items[0]])) {
-                            page.trigger('page.load.canceled');
-                            return this;
-                        }
-                        if (this.page) {
-                            this.oldPage = this.page.attr('this-dead', '');
-                            if (this.oldPage.attr('this-id') === page.attr('this-id'))
-                                replaceInState = true;
-                        }
-                        if (this.store('last_page') === page.attr('this-id'))
-                            replaceInState = true;
-                        this.page = page.clone();
-                        internal.loadLayouts.call(this, replaceInState);
+                    if (!isModel) {
+                        _temp.attr('this-mid', (data[id] || data[id] == 0 ? data[id] : ''))
+                                .attr('this-uid', id)
+                                .attr('this-type', 'model')
+                                .attr('this-in-collection', '')
+                                .attr('this-url', container.attr('this-url')
+                                        + (data[id] || data[id] == 0 ? data[id] : ''));
+                        if (container.attr('this-model'))
+                            _temp.attr('this-id', container.attr('this-model'));
+                        container.append(_temp.show())
+                                .removeAttr('this-cache')
+                                .removeClass('loading');
                     }
                     else {
-                        this.error('Load page failed: ' + page.attr('this-id'));
-                        page.trigger('page.load.failed');
+                        container.attr('this-uid', id)
+                                .attr('this-mid', data[id]);
+                        container.html(_temp.html());
                     }
-                },
-                /**
-                 * Loads all layouts for the page
-                 * @param {boolean} replaceInState
-                 * @returns {void}
-                 */
-                loadLayouts: function (replaceInState) {
-                    var _layout = _(), _this = this;
-                    if (this.config.layout || this.page.attr('this-layout')) {
-                        var layout = this.page.attr('this-layout') || this.config.layout;
-                        // get existing layout in container
-                        _layout = this.container.find('layout[this-id="' + layout
-                                + '"],[this-type="layout"][this-id="' + layout + '"]');
-                        _layout.find('[this-content]').html(this.page.show());
-                        // layout does not exist in container
-                        if (!_layout.length) {
-                            // get layout template
-                            _layout = this._('[this-type="layouts"] layout[this-id="' + layout + '"],'
-                                    + '[this-type="layouts"] [this-type="layout"][this-id="'
-                                    + layout + '"]').clone();
-                            // layout doesn't exist
-                            if (!_layout.length) {
-                                internal.fullyFromURL.call(this, 'layout', layout,
-                                        function (_layout) {
-                                            _layout.removeAttr('this-url')
-                                                    .find('[this-content]').html(_this.page);
-                                            if (_layout.attr('this-extends'))
-                                                internal.extendLayout
-                                                        .call(_this, _layout, replaceInState);
-                                            else
-                                                internal.finalizePageLoad
-                                                        .call(_this, _layout, replaceInState);
-
-                                        },
-                                        function () {
-                                            this.error('Layout [' + layout + '] not found!');
-                                            internal.finalizePageLoad.call(_this, _layout, replaceInState);
-                                        });
-                            }
-                            else {
-                                if (_layout.attr('this-url')) {
-                                    this.request(_layout.attr('this-url'),
-                                            function (data) {
-                                                _layout.removeAttr('this-url')
-                                                        .html(data)
-                                                        .find('[this-content]')
-                                                        .html(_this.page);
-                                                if (_layout.attr('this-extends'))
-                                                    internal.extendLayout.call(_this, _layout, replaceInState);
-                                                else
-                                                    internal.finalizePageLoad.call(_this, _layout, replaceInState);
-                                            },
-                                            function () {
-                                            },
-                                            {}, 'text');
-                                }
-                                else {
-                                    _layout.find('[this-content]').html(_this.page);
-                                    internal.extendLayout.call(this, _layout, replaceInState);
-                                }
-                            }
-
-                        }
-                        else
-                            internal.finalizePageLoad.call(this, _layout, replaceInState);
-                    }
-                    else {
-                        internal.finalizePageLoad.call(this, _layout, replaceInState);
-                    }
-                },
-                /**
-                 * Extends the given layout
-                 * @param {_} _layout
-                 * @param {boolean} replaceInState
-                 * @returns {void}
-                 */
-                extendLayout: function (_layout, replaceInState) {
-                    var __layout = _layout.clone(), _this = this;
-                    _layout.removeAttr('this-extends');
-                    // get existing layout in container
-                    _layout = this.container.find('layout[this-id="'
-                            + __layout.attr('this-extends')
-                            + '"],[this-type="layout"][this-id="'
-                            + __layout.attr('this-extends') + '"]');
-                    if (!_layout.length)
-                        _layout = this._('[this-type="layouts"] layout[this-id="'
-                                + __layout.attr('this-extends') + '"],'
-                                + '[this-type="layouts"] [this-type="layout"][this-id="'
-                                + __layout.attr('this-extends') + '"]').clone();
-                    if (!_layout.length) {
-                        internal.fullyFromURL.call(this, 'layout', __layout.attr('this-extends'),
-                                function (_layout) {
-                                    _layout.removeAttr('this-url')
-                                            .find('[this-content]').html(__layout);
-                                    if (_layout.attr('this-extends'))
-                                        internal.extendLayout
-                                                .call(_this, _layout, replaceInState);
-                                    else
-                                        internal.finalizePageLoad
-                                                .call(_this, _layout, replaceInState);
-
-                                },
-                                function () {
-                                    this.error('Layout [' + __layout.attr('this-extends')
-                                            + '] not found!');
-                                    internal.finalizePageLoad.call(_this, _layout, replaceInState);
-                                });
-                    }
-                    else {
-                        if (_layout.attr('this-url')) {
-                            this.request(_layout.attr('this-url'),
-                                    function (data) {
-                                        _layout.removeAttr('this-url')
-                                                .html(data)
-                                                .find('[this-content]')
-                                                .html(__layout.show());
-                                        if (_layout.attr('this-extends')) {
-                                            internal.extendLayout.call(_this, _layout, replaceInState);
-                                        }
-                                        else {
-                                            internal.finalizePageLoad.call(_this, _layout,
-                                                    replaceInState);
-                                        }
-                                    },
-                                    function () {
-                                    },
-                                    {}, 'text');
-                        }
-                        else {
-                            _layout.find('[this-content]')
-                                    .html(__layout.removeAttr('this-extends').show());
-                            if (_layout.attr('this-extends')) {
-                                internal.extendLayout.call(this, _layout, replaceInState);
-                            }
-                            else {
-                                internal.finalizePageLoad.call(this, _layout, replaceInState);
-                            }
-                        }
-                    }
-                },
-                /**
-                 * Finalizes page load after layouts have been loaded
-                 * @param {_} _layout
-                 * @param {boolean} replaceInState
-                 * @returns {void}
-                 */
-                finalizePageLoad: function (_layout, replaceInState) {
-                    var _this = this;
-                    if (_layout && _layout.length) {
-                        if (!this.container.find('layout[this-id="'
-                                + _layout.attr('this-id')
-                                + '"],[this-type="layout"][this-id="'
-                                + _layout.attr('this-id') + '"]').length)
-                            this.container.html(_layout.show());
-                    }
-                    else
-                        this.container.html(this.page);
-                    this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
-                            + '"]:not([this-dead]),'
-                            + '[this-type="page"][this-id="'
-                            + this.page.attr('this-id')
-                            + '"]:not([this-dead])')
-                            .attr('this-current', '')
-                            .removeAttr('this-layout')
-                            .show();
-                    // remove page-specific css file that doesn't belong to the current page
-                    this._('link[this-page]:not([this-page="' + this.page.attr('this-id')
-                            + '"])').remove();
-                    if (this.page.attr('this-load-css')) {
-                        var url = this.config.paths.css + this.page.attr('this-load-css').trim();
-                        if (!url.endsWith('.css'))
-                            url += '.css';
-                        if (this.config.debug)
-                            url += '?' + Math.round(Math.random() * 99999);
-                        var link = this.__.createElement(null, 'link')
-                                .attr('type', 'text/css')
-                                .attr('rel', 'stylesheet')
-                                .attr('this-page', this.page.attr('this-id'))
-                                .attr('href', url);
-                        this.page.prepend(link);
-                    }
-                    internal.loadComponents.call(this, function () {
-                        this.page = internal.doTar.call(this, this.page);
-                        var transit = this.__.callable(this.config.transition, true), wait;
-                        if (transit)
-                            wait = transit.call(null, _this.oldPage.removeAttr('this-current'), this.page,
-                                    this.config.transitionOptions);
-                        else if (this.__.isString(this.config.transition)) {
-                            if (!Transitions[this.config.transition])
-                                this.config.transition = 'show';
-                            wait = Transitions[this.config.transition](_this.oldPage
-                                    .removeAttr('this-current'),
-                                    this.page, this.config.transitionOptions);
-                        }
-                        setTimeout(function () {
-                            _this.oldPage.remove();
-                            delete _this.oldPage;
-                        }, wait);
-                        if (this.config.titleContainer)
-                            this.config.titleContainer.html(this.page.attr('this-title'));
-                        if (this.page.attr('this-url')) {
-                            this.request(this.page.attr('this-url'), function (data) {
-                                _this.page.html(data);
-                                internal.loadModels.call(_this, replaceInState, true);
-                            },
-                                    function () {
-                                    }, {}, 'text');
-                        }
-                        else {
-                            internal.loadModels.call(this, replaceInState, true);
-                        }
-                    }.bind(this));
+                    return this;
                 },
                 /**
                  * Parses temporary attributes
@@ -2215,6 +1272,659 @@
                     if (!noShow)
                         __this.show();
                     return __this.removeAttr('this-tar');
+                },
+                /**
+                 * Calls JS eval on the content after parsing it for variables
+                 * @param {string} content
+                 * @param {object} data
+                 * @returns {mixed}
+                 */
+                eval: function (content, data) {
+                    var variables = internal.parseBrackets.call(this, '{{', '}}', content);
+                    content = internal.fillVariables.call(this, variables, data, content);
+                    return eval(content);
+                },
+                /**
+                 * Extends the given layout
+                 * @param {_} _layout
+                 * @param {boolean} replaceInState
+                 * @returns {void}
+                 */
+                extendLayout: function (_layout, replaceInState) {
+                    var __layout = _layout.clone(), _this = this;
+                    // load layout assets (css)
+                    internal.loadAssets.call(this, __layout);
+
+                    // get existing layout in container
+                    _layout = this.reloadLayouts ? _() :
+                            this.container.find('layout[this-id="'
+                                    + __layout.attr('this-extends')
+                                    + '"],[this-type="layout"][this-id="'
+                                    + __layout.attr('this-extends') + '"]');
+                    // layout doesn't exist in container
+                    if (!_layout.length)
+                        // get from templates
+                        _layout = this._('[this-type="layouts"] layout[this-id="'
+                                + __layout.attr('this-extends') + '"],'
+                                + '[this-type="layouts"] [this-type="layout"][this-id="'
+                                + __layout.attr('this-extends') + '"]').clone();
+                    // doesn't exist in templates
+                    if (!_layout.length) {
+                        // get from filesystem
+                        internal.fullyFromURL.call(this, 'layout', __layout.attr('this-extends'),
+                                function (_layout) {
+                                    __layout.removeAttr('this-extends');
+                                    _layout.removeAttr('this-url')
+                                            .find('[this-content]').html(__layout);
+                                    if (_layout.attr('this-extends'))
+                                        internal.extendLayout
+                                                .call(_this, _layout, replaceInState);
+                                    else
+                                        internal.finalizePageLoad
+                                                .call(_this, _layout, replaceInState);
+
+                                },
+                                function () {
+                                    _this.error('Layout [' + __layout.attr('this-extends')
+                                            + '] not found!');
+                                    __layout.removeAttr('this-extends');
+                                    internal.finalizePageLoad.call(_this, __layout, replaceInState);
+                                });
+                    }
+                    else {
+                        __layout.removeAttr('this-extends');
+                        if (_layout.attr('this-url')) {
+                            this.request(_layout.attr('this-url'),
+                                    function (data) {
+                                        _layout.removeAttr('this-url')
+                                                .html(data)
+                                                .find('[this-content]')
+                                                .html(__layout.show());
+                                        if (_layout.attr('this-extends')) {
+                                            internal.extendLayout.call(_this, _layout, replaceInState);
+                                        }
+                                        else {
+                                            internal.finalizePageLoad.call(_this, _layout,
+                                                    replaceInState);
+                                        }
+                                    },
+                                    function () {
+                                    },
+                                    {}, 'text');
+                        }
+                        else {
+                            _layout.find('[this-content]')
+                                    .html(__layout.removeAttr('this-extends').show());
+                            if (_layout.attr('this-extends')) {
+                                internal.extendLayout.call(this, _layout, replaceInState);
+                            }
+                            else {
+                                internal.finalizePageLoad.call(this, _layout, replaceInState);
+                            }
+                        }
+                    }
+                },
+                /**
+                 * Fills content variables with data
+                 * @param array variables
+                 * @param array data
+                 * @param string content
+                 * @returns string
+                 */
+                fillVariables: function (variables, data, content) {
+                    var _this = this;
+                    if (variables && data && content) {
+                        this.__.forEach(variables, function (i, v) {
+                            var value = internal.getVariableValue.call(_this, v, data);
+                            content = content.replace(v, value || value == 0 ? value : v);
+                        });
+                    }
+                    return content;
+                },
+                /**
+                 * Finalizes page load after layouts have been loaded
+                 * @param {_} _layout
+                 * @param {boolean} replaceInState
+                 * @returns {void}
+                 */
+                finalizePageLoad: function (_layout, replaceInState) {
+                    this.removedAssets = {};
+                    internal.loadAssets.call(this, _layout);
+                    var _this = this;
+                    if (_layout && _layout.length) {
+                        if (!this.container.find('layout[this-id="'
+                                + _layout.attr('this-id')
+                                + '"],[this-type="layout"][this-id="' + _layout.attr('this-id') + '"]').length)
+                            this.container.html(_layout.show());
+                    }
+                    else
+                        this.container.html(this.page);
+                    this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
+                            + '"]:not([this-dead]),'
+                            + '[this-type="page"][this-id="'
+                            + this.page.attr('this-id')
+                            + '"]:not([this-dead])')
+                            .attr('this-current', '')
+                            .removeAttr('this-layout')
+                            .show();
+                    this.page.find('[this-type]').hide();
+                    internal.loadAssets.call(this, this.page, function () {
+                        internal.loadComponents.call(this, function () {
+                            this.page = internal.doTar.call(this, this.page);
+                            var transit = this.__.callable(this.config.transition, true), wait;
+                            if (transit)
+                                wait = transit.call(null, _this.oldPage.removeAttr('this-current'),
+                                        this.page, this.config.transitionOptions);
+                            else if (this.__.isString(this.config.transition)) {
+                                if (!Transitions[this.config.transition])
+                                    this.config.transition = 'switch';
+                                wait = Transitions[this.config.transition](_this.oldPage
+                                        .removeAttr('this-current'),
+                                        this.page, this.config.transitionOptions);
+                            }
+                            setTimeout(function () {
+                                _this.oldPage.remove();
+                                delete _this.oldPage;
+                            }, wait);
+                            if (this.config.titleContainer)
+                                this.config.titleContainer.html(this.page.attr('this-title'));
+                            if (this.page.attr('this-url')) {
+                                this.request(this.page.attr('this-url'), function (data) {
+                                    _this.page.html(data);
+                                    internal.loadModels.call(_this, replaceInState, true);
+                                },
+                                        function () {
+                                        }, {}, 'text');
+                            }
+                            else {
+                                internal.loadModels.call(this, replaceInState, true);
+                            }
+                        }.bind(this));
+                    });
+                },
+                /**
+                 * Loads a type fully from URL
+                 * @param {string} type page || layout || component
+                 * @param {string} id
+                 * @param {boolean} replaceInState
+                 * @returns {void}
+                 */
+                fullyFromURL: function (type, id, success, error) {
+                    if (!this.config.paths) {
+                        this.__.callable(error).call(this);
+                        return;
+                    }
+                    var _this = this,
+                            pathConfig = this.config.paths[type + 's'],
+                            url = pathConfig.dir + id + pathConfig.ext;
+                    this.request(url,
+                            function (data) {
+                                var elem = _this.__.createElement(data);
+                                if (type !== 'component') {
+                                    if (!elem.length || elem.length > 1 ||
+                                            (!elem.is(type) && elem.attr('this-type') !== type))
+                                    {
+                                        elem = _this._('<div this-type="' + type + '" this-id="'
+                                                + id + '" />')
+                                                .html(data);
+                                    }
+                                    elem.attr('this-id', id);
+                                }
+                                if (!_this._('[this-type="' + type + 's"]').length) {
+                                    _this._('body').append('<div this-type="' + type
+                                            + 's" style="display:none" />');
+                                }
+                                _this._('[this-type="' + type + 's"]').append(elem);
+                                _this.__.callable(success).call(this, elem);
+                            },
+                            function (e) {
+                                _this.__.callable(error).call(this, e);
+                            }, {}, 'text');
+                },
+                /**
+                 * Fetches the value of the variable on a deep level
+                 * @param string variable May contain dots (.) which denote children keys
+                 * @param object data The object from which to get the value
+                 * @returns string
+                 */
+                getDeepValue: function (variable, data) {
+                    var value = data, vars = __.isObject(variable, true) ? variable : variable.split('.');
+                    __.forEach(vars, function (i, v) {
+                        if (!value)
+                            return false;
+                        value = value[v];
+                    });
+                    return value || value == 0 ? value : '';
+                },
+                /**
+                 * Fetches all the expressions in the content
+                 * @param {string} content
+                 * @returns {Array}
+                 */
+                getExpressions: function (content) {
+                    var exps = [];
+                    this.__.forEach(content.split('({'), function (i, v) {
+                        if (!i)
+                            return;
+                        exps.push('({' + v.split('})')[0] + '})');
+                    });
+                    return exps;
+                },
+                /**
+                 * Retrieves the value of the variable from the data and filters it if required
+                 * @param {string} variable
+                 * @param {object} data
+                 * @param {Boolean} raw Indicates whether to return value without surrounding span tag
+                 * @returns {mixed}
+                 */
+                getVariableValue: function (variable, data, raw) {
+                    var _this = this,
+                            vars = variable.replace(/{*}*/g, '')
+                            .replace(/\\\|/g, '__fpipe__').split('|'),
+                            key = this.__.arrayRemoveIndex(vars, 0), value = this.__.contains(key, '.') ?
+                            internal.getDeepValue.call(null, key, data) : data[key];
+                    if (value || value == 0)
+                        this.__.forEach(vars, function (i, v) {
+                            v = v.replace(/__fpipe__/g, '|');
+                            var exp = v.split(':'), filter = _this.__.arrayRemoveIndex(exp, 0);
+                            if (Filters[filter])
+                                value = Filters[filter](value, exp.join(':'));
+                            if (!value) /* stop filtering if no value exists anymore */
+                                return false;
+                        });
+                    if (!value && value != 0)
+                        return;
+                    return value;
+//                    var _key = key.split('.');
+                    //                    return raw ? value : '<span this-for="' + _key[_key.length - 1] + '">' + value
+                    //                            + '</span>';
+                },
+                /**
+                 * Groups the function output on the console
+                 * @param {String} name
+                 * @param {Function} func The action to be performed in the group
+                 * @param (Boolean) isMethod Indicates whether the group name is a method name
+                 * @returns {mixed}
+                 */
+                groupConsoleOutput: function (name, func, isMethod) {
+                    if (isMethod)
+                        name += '(...)';
+                    if (internal.debugLevel.call(this) >= 2)
+                        this.console('group', name);
+                    var result = this.tryCatch(this.__.callable(func));
+                    if (internal.debugLevel.call(this) >= 2)
+                        this.console('groupEnd');
+                    return result;
+                },
+                /**
+                 * Does things on looped objects
+                 * @param {object} current Object containing the key/index and the value/model 
+                 * currently being processed
+                 * @param {string} filter Expression to evaluate on content
+                 * @param {string} content
+                 * @returns {_}
+                 */
+                inLoop: function (current, filter, content) {
+                    /* evaluates filter */
+                    if (filter && !eval(filter.trim()))
+                        return;
+                    content = this._(document.createElement('div'))
+                            .html(content);
+                    var _this = this, level = 0, matched = {};
+                    content.find('[this-each]').each(function () {
+                        var __this = _this._(this).attr('this-muted', '');
+                        __this.html(__this.html()
+                                .replace(/\{\{/g, '__obrace__')
+                                .replace(/\}\}/g, '__cbrace__')
+                                .replace(/\(\{/g, '__obrace2__')
+                                .replace(/\}\)/g, '__cbrace2__'))
+                                .find('[this-if], [this-else-if], [this-else]')
+                                .attr('this-ignore', '');
+                    });
+                    content.find('[this-if],[this-else-if],[this-else]')
+                            .each(function () {
+                                var __this = _this._(this);
+                                if (__this.attr('this-if') && !__this.hasAttr('this-ignore'))
+                                {
+                                    level++;
+                                    if (eval(__this.attr('this-if').trim())) {
+                                        __this.removeAttr('this-if');
+                                        matched[level] = true;
+                                    }
+                                    else {
+                                        matched[level] = false;
+                                        __this.remove();
+                                    }
+                                    if (__this.hasAttr('this-end-if')) {
+                                        __this.removeAttr('this-end-if');
+                                        delete matched[level];
+                                        level--;
+                                    }
+                                }
+                                else if (__this.attr('this-else-if') && !__this.hasAttr('this-ignore'))
+                                {
+                                    if (!__.isBoolean(matched[level])) {
+                                        _this.error('Branching error: Else-if without If!');
+                                        return;
+                                    }
+                                    if (matched[level] || !eval(__this.attr('this-else-if').trim()))
+                                        __this.remove();
+                                    else {
+                                        __this.removeAttr('this-else-if');
+                                        matched[level] = true;
+                                    }
+
+                                    if (__this.hasAttr('this-end-if')) {
+                                        __this.removeAttr('this-end-if');
+                                        delete matched[level];
+                                        level--;
+                                    }
+                                }
+                                else if (__this.hasAttr('this-else') && !__this.hasAttr('this-ignore'))
+                                {
+                                    if (!__.isBoolean(matched[level])) {
+                                        _this.error('Branching error: Else without If!');
+                                        return;
+                                    }
+                                    if (matched[level])
+                                        __this.remove();
+                                    else
+                                        __this.removeAttr('this-else');
+                                    if (__this.hasAttr('this-end-if'))
+                                        __this.removeAttr('this-end-if');
+                                    delete matched[level];
+                                    level--;
+                                }
+                            });
+                    content.find('[this-ignore]').removeAttr('this-ignore');
+                    return content.html();
+                },
+                /**
+                 * Checks that the type of container matches the given type
+                 * @param string type
+                 * @param string|_ container
+                 * @returns booean
+                 */
+                is: function (type, container) {
+                    return this._(container).attr('this-type') === type || this._(container).is(type);
+                },
+                /**
+                 * Loads the given type of asset on the given elementF
+                 * @param {string} type js|css
+                 * @param {string} name Asset filename, or full path to file if remote
+                 * @param {_} elem
+                 * @param {Function} callback
+                 * @returns {internal}
+                 */
+                loadAsset: function (type, name, elem, callback) {
+                    name = name.trim();
+                    var url = (name.indexOf('://') !== -1 && name.startsWith('//')) ?
+                            name : this.config.paths[type] + name,
+                            _this = this;
+                    if (type === 'css') {
+                        var current = this._('link[this-id="' + name + '"]');
+                        // if exists already, mark as current and move to next
+                        if (current.length) {
+                            current.attr('this-loaded', '');
+                            return;
+                        }
+                        // ensure url ends with .css
+                        if (!url.endsWith('.css'))
+                            url += '.css';
+                        // request new version if debugging
+                        if (this.config.debug)
+                            url += '?' + Math.round(Math.random() * 99999);
+                        // create link
+                        var link = this.__.createElement(null, 'link')
+                                // add attributes
+                                .attr('type', 'text/css')
+                                .attr('rel', 'stylesheet')
+                                .attr('this-for', elem.attr('this-type'))
+                                .attr('this-loaded', '')
+                                .attr('this-id', name);
+                        this.__.callable(callback).call(this);
+                        link.attr('href', url);
+                        // prepend link to elem
+                        elem.prepend(link);
+                    }
+                    else if (type === 'js') {
+                        var current = this._('script[this-id="' + name + '"]');
+                        // if exists already, mark as current and move to next
+                        if (current.length) {
+                            current.attr('this-loaded', '');
+                            this.__.callable(callback).call(this);
+                            return;
+                        }
+                        // ensure url ends with .js
+                        if (!url.endsWith('.js'))
+                            url += '.js';
+                        // request new version if debugging
+                        if (this.config.debug)
+                            url += '?' + Math.round(Math.random() * 99999);
+
+                        // create script
+                        var script = this.__.createElement(null, 'script')
+                                // add attributes
+                                .attr('type', 'application/javascript')
+                                .attr('this-for', elem.attr('this-type'))
+                                .attr('this-loaded', '')
+                                .attr('this-id', name);
+                        script.items[0].onload = function () {
+                            _this.__.callable(callback).call(_this);
+                        };
+                        script.attr('src', url);
+                        // append script to body
+                        this._('body').append(script);
+                        return internal;
+                    }
+                    this.__.callable(callback).call(this);
+                    return internal;
+                },
+                /**
+                 * Loads the assets (css|js) for the given element
+                 * @param {_} elem
+                 * @returns {internal}
+                 */
+                loadAssets: function (elem, callback) {
+                    var _this = this,
+                            elemType = elem.attr('this-type') || elem.items[0].tagName.toLowerCase(),
+                            leaveUnrequired;
+                    if (elem.attr('this-load-css') && !elem.hasAttr('this-with-css')) {
+                        // load comma-separated css files
+                        this.__.forEach(elem.attr('this-load-css').split(','),
+                                function (i, css) {
+                                    internal.loadAsset.call(_this, 'css', css, elem);
+                                });
+                        elem.attr('this-with-css', '').removeAttr('this-load-css');
+                    }
+
+                    // mark all scripts as old by removing attribute `this-loaded`
+                    if (!Object.keys(this.removedAssets).length)
+                        this._('script').removeAttr('this-loaded');
+
+                    if (elem.attr('this-load-js-first') && !elem.hasAttr('this-with-first-js'))
+                    {
+                        leaveUnrequired = true;
+                        var jses = elem.attr('this-load-js-first').split(','),
+                                removedAssets = this.removedAssets[elemType];
+                        // load comma-separated css files
+                        this.__.forEach(jses, function (i, js) {
+                            internal.loadAsset.call(_this, 'js', js, elem, function () {
+                                // loaded js is last js
+                                if (jses.length - 1 === i) {
+                                    // remove elem-type css and js files that don't belong to
+                                    // the elem type
+                                    if (!removedAssets)
+                                        _this._('script[this-for="' + elemType
+                                                + '"]:not([this-loaded])')
+                                                .remove();
+                                    // call callback function
+                                    _this.__.callable(callback).call(_this);
+                                }
+                            });
+                        });
+                        elem.attr('this-with-first-js', '');
+                    }
+                    // remove elem-type js files that don't belong to the elem type
+                    if (!leaveUnrequired && !this.removedAssets[elemType])
+                        this._('script[this-for="' + elemType + '"]:not([this-loaded])')
+                                .remove();
+                    // indicate that unrequired assets have been removed to avoid removal of currently
+                    // required assets
+                    this.removedAssets[elemType] = true;
+                    if (!leaveUnrequired)
+                        this.__.callable(callback).call(this);
+                    return internal;
+                },
+                /**
+                 * Loads a collection
+                 * @param {_}|{HTMLElement} __this
+                 * @param {boolean} replaceState
+                 * @param {boolean} looping Indicates whether loading collection in loop of collections.
+                 * This means that the count on collections would be reduced by one after loading this.
+                 * @param {Object} data The data to load into the collection. If available and a url
+                 * exists on __this, it is monitored for changes to the data.
+                 * @returns {void}
+                 */
+                loadCollection: function (__this, replaceState, looping, chain, data) {
+                    __this = this._(__this).addClass('loading');
+                    var _this = this,
+                            content = __this.html(),
+                            model_name = __this.attr('this-model'),
+                            model_to_bind = _this.page.find('model[this-id="' + model_name
+                                    + '"],[this-type="model"][this-id="' + model_name
+                                    + '"]');
+
+                    __this = internal.doTar.call(this, __this, true);
+                    __this.html(__this.children().attr('this-cache', __this.attr('this-model') || '')
+                            .hide().outerHtml()
+                            .replace(/\(\{/g, '__obrace2__')
+                            .replace(/\}\)/g, '__cbrace2__'));
+
+                    if (model_name && model_to_bind.length)
+                        model_to_bind.attr('this-bind', true);
+
+                    var requestData = {}, save = true, success, error;
+                    if (_this.page.attr('this-query')) {
+                        requestData['query'] = _this.page.attr('this-query');
+                        /* don't save search response requestData */
+                        save = false;
+                    }
+                    if (__this.attr('this-search'))
+                        requestData['keys'] = __this.attr('this-search');
+
+                    // callbacks for request
+                    success = function (data, uid) {
+                        if (uid)
+                            __this.attr('this-model-uid', uid);
+                        internal.loadData
+                                .call(_this, __this, data, content, false, save);
+                        __this.attr('this-loaded', '')
+                                .trigger('collection.loaded');
+                        if (looping)
+                            _this.__proto__.collections--;
+                        if (chain && !_this.collections)
+                            internal.loadForms.call(_this, null, null, replaceState, chain);
+                    },
+                            error = function () {
+                                if (looping)
+                                    _this.__proto__.collections--;
+                                if (chain && !_this.collections)
+                                    internal.loadForms.call(_this, null, null, replaceState, chain);
+                            };
+                    internal.loadOrRequestData.call(this, {
+                        elem: __this,
+                        content: content,
+                        data: data,
+                        success: success,
+                        error: error,
+                        looping: looping,
+                        chain: chain,
+                        replaceState: replaceState,
+                        requestData: requestData
+                    });
+                    return this;
+                },
+                /**
+                 * Loads all collections in the current page
+                 * @param boolean replaceState
+                 * @returns ThisApp
+                 */
+                loadCollections: function (replaceState, chain) {
+                    var _this = this;
+                    var collections = this.page.find('collection:not([this-loaded])'
+                            + ':not([this-cache]):not([this-data]),'
+                            + '[this-type="collection"]:not([this-loaded]):not([this-cache])'
+                            + ':not([this-data])');
+                    this.__proto__.collections += collections.length;
+                    if (chain && !collections.length)
+                        internal.loadForms.call(this, null, null, replaceState, chain);
+                    collections.each(function () {
+                        var __this = _this._(this).addClass('loading');
+                        if (!__this.attr('this-model'))
+                            __this.attr('this-model', __this.attr('this-id'));
+                        // ensure collection content is grouped together
+                        if (__this.children().length > 1)
+                            __this.innerWrap('<div/>');
+                        // cache collection if not exist in dom as unloaded
+                        if (!_this._('collection[this-id="' + __this.attr('this-id') +
+                                '"]:not(.loading),[this-type="collection"][this-id="'
+                                + __this.attr('this-id') + '"]:not(.loading)').length) {
+                            var cache = __this.removeAttr('this-loaded')
+                                    .removeClass('loading').attr('this-cache', '').hide().outerHtml()
+                                    .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
+                            _this.page.append(cache);
+                        }
+                        __this.removeClass('loading');
+                        internal.loadCollection.call(_this, __this, replaceState, true, chain);
+                    });
+                    return this;
+                },
+                /**
+                 * Loads a single component
+                 * @param {_} __this
+                 * @param {_} component
+                 * @param function callback To be called when all components have been loaded
+                 * @returns {void}
+                 */
+                loadComponent: function (__this, component, callback) {
+                    var _this = this,
+                            collection_id;
+                    this.__.forEach(__this.attr(), function (i, attr) {
+                        if (attr.name === 'this-component' || attr.name === 'this-url')
+                            return;
+                        if ((attr.name === 'this-filter' || attr.name === 'this-search')
+                                && _this.__.contains(attr.value, ':')) {
+                            var split = attr.value.split(':'),
+                                    target = _this.__.arrayRemoveIndex(split, 0),
+                                    value = split.join(':'),
+                                    selector = '[this-id="' + target + '"]';
+                            if (_this.__.contains(target, '#')) {
+                                split = target.split('#');
+                                selector = split[0] + '[this-id="' + split[1]
+                                        + '"],[this-type="' + split[0]
+                                        + '"][this-id="' + split[1] + '"]';
+                                collection_id = split[1];
+                            }
+                            component.find(selector).attr(attr.name, value);
+                            return;
+                        }
+
+                        component.attr(attr.name, attr.value);
+                    });
+                    if (!component.attr('this-type') && !component.is('collection')
+                            && !component.is('model'))
+                        component.attr('this-type', 'component');
+                    if (component.attr('this-type') === 'component' || component.is('component')) {
+                        component.attr('this-loaded', '').show();
+                    }
+                    else {// hide non-components, e.g. collection, until system shows them
+                        component.hide();
+                    }
+                    __this.replaceWith(component).trigger('component.loaded');
+                    this.__proto__.components--;
+                    if (!this.__proto__.components)
+                        this.__.callable(callback).call(this);
                 },
                 /**
                  * Loads all components in the current page
@@ -2256,51 +1966,376 @@
                     return this;
                 },
                 /**
-                 * Loads a single component
-                 * @param {_} __this
-                 * @param {_} component
-                 * @param function callback To be called when all components have been loaded
-                 * @returns {void}
+                 * Loads the response data into the container
+                 * @param mixed container
+                 * @param mixed data Object or data. If object, the array of data key must be set with 
+                 * setDataKey()
+                 * @param string content Template content to use
+                 * @param boolean model Indicates whether the data is just model
+                 * @param boolean save Indicates whether to save the data to store or not. Default is TRUE
+                 * @returns ThisApp
                  */
-                loadComponent: function (__this, component, callback) {
-                    var _this = this,
-                            collection_id;
-                    this.__.forEach(__this.attr(), function (i, attr) {
-                        if (attr.name === 'this-component' || attr.name === 'this-url')
-                            return;
-                        if ((attr.name === 'this-filter' || attr.name === 'this-search')
-                                && _this.__.contains(attr.value, ':')) {
-                            var split = attr.value.split(':'),
-                                    target = _this.__.arrayRemoveIndex(split, 0),
-                                    value = split.join(':'),
-                                    selector = '[this-id="' + target + '"]';
-                            if (_this.__.contains(target, '#')) {
-                                split = target.split('#');
-                                selector = split[0] + '[this-id="' + split[1]
-                                        + '"],[this-type="' + split[0]
-                                        + '"][this-id="' + split[1] + '"]';
-                                collection_id = split[1];
+                loadData: function (container, data, content, isModel, save) {
+                    container = this._(container);
+                    // trigger invalid.response trigger if no data
+                    if (!data) {
+                        container.trigger('invalid.response');
+                        return;
+                    }
+                    // get variables in content
+                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
+                            // model_name for containers, model id for models
+                            save_as = container.attr('this-model') || container.attr('this-id'),
+                            // default data structure
+                            _data = {
+                                data: {},
+                                // set expiration timestamp to 24 hours
+                                expires: new Date().setMilliseconds(1000 * 3600 * 24)
+                            };
+
+                    // get expiration if set and data from dataKey if specified
+                    if (this.config.dataKey) {
+                        // set data expiration timestamp too.
+                        if (!isNaN(data.expires)) // expiration is a number. Must be milliseconds
+                            _data.expires = new Date().setMilliseconds(1000 * data.expires);
+                        else if (this.__.isString(data.expires)) // expiration is a string. Must be date
+                            _data.expires = new Date(data.expires).getTime();
+                        data = data[this.config.dataKey];
+                    }
+                    // loading a collection
+                    if (this.__.isArray(data) || isModel === false) {
+                        // check if can continue with rendering
+                        var __data = internal.canContinue
+                                .call(this, 'collection.render', [data, container]);
+                        // rendering canceled
+                        if (!__data) {
+                            container.trigger('collection.render.canceled');
+                            return this;
+                        }
+                        // rendering continues. Overwrite data with returned value if object 
+                        else if (this.__.isObject(__data, true))
+                            data = __data;
+                        var _this = this,
+                                // filter for the collection
+                                filter = container.attr('this-filter'),
+                                // for processing table and its descendants' templates
+                                level = 0,
+                                // the template element
+                                child = container.children().get(0),
+                                // unique id key for models
+                                uid = container.attr('this-model-uid') || 'id',
+                                // the url of the collection/model
+                                url = container.attr('this-url');
+                        if (child) {
+                            // process content properly
+                            switch (child.tagName.toLowerCase()) {
+                                case "td":
+                                    level = 3;
+                                    content = _this._('<table />').html(content).outerHtml();
+                                    break;
+                                case "tr":
+                                    level = 2;
+                                    content = _this._('<table />').html(content).outerHtml();
+                                    break;
                             }
-                            component.find(selector).attr(attr.name, value);
+                        }
+                        this.__.forEach(data, function (index, model) {
+                            // if saving data is allowed
+                            if (save !== false)
+                                // set model into data to save. use uid if available, or else index
+                                _data.data[model[uid] || index] = model;
+                            // process content as being in a loop
+                            var _content = internal.inLoop.call(_this, {
+                                index: index,
+                                model: model
+                            }, filter,
+                                    content.replace(/{{_index}}/g, index));
+                            // if there's not content, go to the next model
+                            if (!_content)
+                                return;
+                            // process expressions in content
+                            _content = _this._(internal.processExpressions.call(_this,
+                                    _content, {
+                                        index: index,
+                                        model: model
+                                    }));
+                            // uid must exist in model
+                            if (!model[uid])
+                                model[uid] = index;
+                            // continue loading
+                            internal.doLoad.call(_this, container, model, _content, variables,
+                                    false, level);
+                        });
+                        // if saving data is allowed
+                        if (save !== false) {
+                            // save uid
+                            _data.uid = container.attr('this-model-uid') || 'id';
+                            // save url
+                            _data.url = url;
+                        }
+                    }
+                    // loading a model
+                    else if (data && isModel) {
+                        // check if can continue rendering
+                        var __data = internal.canContinue
+                                .call(this, 'model.render', [data, container]);
+                        // rendering canceled
+                        if (!__data) {
+                            container.trigger('model.render.canceled');
+                            return this;
+                        }
+                        // continue rendering. update data with returned value if object
+                        else if (this.__.isObject(__data))
+                            data = __data;
+                        // saving is allowed
+                        if (save !== false) {
+                            save_as = container.attr('this-id');
+                            // store data under its uid
+                            _data.data[data[container.attr('this-uid') || 'id']] = data;
+                            // get url without the model id
+                            // split into array by /
+                            var _url = container.attr('this-url').split('/');
+                            // remove the last value
+                            this.__.arrayRemoveIndex(_url, _url.length - 1);
+                            // save the url
+                            _data.url = _url.join('/') + '/';
+                        }
+                        // add url to model data for parsing
+                        data['_url'] = container.attr('this-url');
+                        // continue loading
+                        internal.doLoad.call(this, container, data, content, variables, true);
+                    }
+                    // remove filter attribute and show
+                    container.removeAttr('this-filter').show();
+                    if (save !== false)
+                        internal.cache.call(this, 'model', save_as, _data, true);
+                    return this;
+                },
+                /**
+                 * Loads the given form elements with the model
+                 * @param array elements
+                 * @param object model
+                 * @returns ThisApp
+                 */
+                loadFormElements: function (elements, model) {
+                    if (!model)
+                        return;
+                    var _this = this;
+                    this.__.forEach(elements, function () {
+                        var __this = _this._(this),
+                                key = __this.attr('this-is');
+                        if (!key)
+                            return;
+                        var data = _this.__.extend({}, model, true),
+                                keys = _this.__.contains(key, '.') ? keys = key.split('.') : keys = [key];
+                        _this.__.forEach(keys, function (i, v) {
+                            data = data[v];
+                        });
+                        if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox') {
+                            // using attribute so that redumping content 
+                            // would still work fine
+                            if (__this.attr('value') == data || data == on)
+                                __this.attr('checked', 'checked');
                             return;
                         }
-
-                        component.attr(attr.name, attr.value);
+                        else if (__this.is('select')) {
+                            __this.children().each(function () {
+                                var val = _this._(this).attr('value') || _this._(this).html().trim();
+                                if (val == data)
+                                    _this._(this).attr('selected', 'selected');
+                                else
+                                    _this._(this).removeAttr('selected');
+                            });
+                            // using attribute so that redumping content 
+                            // would still work fine
+                            //                            __this.find('[value="' + data + '"]').attr('selected', 'selected');
+                            return;
+                        }
+                        // using attribute so that redumping content 
+                        // would still work fine
+                        __this.attr('value', data);
                     });
-                    if (!component.attr('this-type') && !component.is('collection')
-                            && !component.is('model'))
-                        component.attr('this-type', 'component');
-                    if (component.attr('this-type') === 'component'
-                            || component.is('component')) {
-                        component.attr('this-loaded', '').show();
+                    return this;
+                },
+                /**
+                 * Loads all forms
+                 * @param {_} forms Required if to load specific forms
+                 * @param object model May be supplied if loading specific forms
+                 * @returns {ThisApp}
+                 */
+                loadForms: function (forms, model, replaceState, chain) {
+                    var _this = this, isPage = false;
+                    if (!forms) {
+                        isPage = this.page.is('form');
+                        forms = isPage ? this.page : this.page.find('form');
                     }
-                    else {// hide non-components, e.g. collection, until system shows them
-                        component.hide();
+                    forms.each(function () {
+                        var __this = _this._(this),
+                                elements = Array.from(this.elements);
+                        // pass form action type from page to form if not exist on form                 
+                        if (!__this.hasAttr('this-do') && _this.page.attr('this-do'))
+                            __this.attr('this-do', _this.page.attr('this-do'));
+                        // is search form. no need loading except for search field
+                        if ((__this.attr('this-do') === 'search' ||
+                                _this.page.attr('this-do') === 'search') &&
+                                _this.page.attr('this-query')) {
+                            __this.find('[this-search]').attr('value', _this.page.attr('this-query'));
+                            return;
+                        }
+                        internal.doTar.call(_this, __this, true);
+                        var mid = __this.attr('this-mid') || _this.page.attr('this-mid'),
+                                model_name = __this.attr('this-model') || _this.page.attr('this-model');
+                        if (!mid)
+                            return;
+                        if (!model)
+                            model = internal.modelFromStore.call(_this, mid, model_name);
+                        if (model)
+                            internal.loadFormElements.call(_this, elements, model);
+                        __this.attr('this-loaded', '').trigger('form.loaded');
+                    });
+                    if (chain)
+                        internal.pageLoaded.call(this, replaceState);
+                    return this;
+                },
+                /**
+                 * Loads all layouts for the page
+                 * @param {boolean} replaceInState
+                 * @returns {void}
+                 */
+                loadLayouts: function (replaceInState) {
+                    var _layout = _(), _this = this;
+                    if (this.config.layout || this.page.attr('this-layout')) {
+                        var layout = this.page.attr('this-layout') || this.config.layout;
+                        // get existing layout in container if not asked to reload layouts
+                        _layout = this.reloadLayouts ? _layout :
+                                this.container.find('layout[this-id="' + layout
+                                        + '"],[this-type="layout"][this-id="' + layout + '"]');
+                        // layout does not exist in container
+                        if (!_layout.length) {
+                            // get layout template
+                            _layout = this._('[this-type="layouts"] layout[this-id="' + layout + '"],'
+                                    + '[this-type="layouts"] [this-type="layout"][this-id="'
+                                    + layout + '"]').clone().attr('this-loaded', '');
+                            // layout doesn't exist
+                            if (!_layout.length) {
+                                internal.fullyFromURL.call(this, 'layout', layout,
+                                        function (_layout) {
+                                            _layout.removeAttr('this-url')
+                                                    .find('[this-content]').html(_this.page);
+                                            if (_layout.attr('this-extends'))
+                                                internal.extendLayout
+                                                        .call(_this, _layout, replaceInState);
+                                            else {
+                                                internal.finalizePageLoad
+                                                        .call(_this, _layout.clone(), replaceInState);
+                                            }
+
+                                        },
+                                        function () {
+                                            _this.error('Layout [' + layout + '] not found!');
+                                            internal.finalizePageLoad.call(_this, _layout,
+                                                    replaceInState);
+                                        });
+                            }
+                            else {
+                                if (_layout.attr('this-url')) {
+                                    this.request(_layout.attr('this-url'),
+                                            function (data) {
+                                                _layout.removeAttr('this-url')
+                                                        .html(data)
+                                                        .find('[this-content]')
+                                                        .html(_this.page);
+                                                if (_layout.attr('this-extends'))
+                                                    internal.extendLayout.call(_this, _layout,
+                                                            replaceInState);
+                                                else {
+                                                    internal.finalizePageLoad.call(_this, _layout,
+                                                            replaceInState);
+                                                }
+                                            },
+                                            function () {
+                                                _this.error('Layout [' + layout + '] not found!');
+                                                internal.finalizePageLoad.call(_this, _layout,
+                                                        replaceInState);
+                                            },
+                                            {}, 'text');
+                                }
+                                else {
+                                    _layout.find('[this-content]').html(_this.page);
+                                    if (_layout.attr('this-extends'))
+                                        internal.extendLayout.call(this, _layout, replaceInState);
+                                    else {
+                                        internal.finalizePageLoad.call(this, _layout, replaceInState);
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            _layout.find('[this-content]').html(this.page.show());
+                            internal.finalizePageLoad.call(this, _layout, replaceInState);
+                        }
                     }
-                    __this.replaceWith(component).trigger('component.loaded');
-                    this.__proto__.components--;
-                    if (!this.__proto__.components)
-                        this.__.callable(callback).call(this);
+                    else {
+                        internal.finalizePageLoad.call(this, _layout, replaceInState);
+                    }
+                },
+                /**
+                 * Loads a model on the current page
+                 * @param {HTMLElement}|{_} target
+                 * @param boolean binding Indicates whether to currently binding model to a collection
+                 * @param boolean replaceState Indicates whether to overwrite current state
+                 *  after loading model
+                 * @returns void
+                 */
+                loadModel: function (target, data, replaceState, chain, looping) {
+                    var __this = this._(target),
+                            content = __this.hide().outerHtml(),
+                            _this = this;
+                    __this = internal.doTar.call(this, __this, true);
+                    if (!data && !__this.attr('this-url')) {
+                        this.__proto__.models--;
+                        if (chain && !this.models)
+                            internal.loadCollections.call(this, replaceState, chain);
+                        return;
+                    }
+                    if (__this.siblings('[this-cache="' + __this.attr('this-id')
+                            + '"]').length) {
+
+                        // necessary in case of binding and target has already been used
+                        content = __this.siblings('[this-cache="' + __this.attr('this-id') + '"]')
+                                .hide().outerHtml();
+                    }
+                    else { // keep a copy for later use
+                        var cache = _this._(content
+                                .replace(/\(\{/g, '__obrace2__')
+                                .replace(/\}\)/g, '__cbrace2__'))
+                                .attr('this-cache', __this.attr('this-id'));
+                        __this.parent().append(cache.hide());
+                    }
+                    __this.html(content);
+                    var success = function (data) {
+                        internal.loadData.call(_this, __this, data, content, true, true);
+                        __this.attr('this-loaded', '').trigger('model.loaded');
+                        _this.__proto__.models--;
+                        if (chain && !this.models)
+                            internal.loadCollections.call(_this, replaceState, chain);
+                    },
+                            error = function () {
+                                _this.__proto__.models--;
+                                if (chain && !this.models)
+                                    internal.loadCollections.call(_this, replaceState, chain);
+                            };
+                    internal.loadOrRequestData.call(this, {
+                        elem: __this,
+                        content: content,
+                        data: data,
+                        success: success,
+                        error: error,
+                        looping: looping,
+                        chain: chain,
+                        replaceState: replaceState
+                    });
+                    return __this;
                 },
                 /**
                  * Loads all models in the current page
@@ -2325,63 +2360,6 @@
                         internal.loadModel.call(_this, this, null, replaceState, chain, true);
                     });
                     return this;
-                },
-                /**
-                 * Loads a model on the current page
-                 * @param {HTMLElement}|{_} target
-                 * @param boolean binding Indicates whether to currently binding model to a collection
-                 * @param boolean replaceState Indicates whether to overwrite current state
-                 *  after loading model
-                 * @returns void
-                 */
-                loadModel: function (target, data, replaceState, chain, looping) {
-                    var __this = this._(target),
-                            content = __this.hide().outerHtml(),
-                            _this = this;
-                    __this = internal.doTar.call(this, __this, true);
-                    if (!data && !__this.attr('this-url')) {
-                        this.__proto__.models--;
-                        if (chain && !this.models)
-                            internal.loadCollections.call(this, replaceState, chain);
-                        return;
-                    }
-                    if (__this.siblings('[this-cache="' + __this.attr('this-id')
-                            + '"]').length) {
-                        // necessary in case of binding and target has already been used
-                        content = __this.siblings('[this-cache="' + __this.attr('this-id') + '"]')
-                                .html().hide();
-                    }
-                    else { // keep a copy for later use
-                        var cache = _this._(content
-                                .replace(/\(\{/g, '__obrace2__')
-                                .replace(/\}\)/g, '__cbrace2__'))
-                                .attr('this-cache', __this.attr('this-id'));
-                        __this.parent().append(cache.hide());
-                    }
-
-                    var success = function (data) {
-                        internal.loadData.call(_this, __this, data, content, true, true);
-                        __this.attr('this-loaded', '').trigger('model.loaded');
-                        _this.__proto__.models--;
-                        if (chain && !this.models)
-                            internal.loadCollections.call(_this, replaceState, chain);
-                    },
-                            error = function () {
-                                _this.__proto__.models--;
-                                if (chain && !this.models)
-                                    internal.loadCollections.call(_this, replaceState, chain);
-                            };
-
-                    internal.loadOrRequestData.call(this, {
-                        elem: __this,
-                        content: content,
-                        data: data,
-                        success: success,
-                        error: error,
-                        looping: looping,
-                        chain: chain,
-                        replaceState: replaceState
-                    });
                 },
                 /**
                  * Loads the given data or requests and loads it.
@@ -2500,195 +2478,96 @@
                     }
                 },
                 /**
-                 * Loads all collections in the current page
-                 * @param boolean replaceState
-                 * @returns ThisApp
+                 * Fetches a model from a collection store
+                 * @param string model_id
+                 * @param string collection_id
+                 * @returns object|null
                  */
-                loadCollections: function (replaceState, chain) {
-                    var _this = this;
-                    var collections = this.page.find('collection:not([this-loaded])'
-                            + ':not([this-cache]):not([this-data]),'
-                            + '[this-type="collection"]:not([this-loaded]):not([this-cache])'
-                            + ':not([this-data])');
-                    this.__proto__.collections += collections.length;
-                    if (chain && !collections.length)
-                        internal.loadForms.call(this, null, null, replaceState, chain);
-                    collections.each(function () {
-                        var __this = _this._(this).addClass('loading');
-                        if (!__this.attr('this-model'))
-                            __this.attr('this-model', __this.attr('this-id'));
-                        // ensure collection content is grouped together
-                        if (__this.children().length > 1)
-                            __this.innerWrap('<div/>');
-                        // cache collection if not exist in dom as unloaded
-                        if (!_this._('collection[this-id="' + __this.attr('this-id') +
-                                '"]:not(.loading),[this-type="collection"][this-id="'
-                                + __this.attr('this-id') + '"]:not(.loading)').length) {
-                            var cache = __this.removeAttr('this-loaded')
-                                    .removeClass('loading').attr('this-cache', '').hide().outerHtml()
-                                    .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
-                            _this.page.append(cache);
-                        }
-                        __this.removeClass('loading');
-                        internal.loadCollection.call(_this, __this, replaceState, true, chain);
+                modelFromStore: function (model_id, model_name) {
+                    return this.tryCatch(function () {
+                        var _collection = internal.cache.call(this, 'model', model_name);
+                        return _collection && _collection.length && ((_collection.expires
+                                && _collection.expires > Date.now())
+                                || !_collection.expires) ? _collection.data[model_id] : null;
                     });
-                    return this;
                 },
                 /**
-                 * Loads a collection
-                 * @param {_}|{HTMLElement} __this
-                 * @param {boolean} replaceState
-                 * @param {boolean} looping Indicates whether loading collection in loop of collections.
-                 * This means that the count on collections would be reduced by one after loading this.
-                 * @param {Object} data The data to load into the collection. If available and a url
-                 * exists on __this, it is monitored for changes to the data.
-                 * @returns {void}
+                 * Saves a model to a collection store
+                 * @param string|int model_id
+                 * @param object model
+                 * @param string model_name
+                 * @param string uid
+                 * @returns object|null
                  */
-                loadCollection: function (__this, replaceState, looping, chain, data) {
-                    __this = this._(__this).addClass('loading');
-                    var _this = this,
-                            content = __this.html(),
-                            model_name = __this.attr('this-model'),
-                            model_to_bind = _this.page.find('model[this-id="' + model_name
-                                    + '"],[this-type="model"][this-id="' + model_name
-                                    + '"]');
-
-                    __this = internal.doTar.call(this, __this, true);
-                    __this.html(__this.children().attr('this-cache', __this.attr('this-model') || '')
-                            .hide().outerHtml()
-                            .replace(/\(\{/g, '__obrace2__')
-                            .replace(/\}\)/g, '__cbrace2__'));
-
-                    if (model_name && model_to_bind.length)
-                        model_to_bind.attr('this-bind', true);
-
-                    var requestData = {}, save = true, success, error;
-                    if (_this.page.attr('this-query')) {
-                        requestData['query'] = _this.page.attr('this-query');
-                        /* don't save search response requestData */
-                        save = false;
-                    }
-                    if (__this.attr('this-search'))
-                        requestData['keys'] = __this.attr('this-search');
-
-                    // callbacks for request
-                    success = function (data, uid) {
-                        if (uid)
-                            __this.attr('this-model-uid', uid);
-                        internal.loadData
-                                .call(_this, __this, data, content, false, save);
-                        __this.attr('this-loaded', '')
-                                .trigger('collection.loaded');
-                        if (looping)
-                            _this.__proto__.collections--;
-                        if (chain && !_this.collections)
-                            internal.loadForms.call(_this, null, null, replaceState, chain);
-                    },
-                            error = function () {
-                                if (looping)
-                                    _this.__proto__.collections--;
-                                if (chain && !_this.collections)
-                                    internal.loadForms.call(_this, null, null, replaceState, chain);
-                            };
-
-                    internal.loadOrRequestData.call(this, {
-                        elem: __this,
-                        content: content,
-                        data: data,
-                        success: success,
-                        error: error,
-                        looping: looping,
-                        chain: chain,
-                        replaceState: replaceState,
-                        requestData: requestData
+                modelToStore: function (model_name, model_id, model, uid) {
+                    return this.tryCatch(function () {
+                        var collection = internal.cache.call(this, 'model', model_name)
+                                || {data: {}, uid: uid, length: 0};
+                        if (!model_id)
+                            model_id = model[collection.uid || uid];
+                        model = this.__.extend(collection.data[model_id], model, true);
+                        collection.data[model_id] = model;
+                        internal.cache.call(this, 'model', model_name, collection, false);
+                        return model;
                     });
-                    return this;
                 },
                 /**
-                 * Loads all forms
-                 * @param {_} forms Required if to load specific forms
-                 * @param object model May be supplied if loading specific forms
+                 * Called when the target page is not found a page
+                 * @param {string} page Page ID
                  * @returns {ThisApp}
                  */
-                loadForms: function (forms, model, replaceState, chain) {
-                    var _this = this, isPage = false;
-                    if (!forms) {
-                        isPage = this.page.is('form');
-                        forms = isPage ? this.page : this.page.find('form');
-                    }
-                    forms.each(function (i) {
-                        var __this = _this._(this),
-                                elements = Array.from(this.elements);
-                        // pass form action type from page to form if not exist on form
-                        if (!__this.hasAttr('this-do') && _this.page.attr('this-do'))
-                            __this.attr('this-do', _this.page.attr('this-do'));
-                        // is search form. no need loading except for search field
-                        if ((__this.attr('this-do') === 'search' ||
-                                _this.page.attr('this-do') === 'search') &&
-                                _this.page.attr('this-query')) {
-                            __this.find('[this-search]').attr('value', _this.page.attr('this-query'));
-                            return;
+                notAPage: function (page) {
+                    this.error('Page [' + page + '] not found');
+                    if (this.__.isString(this.notFound)) {
+                        page = this._(internal.selector.call(this, this.notFound
+                                .startsWith('page#') ? this.notFound : 'page#' + this.notFound,
+                                ':not([this-current]):not([this-dead])'));
+                        if (!page.length) {
+                            return this.error('Page [' + this.notFound + '] also not found');
                         }
-                        internal.doTar.call(_this, __this, true);
-                        var mid = __this.attr('this-mid') || _this.page.attr('this-mid'),
-                                model_name = __this.attr('this-model') || _this.page.attr('this-model');
-                        if (!mid)
-                            return;
-                        if (!model)
-                            model = internal.modelFromStore.call(_this, mid, model_name);
-                        if (model)
-                            internal.loadFormElements.call(_this, elements, model);
-                        __this.attr('this-loaded', '').trigger('form.loaded');
-                    });
-                    if (chain)
-                        internal.pageLoaded.call(this, replaceState);
-                    return this;
+                        internal.pageFound.call(this, page, true);
+                        return this;
+                    }
+                    else
+                        return this.__.callable(this.notFound).call(this, page);
                 },
                 /**
-                 * Loads the given form elements with the model
-                 * @param array elements
-                 * @param object model
-                 * @returns ThisApp
+                 * Called when the target page is found
+                 * @param {boolean} replaceInState
+                 * @returns {void}
                  */
-                loadFormElements: function (elements, model) {
-                    if (!model)
-                        return;
-                    var _this = this;
-                    this.__.forEach(elements, function () {
-                        var __this = _this._(this),
-                                key = __this.attr('this-is');
-                        if (!key)
-                            return;
-                        var data = _this.__.extend({}, model, true),
-                                keys = _this.__.contains(key, '.') ? keys = key.split('.') : keys = [key];
-                        _this.__.forEach(keys, function (i, v) {
-                            data = data[v];
-                        });
-                        if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox') {
-                            // using attribute so that redumping content 
-                            // would still work fine
-                            if (__this.attr('value') == data || data == on)
-                                __this.attr('checked', 'checked');
-                            return;
+                pageFound: function (page, replaceInState) {
+                    if (internal.is.call(this, 'page', page)) {
+                        if (!internal.canContinue.call(this, 'page.load', [page.items[0]])) {
+                            page.trigger('page.load.canceled');
+                            return this;
                         }
-                        else if (__this.is('select')) {
-                            __this.children().each(function () {
-                                var val = _this._(this).attr('value') || _this._(this).html().trim();
-                                if (val == data)
-                                    _this._(this).attr('selected', 'selected');
-                                else
-                                    _this._(this).removeAttr('selected');
-                            });
-                            // using attribute so that redumping content 
-                            // would still work fine
-//                            __this.find('[value="' + data + '"]').attr('selected', 'selected');
-                            return;
+                        if (this.page) {
+                            this.oldPage = this.page.attr('this-dead', '');
+                            if (this.oldPage.attr('this-id') === page.attr('this-id'))
+                                replaceInState = true;
                         }
-                        // using attribute so that redumping content 
-                        // would still work fine
-                        __this.attr('value', data);
-                    });
-                    return this;
+                        if (this.store('last_page') === page.attr('this-id'))
+                            replaceInState = true;
+                        this.page = page.clone();
+                        internal.loadLayouts.call(this, replaceInState);
+                    }
+                    else {
+                        this.error('Load page failed: ' + page.attr('this-id'));
+                        page.trigger('page.load.failed');
+                    }
+                },
+                /**
+                 * Parses the url hash
+                 * @returns {string} Target page ID
+                 */
+                pageIDFromLink: function (link) {
+                    if (link.startsWith('#'))
+                        link = link.substr(1);
+                    var parts = link.split('&');
+                    if (parts.length > 1)
+                        this.target_on_page = parts[1];
+                    return parts[0];
                 },
                 /**
                  * Called after the page has been fully loaded
@@ -2704,6 +2583,7 @@
                         return this;
 
                     var _this = this;
+                    // page was just loaded and not restored from history
                     if (!restored) {
                         this.container.find('[this-inline-code]').each(function () {
                             var __this = _this._(this);
@@ -2735,18 +2615,19 @@
                         internal.resolveTargetOnPage.call(this);
                         internal.saveState.call(this, replaceState);
                     }
+                    // page was restored from history
                     else {
                         this.page.attr('this-restored', '');
+                        internal.updatePage.call(this);
                     }
                     if (this.firstPage) {
                         if (restored)
                             // watch collections and models on current page
                             this.page.find('collection[this-loaded],[this-type="collection"]'
                                     + '[this-loaded],model[this-loaded],[this-type="model"]'
-                                    + '[this-loaded]')
-                                    .each(function () {
-                                        internal.watch.call(_this, this);
-                                    });
+                                    + '[this-loaded]').each(function () {
+                                internal.watch.call(_this, this);
+                            });
 
                         // get all previously watched collections and models
                         var watching = this.store('watching');
@@ -2761,224 +2642,18 @@
                     }
                     this.store('watching', this.watching);
                     this.page.trigger('page.loaded');
-                    internal.updatePage.call(this);
-                    // remove page-specific js file that doesn't belong to the current page
-                    this._('script[this-page]:not([this-page="' + this.page.attr('this-id')
-                            + '"])').remove();
                     // load required js
-                    if (this.page.attr('this-load-js') && !this._('script[this-page="'
-                            + this.page.attr('this-id') + '"][this-id="'
-                            + this.page.attr('this-load-js') + '"]').length) {
-                        var url = this.config.paths.js + this.page.attr('this-load-js');
-                        if (!url.endsWith('.js'))
-                            url += '.js';
-                        if (this.config.debug)
-                            url += '?' + Math.round(Math.random() * 99999);
-                        var script = this.__.createElement(null, 'script')
-                                .attr('type', 'application/javascript')
-                                .attr('src', url)
-                                .attr('this-id', this.page.attr('this-load-js'))
-                                .attr('this-page', this.page.attr('this-id'));
-                        this._('body').append(script);
-                    }
-                    return this;
-                },
-                /**
-                 * Loads the response data into the container
-                 * @param mixed container
-                 * @param mixed data Object or data. If object, the array of data key must be set with 
-                 * setDataKey()
-                 * @param string content Template content to use
-                 * @param boolean model Indicates whether the data is just model
-                 * @param boolean save Indicates whether to save the data to store or not. Default is TRUE
-                 * @returns ThisApp
-                 */
-                loadData: function (container, data, content, isModel, save) {
-                    container = this._(container);
-                    // trigger invalid.response trigger if no data
-                    if (!data) {
-                        container.trigger('invalid.response');
-                        return;
-                    }
-                    // get variables in content
-                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
-                            // model_name for containers, model id for models
-                            save_as = container.attr('this-model') || container.attr('this-id'),
-                            // default data structure
-                            _data = {
-                                data: {},
-                                // set expiration timestamp to 24 hours
-                                expires: new Date().setMilliseconds(1000 * 3600 * 24)
-                            };
-
-                    // get expiration if set and data from dataKey if specified
-                    if (this.config.dataKey) {
-                        // set data expiration timestamp too.
-                        if (!isNaN(data.expires)) // expiration is a number. Must be milliseconds
-                            _data.expires = new Date().setMilliseconds(1000 * data.expires);
-                        else if (this.__isString(data.expires)) // expiration is a string. Must be date
-                            _data.expires = new Date(data.expires).getTime();
-                        data = data[this.config.dataKey];
-                    }
-                    // loading a collection
-                    if (this.__.isArray(data) || isModel === false) {
-                        // check if can continue with rendering
-                        var __data = internal.canContinue
-                                .call(this, 'collection.render', [data, container]);
-                        // rendering canceled
-                        if (!__data) {
-                            container.trigger('collection.render.canceled');
-                            return this;
-                        }
-                        // rendering continues. Overwrite data with returned value if object
-                        else if (this.__.isObject(__data, true))
-                            data = __data;
-                        var _this = this,
-                                // filter for the collection
-                                filter = container.attr('this-filter'),
-                                // for processing table and its descendants' templates
-                                level = 0,
-                                // the template element
-                                child = container.children().get(0),
-                                // unique id key for models
-                                uid = container.attr('this-model-uid') || 'id',
-                                // the url of the collection/model
-                                url = container.attr('this-url');
-                        if (child) {
-                            // process content properly
-                            switch (child.tagName.toLowerCase()) {
-                                case "td":
-                                    level = 3;
-                                    content = _this._('<table />').html(content).outerHtml();
-                                    break;
-                                case "tr":
-                                    level = 2;
-                                    content = _this._('<table />').html(content).outerHtml();
-                                    break;
-                            }
-                        }
-                        this.__.forEach(data, function (index, model) {
-                            // if saving data is allowed
-                            if (save !== false)
-                                // set model into data to save. use uid if available, or else index
-                                _data.data[model[uid] || index] = model;
-                            // process content as being in a loop
-                            var _content = internal.inLoop.call(_this, {
-                                index: index,
-                                model: model
-                            }, filter,
-                                    content.replace(/{{_index}}/g, index));
-                            // if there's not content, go to the next model
-                            if (!_content)
-                                return;
-                            // process expressions in content
-                            _content = _this._(internal.processExpressions.call(_this,
-                                    _content, {
-                                        index: index,
-                                        model: model
-                                    }));
-                            // uid must exist in model
-                            if (!model[uid])
-                                model[uid] = index;
-                            // continue loading
-                            internal.doLoad.call(_this, container, model, _content, variables,
-                                    false, level);
+                    if (this.page.attr('this-load-js')
+                            && !this.page.hasAttr('this-with-js')) {
+                        var jses = this.page.attr('this-load-js').split(','),
+                                removedAssets = this.removedAssets;
+                        // load comma-separated css files
+                        this.__.forEach(jses, function (i, js) {
+                            internal.loadAsset.call(_this, 'js', js, _this.page);
                         });
-                        // if saving data is allowed
-                        if (save !== false) {
-                            // save uid
-                            _data.uid = container.attr('this-model-uid') || 'id';
-                            // save url
-                            _data.url = url;
-                        }
-                    }
-                    // loading a model
-                    else if (data && isModel) {
-                        // check if can continue rendering
-                        var __data = internal.canContinue
-                                .call(this, 'model.render', [data, container]);
-                        // rendering canceled
-                        if (!__data) {
-                            container.trigger('model.render.canceled');
-                            return this;
-                        }
-                        // continue rendering. update data with returned value if object
-                        else if (this.__.isObject(__data))
-                            data = __data;
-                        // saving is allowed
-                        if (save !== false) {
-                            save_as = container.attr('this-id');
-                            // store data under its uid
-                            _data.data[data[container.attr('this-uid') || 'id']] = data;
-                            // get url without the model id
-                            // split into array by /
-                            var _url = container.attr('this-url').split('/');
-                            // remove the last value
-                            this.__.arrayRemoveIndex(_url, _url.length - 1);
-                            // save the url
-                            _data.url = _url.join('/') + '/';
-                        }
-                        // add url to model data for parsing
-                        data['_url'] = container.attr('this-url');
-                        // continue loading
-                        internal.doLoad.call(this, container, data, content, variables, true);
-                    }
-                    // remove filter attribute and show
-                    container.removeAttr('this-filter').show();
-                    if (save !== false)
-                        internal.cache.call(this, 'model', save_as, _data, true);
-                    return this;
-                },
-                /**
-                 * Does the loading
-                 * @param {HTMLElement}|{_} container
-                 * @param object data
-                 * @param string content
-                 * @param array variables
-                 * @param {boolean} isModel Indicates whether loading a model or not
-                 * @returns ThisApp
-                 */
-                doLoad: function (container, data, content, variables, isModel, level) {
-                    if (isModel)
-                        content = internal.processExpressions.call(this, content, data);
-                    container = this._(container).hide();
-                    var _temp = internal.parseData.call(this, data, content, variables, false, isModel),
-                            id = container.attr('this-model-uid') || container.attr('this-uid')
-                            || 'id';
-                    while (level) {
-                        _temp = _temp.children();
-                        level--;
-                    }
-                    if (!isModel) {
-                        _temp.attr('this-mid', (data[id] || data[id] == 0 ? data[id] : ''))
-                                .attr('this-uid', id)
-                                .attr('this-type', 'model')
-                                .attr('this-in-collection', '')
-                                .attr('this-url', container.attr('this-url')
-                                        + (data[id] || data[id] == 0 ? data[id] : ''));
-                        if (container.attr('this-model'))
-                            _temp.attr('this-id', container.attr('this-model'));
-                        container.append(_temp.show())
-                                .removeAttr('this-cache')
-                                .removeClass('loading');
-                    }
-                    else {
-                        container.attr('this-uid', id)
-                                .attr('this-mid', data[id]);
-                        container.html(_temp.html());
+                        this.page.attr('this-with-first-js', '');
                     }
                     return this;
-                },
-                /**
-                 * Calls JS eval on the content after parsing it for variables
-                 * @param {string} content
-                 * @param {object} data
-                 * @returns {mixed}
-                 */
-                eval: function (content, data) {
-                    var variables = internal.parseBrackets.call(this, '{{', '}}', content);
-                    content = internal.fillVariables.call(this, variables, data, content);
-                    return eval(content);
                 },
                 /**
                  * Fetches everything between the oBrace and cBrace as an array and trims each
@@ -2992,48 +2667,6 @@
                         return content.match(new RegExp(oBrace + '\\s*[^' + cBrace + ']+\\s*'
                                 + cBrace, 'gi')) || [];
                     });
-                },
-                /**
-                 * Escapes a regex string
-                 * @param {string} str
-                 * @returns {string}
-                 */
-                regEsc: function (str) {
-                    return str.replace(/[-[\]{}()*+?.,\\/^$|#\s]/g, "\\$&");
-                },
-                /**
-                 * Fetches all the expressions in the content
-                 * @param {string} content
-                 * @returns {Array}
-                 */
-                getExpressions: function (content) {
-                    var exps = [];
-                    this.__.forEach(content.split('({'), function (i, v) {
-                        if (!i)
-                            return;
-                        exps.push('({' + v.split('})')[0] + '})');
-                    });
-                    return exps;
-                },
-                /**
-                 * Processes all expressions in the content
-                 * @param {string} content
-                 * @param {object} current Object available to expressions
-                 * @returns {mixed}
-                 */
-                processExpressions: function (content, current, removeUnresolved) {
-                    var _this = this,
-                            exps = internal.getExpressions.call(this, content);
-                    this.__.forEach(exps, function (i, v) {
-                        _this.tryCatch(function () {
-                            content = content.replace(v, eval(v.trim().substr(2, v.trim().length - 4)));
-                        }, function (e) {
-                            _this.console('error', e.message);
-                            if (removeUnresolved)
-                                content = content.replace(v, '');
-                        });
-                    });
-                    return content;
                 },
                 /**
                  * Parse the given data into the given content based on the given variables
@@ -3100,7 +2733,7 @@
                         _this.__.forEach(_data, function (key, value) {
                             var __data = {
                                 key: key,
-//                                _model: data,
+                                //                                _model: data,
                                 value: value
                             },
                             _content = internal.inLoop.call(_this, __data, filter, content);
@@ -3164,144 +2797,88 @@
                     return _temp.show();
                 },
                 /**
-                 * Does things on looped objects
-                 * @param {object} current Object containing the key/index and the value/model 
-                 * currently being processed
-                 * @param {string} filter Expression to evaluate on content
+                 * Processes all expressions in the content
                  * @param {string} content
-                 * @returns {_}
-                 */
-                inLoop: function (current, filter, content) {
-                    /* evaluates filter */
-                    if (filter && !eval(filter.trim()))
-                        return;
-                    content = this._(document.createElement('div'))
-                            .html(content);
-                    var _this = this, level = 0, matched = {};
-                    content.find('[this-each]').each(function () {
-                        var __this = _this._(this).attr('this-muted', '');
-                        __this.html(__this.html()
-                                .replace(/\{\{/g, '__obrace__')
-                                .replace(/\}\}/g, '__cbrace__')
-                                .replace(/\(\{/g, '__obrace2__')
-                                .replace(/\}\)/g, '__cbrace2__'))
-                                .find('[this-if], [this-else-if], [this-else]')
-                                .attr('this-ignore', '');
-                    });
-                    content.find('[this-if],[this-else-if],[this-else]')
-                            .each(function () {
-                                var __this = _this._(this);
-                                if (__this.attr('this-if') && !__this.hasAttr('this-ignore')) {
-                                    level++;
-                                    if (eval(__this.attr('this-if').trim())) {
-                                        __this.removeAttr('this-if');
-                                        matched[level] = true;
-                                    }
-                                    else {
-                                        matched[level] = false;
-                                        __this.remove();
-                                    }
-                                    if (__this.hasAttr('this-end-if')) {
-                                        __this.removeAttr('this-end-if');
-                                        delete matched[level];
-                                        level--;
-                                    }
-                                }
-                                else if (__this.attr('this-else-if') && !__this.hasAttr('this-ignore')) {
-                                    if (!__.isBoolean(matched[level])) {
-                                        _this.error('Branching error: Else-if without If!');
-                                        return;
-                                    }
-                                    if (matched[level] || !eval(__this.attr('this-else-if').trim()))
-                                        __this.remove();
-                                    else {
-                                        __this.removeAttr('this-else-if');
-                                        matched[level] = true;
-                                    }
-
-                                    if (__this.hasAttr('this-end-if')) {
-                                        __this.removeAttr('this-end-if');
-                                        delete matched[level];
-                                        level--;
-                                    }
-                                }
-                                else if (__this.hasAttr('this-else') && !__this.hasAttr('this-ignore')) {
-                                    if (!__.isBoolean(matched[level])) {
-                                        _this.error('Branching error: Else without If!');
-                                        return;
-                                    }
-                                    if (matched[level])
-                                        __this.remove();
-                                    else
-                                        __this.removeAttr('this-else');
-                                    if (__this.hasAttr('this-end-if'))
-                                        __this.removeAttr('this-end-if');
-                                    delete matched[level];
-                                    level--;
-                                }
-                            });
-                    content.find('[this-ignore]').removeAttr('this-ignore');
-                    return content.html();
-                },
-                /**
-                 * Retrieves the value of the variable from the data and filters it if required
-                 * @param {string} variable
-                 * @param {object} data
-                 * @param {Boolean} raw Indicates whether to return value without surrounding span tag
+                 * @param {object} current Object available to expressions
                  * @returns {mixed}
                  */
-                getVariableValue: function (variable, data, raw) {
+                processExpressions: function (content, current, removeUnresolved) {
                     var _this = this,
-                            vars = variable.replace(/{*}*/g, '')
-                            .replace(/\\\|/g, '__fpipe__').split('|'),
-                            key = this.__.arrayRemoveIndex(vars, 0),
-                            value = this.__.contains(key, '.') ?
-                            internal.getDeepValue.call(null, key, data) : data[key];
-                    if (value || value == 0)
-                        this.__.forEach(vars, function (i, v) {
-                            v = v.replace(/__fpipe__/g, '|');
-                            var exp = v.split(':'), filter = _this.__.arrayRemoveIndex(exp, 0);
-                            if (Filters[filter])
-                                value = Filters[filter](value, exp.join(':'));
-                            if (!value) /* stop filtering if no value exists anymore */
-                                return false;
+                            exps = internal.getExpressions.call(this, content);
+                    this.__.forEach(exps, function (i, v) {
+                        _this.tryCatch(function () {
+                            content = content.replace(v, eval(v.trim().substr(2, v.trim().length - 4)));
+                        }, function (e) {
+                            _this.console('error', e.message);
+                            if (removeUnresolved)
+                                content = content.replace(v, '');
                         });
-                    if (!value && value != 0)
-                        return;
-                    return value;
-//                    var _key = key.split('.');
-//                    return raw ? value : '<span this-for="' + _key[_key.length - 1] + '">' + value
-//                            + '</span>';
-                },
-                /**
-                 * Fills content variables with data
-                 * @param array variables
-                 * @param array data
-                 * @param string content
-                 * @returns string
-                 */
-                fillVariables: function (variables, data, content) {
-                    var _this = this;
-                    this.__.forEach(variables, function (i, v) {
-                        var value = internal.getVariableValue.call(_this, v, data);
-                        content = content.replace(v, value || value == 0 ? value : v);
                     });
                     return content;
                 },
                 /**
-                 * Fetches the value of the variable on a deep level
-                 * @param string variable May contain dots (.) which denote children keys
-                 * @param object data The object from which to get the value
-                 * @returns string
+                 * Escapes a regex string
+                 * @param {string} str
+                 * @returns {string}
                  */
-                getDeepValue: function (variable, data) {
-                    var value = data, vars = __.isObject(variable, true) ? variable : variable.split('.');
-                    __.forEach(vars, function (i, v) {
-                        if (!value)
-                            return false;
-                        value = value[v];
+                regEsc: function (str) {
+                    return str.replace(/[-[\]{}()*+?.,\\/^$|#\s]/g, "\\$&");
+                },
+                /**
+                 * Removes a model from the given collection
+                 * @param string model_name
+                 * @param string model_id
+                 * @returns ThisApp
+                 */
+                removeModelFromStore: function (model_name, model_id) {
+                    this.tryCatch(function () {
+                        var collection = internal.cache.call(this, 'model', model_name);
+                        delete collection.data[model_id];
+                        internal.cache.call(this, 'model', model_name, collection);
+                        return this;
                     });
-                    return value || value == 0 ? value : '';
+                },
+                /**
+                 * Scrolls to the target on page
+                 * @returns {void}
+                 */
+                resolveTargetOnPage: function () {
+                    if (!this.target_on_page)
+                        return this;
+                    this._('#' + this.target_on_page).trigger('click');
+                    delete this.target_on_page;
+                },
+                /**
+                 * Restores a saved state
+                 * @param object state
+                 * @returns ThisApp
+                 */
+                restoreState: function (state) {
+                    var _this = this;
+                    if (this.page) {
+                        this.page.trigger('page.leave');
+                    }
+                    this.container.html(state.content);
+                    this.page = this.container.find('page[this-id="' + state.id
+                            + '"]:not([this-dead]),[this-type="page"][this-id="' + state.id
+                            + '"]:not([this-dead])');
+                    if (this.config.titleContainer)
+                        this.config.titleContainer.html(state.title);
+                    this.store('last_page', state.id);
+                    this.__proto__.components = 0;
+                    this.__proto__.collections = 0;
+                    this.__proto__.models = 0;
+                    this.removedAssets = {};
+                    this._('layouts,[this-type="layouts"]').each(function () {
+                        internal.loadAssets.call(_this, _this._(this)
+                                .removeAttr('this-with-first-js')
+                                .removeAttr('this-with-js'));
+                    });
+                    internal.loadAssets.call(this, this.page
+                            .removeAttr('this-with-first-js')
+                            .removeAttr('this-with-js'), function () {
+                        internal.pageLoaded.call(this, null, true);
+                    });
                 },
                 /**
                  * Saves the app state
@@ -3322,25 +2899,685 @@
                     return this;
                 },
                 /**
-                 * Restores a saved state
-                 * @param object state
+                 * Fetches the selector for a ThisApp type
+                 * @param string id May contain dot (.) in the format type.id
+                 * @param string append
+                 * @returns string
+                 */
+                selector: function (id, append) {
+                    id = id.split('#');
+                    if (!append)
+                        append = '';
+                    var attrs = id[id.length - 1].split('[');
+                    id[id.length - 1] = attrs[0];
+                    this.__.arrayRemoveIndex(attrs, 0);
+                    if (attrs.length)
+                        append += '[' + attrs.join('[');
+                    return id.length > 1 ? '[this-type="' + id[0] + '"][this-id="' + id[1] + '"]' + append + ',' + id[0] + '[this-id="' + id[1] + '"]' + append : '[this-id="' + id[0] + '"]' + append;
+                },
+                /**
+                 * Setups the app events
                  * @returns ThisApp
                  */
-                restoreState: function (state) {
-                    if (this.page) {
-                        this.page.trigger('page.leave');
-                    }
-                    this.container.html(state.content);
-                    this.page = this.container.find('page[this-id="' + state.id
-                            + '"]:not([this-dead]),[this-type="page"][this-id="' + state.id
-                            + '"]:not([this-dead])');
-                    if (this.config.titleContainer)
-                        this.config.titleContainer.html(state.title);
-                    this.store('last_page', state.id);
-                    this.__proto__.components = 0;
-                    this.__proto__.collections = 0;
-                    this.__proto__.models = 0;
-                    internal.pageLoaded.call(this, null, true);
+                setup: function () {
+                    this.tryCatch(function () {
+                        var _this = this;
+                        // save page state before leaving
+                        this.when('page.leave', 'page', function () {
+                            internal.saveState.call(_this, true);
+                        });
+                        // save page state before leaving
+                        this._(window).on('beforeunload', function () {
+                            internal.saveState.call(_this, true);
+                        });
+                        // update debug mode
+                        this.__.__proto__.debug = this.config.debug;
+                        // ensure paths end with /
+                        if (this.config.paths) {
+                            this.__.forEach(this.config.paths, function (i, v) {
+                                if (_this.__.isString(v) && !v.endsWith('/'))
+                                    _this.config.paths[i] += '/';
+                                else if (_this.__.isObject(v))
+                                    if (v.dir && !v.dir.endsWith('/'))
+                                        _this.config.paths[i].dir += '/';
+                            });
+                        }
+                        // create default function to call when a page isn't found
+                        if (!this.notFound)
+                            this.notFound = function () {
+                                if (_this.firstPage) {
+                                    if (_this.store('last_page')) {
+                                        var last_page = _this.store('last_page');
+                                        _this.store('last_page', null);
+                                        _this.loadPage(last_page);
+                                    }
+                                    else if (_this.config.startWith) {
+                                        if (this._('page[this-id="' + _this.config.startWith
+                                                + '"]:not([this-current]):not([this-dead]),'
+                                                + '[this-type="pages"]>[this-id="'
+                                                + _this.config.startWith + '"]').length)
+                                            _this.loadPage(_this.config.startWith);
+                                    }
+                                    else {
+                                        var startWith = _this._('[this-default-page]');
+                                        if (startWith.length)
+                                            _this.loadPage(startWith.attr('this-id'));
+                                    }
+                                }
+                            };
+                        // look for the app container
+                        this.container = this._('[this-app-container]');
+                        // use the body tag if no container is set
+                        if (!this.container.length)
+                            this.container = this._('body');
+                        // wrap page templates in pages container
+                        if (!this._('page,[this-type="pages"]').length) {
+                            this._('body').append('<div this-type="pages" style="display:none"/>')
+                                    .find('[this-type="pages"]')
+                                    .append(this._('[this-type="page"]:not([this-loaded])')
+                                            .hide());
+                        }
+                        // wrap component templates in components container
+                        if (this._('component, [this-type="component"]').length &&
+                                !this._('[this-type="components"]').length) {
+                            this._('body').append('<div this-type="components" style="display:none"/>')
+                                    .find('[this-type="components"]')
+                                    .append(this._('[this-type="component"]').hide());
+                        }
+                        // wrap layout templates in layouts container
+                        if (this._('layout,[this-type="layout"]').length &&
+                                !this._('[this-type="layouts"]').length) {
+                            this._('body').append('<div this-type="layouts" style="display:none"/>')
+                                    .find('[this-type="layouts"]')
+                                    .append(this._('layout:not([this-loaded]),'
+                                            + '[this-type="layout"]:not([this-loaded])')
+                                            .hide());
+                        }
+                        // hide all types (pages, models, collections, layouts, components, etc)
+                        this._('page:not([this-loaded]),model:not([this-loaded]),'
+                                + 'collection:not([this-loaded]),layout:not([this-loaded]),'
+                                + 'component:not([this-loaded]),[this-type]:not([this-loaded])')
+                                .hide();
+                        if (this.config.titleContainer)
+                            this.config.titleContainer = this._(this.config.titleContainer,
+                                    this.config.debug);
+                        this.container
+                                /* reload current page or loaded collection|model */
+                                .on('click', '[this-reload],[this-reload-page],[this-reload-layouts]',
+                                        function (e) {
+                                            e.preventDefault();
+                                            var __this = _this._(this);
+                                            // reload only page
+                                            if (__this.hasAttr('this-reload-page')) {
+                                                _this.reload();
+                                                return;
+                                            }
+                                            // reload page and layouts
+                                            else if (__this.hasAttr('this-reload-layouts')) {
+                                                _this.reload(false, true);
+                                                return;
+                                            }
+                                            // If reload has no value
+                                            else if (!__this.attr('this-reload')) {
+                                                // reload the page and all resources
+                                                _this.reload(true);
+                                                return;
+                                            }
+                                            // reload value: collection| 
+                                            var reload = __this.attr('this-reload'),
+                                                    // template to reload
+                                                    toReload = _this._(internal.selector
+                                                            .call(_this, reload, ':not([this-loaded])')),
+                                                    // target to reload
+                                                    _reload = _this.page.find(internal.selector
+                                                            .call(_this, reload, '[this-loaded]'));
+                                            if (!toReload.length) {
+                                                _this.error('Reload target not found');
+                                                return;
+                                            }
+                                            if (__this.attr('this-attributes'))
+                                                _this.__.forEach(__this.attr('this-attributes').split(';'),
+                                                        function (i, v) {
+                                                            var attr = v.split(':'),
+                                                                    name = _this.__.arrayRemoveIndex(attr, 0);
+                                                            attr = attr.join(':');
+                                                            toReload.attr(name, attr);
+                                                        });
+                                            _reload.replaceWith(toReload.clone().removeAttr('this-cache'));
+                                            internal.loadCollection.call(_this, _reload, true);
+                                        })
+                                /* go to the default page */
+                                .on('click', '[this-go-home]', function (e) {
+                                    _this.home();
+                                    e.stop = true;
+                                })
+                                /* go back event */
+                                .on('click', '[this-go-back]', function (e) {
+                                    _this.back(e);
+                                    e.stop = true;
+                                })
+                                /* go forward event */
+                                .on('click', '[this-go-forward]', function (e) {
+                                    _this.forward(e);
+                                    e.stop = true;
+                                })
+                                /*
+                                 * READ event
+                                 * 
+                                 * Target must have attributes `this-read` and `this-goto`. Attribute 
+                                 * `this-read` may have the url of the model as its value.
+                                 * Optionally, target should also have attributes `this-model` and `this-mid`.
+                                 * The are required if target isn't in a model container.
+                                 */
+                                .on('click', '[this-goto][this-read]', function (e) {
+                                    var __this = _this._(this),
+                                            _model = __this.closest('model,[this-type="model"]'),
+                                            model_id = __this.attr('this-model-id') ||
+                                            _model.attr('this-mid'),
+                                            url = __this.attr('this-read') || _model.attr('this-url')
+                                            || '#',
+                                            goto = internal.pageIDFromLink.call(this,
+                                                    __this.attr('this-goto'));
+                                    // keep attributes for page
+                                    _this.tar['page#' + goto] = {
+                                        reading: true,
+                                        url: url
+                                    };
+
+                                    // use the last part of the read url if available as the model's id
+                                    if (__this.attr('this-read')) {
+                                        var split = __this.attr('this-read').split('/');
+                                        model_id = split[split.length - 1];
+                                    }
+                                    _this.tar['page#' + goto]['mid'] = model_id;
+                                })
+                                /*
+                                 * UPDATE event
+                                 * 
+                                 * Target must have attributes `this-update` and `this-goto`. `this-update`
+                                 * may have the url of the model as its value.
+                                 * 
+                                 * If target isn't in a model container or intends to update another model 
+                                 * other than it's container model, it must also have attributes `this-model`
+                                 * and `this-mid`.
+                                 * If model is a part of a collection, target must also have attribute.
+                                 */
+                                .on('click', '[this-goto][this-update]', function () {
+                                    var __this = _this._(this),
+                                            model = __this.closest('model,[this-type="model"]'),
+                                            model_id = __this.attr('this-model-id') ||
+                                            model.attr('this-mid'),
+                                            model_name = __this.attr('this-model')
+                                            || model.attr('this-id'),
+                                            url = __this.attr('this-update')
+                                            || model.attr('this-url') || '#',
+                                            goto = internal.pageIDFromLink.call(this,
+                                                    __this.attr('this-goto'));
+                                    _this.tar['page#' + goto] = {
+                                        "do": "update",
+                                        mid: model_id,
+                                        action: url,
+                                        model: model_name
+                                    };
+                                    if (__this.attr('this-model-uid'))
+                                        _this.tar['page#' + goto]['model-uid'] =
+                                                __this.attr('this-model-uid');
+                                    else if (model.attr('this-uid'))
+                                        _this.tar['page#' + goto]['model-uid'] = model.attr('this-uid');
+                                })
+                                /*
+                                 * CREATE event
+                                 * 
+                                 * Target must have attributes `this-goto` and `this-create`. Attributes
+                                 * `this-create` must have the url of the collection as its value.
+                                 * 
+                                 * If CREATION must update model, then attributes 
+                                 * `this-model` must be provided unless the target
+                                 * form already has the required attributes.
+                                 */
+                                .on('click', '[this-goto][this-create]', function () {
+                                    var __this = _this._(this),
+                                            url = __this.attr('this-create') || '#';
+                                    var goto = internal.pageIDFromLink.call(this,
+                                            __this.attr('this-goto'));
+                                    _this.tar['page#' + goto] = {
+                                        "do": "create",
+                                        action: url
+                                    };
+                                    if (__this.attr('this-model'))
+                                        _this.tar['page#' + goto]['model'] = __this.attr('this-model');
+                                    if (__this.attr('this-model-uid'))
+                                        _this.tar['page#' + goto]['model-uid'] = __this
+                                                .attr('this-model-uid');
+                                })
+                                /*
+                                 * CREATE event
+                                 * 
+                                 * Target must have attributes `this-form`, which is the id of the 
+                                 * target form, and `this-create`, which is the url to submit to.
+                                 * 
+                                 * If CREATION must update model, then attributes 
+                                 * `this-model` must be provided unless the target
+                                 * form already has the required attributes.
+                                 */
+                                .on('click', '[this-create][this-form]', function () {
+                                    var __this = _this._(this);
+                                    _this.page.find('form[this-id="'
+                                            + __this.attr('this-form')
+                                            + '"]:not([this-cache])')
+                                            .removeAttr([
+                                                "this-binding", "this-mid", "this-uid", "this-url"
+                                            ])
+                                            .attr({
+                                                "this-do": "create",
+                                                "this-action": __this.attr('this-create'),
+                                                "this-model": __this.attr('this-model') || '',
+                                                "this-model-uid": __this.attr('this-model-uid') || '',
+                                                "this-binding": ""
+                                            })
+                                            .show();
+                                })
+                                /*
+                                 * DELETE event - Show Page
+                                 * 
+                                 * Target must have attributes `this-goto` and `this-delete`. Attributes
+                                 * `this-delete` must have the url of the model as its value.
+                                 * 
+                                 * If DELETE must update model, then attributes 
+                                 * `this-model` may be provided if target isn't
+                                 * in a model container or target page doesn't have these attributes.
+                                 */
+                                .on('click', '[this-goto][this-delete]', function () {
+                                    var __this = _this._(this),
+                                            model = __this.closest('model,[this-type="model"]'),
+                                            url = __this.attr('this-delete')
+                                            || model.attr('this-url') || '#',
+                                            model_name = __this.attr('this-model')
+                                            || model.attr('this-id'),
+                                            uid = model.attr('this-uid'),
+                                            goto = internal.pageIDFromLink.call(this,
+                                                    __this.attr('this-goto'));
+                                    _this.tar['page#' + goto] = {
+                                        "do": "delete",
+                                        action: url,
+                                        uid: uid
+                                    };
+                                    if (model)
+                                        _this.tar['page#' + goto]['model'] = model_name;
+                                })
+                                /*
+                                 * Load page
+                                 * 
+                                 * Target must have attribute `this-goto`
+                                 * 
+                                 * Event page.leave is triggered
+                                 */
+                                .on('click', '[this-goto]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this);
+                                    if (!__this.attr('this-goto'))
+                                        return;
+                                    _this.page.trigger('page.leave');
+                                    var goto = internal.pageIDFromLink.call(this,
+                                            __this.attr('this-goto'));
+                                    if (!_this.tar['page#' + goto])
+                                        _this.tar['page#' + goto] = {};
+                                    if (__this.attr('this-page-title'))
+                                        _this.tar['page#' + goto]['title'] =
+                                                __this.attr('this-page-title');
+                                    if (__this.attr('this-run'))
+                                        _this.tar['page#' + goto]['run'] = __this.attr('this-run');
+                                    if (__this.attr('this-ignore-cache'))
+                                        _this.tar['page#' + goto]['ignore-cache'] =
+                                                __this.attr('this-ignore-cache');
+                                    _this.loadPage(goto);
+                                    e.stop = true;
+                                })
+                                /*
+                                 * DELETE event
+                                 * 
+                                 * This is where the actual DELETE request is sent.
+                                 * 
+                                 * Target must have attribute `this-delete` which may contain 
+                                 * the url of the model.
+                                 * 
+                                 * If DELETE must update model and/or collection, then attributes 
+                                 * `this-model` must be provided if target isn't
+                                 *  within a model or page loaded as a result of a previous 
+                                 *  delete click.
+                                 */
+                                .on('click', '[this-delete]', function (e) {
+                                    if (e.stop)
+                                        return;
+                                    e.preventDefault();
+                                    var __this = _this._(this);
+                                    var _model = __this.closest('model,[this-type="model"]'),
+                                            _do = __this.closest('[this-do="delete"]'),
+                                            __model = new Model(_model.attr('this-mid'), {}, {
+                                                app: _this,
+                                                name: __this.attr('this-model') ||
+                                                        _model.attr('this-id') ||
+                                                        _do.attr('this-model'),
+                                                uid: _model.attr('this-uid') ||
+                                                        _do.attr('this-uid') || 'id',
+                                                url: __this.attr('this-delete') ||
+                                                        _model.attr('this-url') ||
+                                                        _do.attr('this-action')
+                                            });
+                                    if (!internal.canContinue
+                                            .call(_this, 'model.delete',
+                                                    [__model, _model.items[0]])) {
+                                        _model.trigger('delete.canceled');
+                                        return;
+                                    }
+                                    __model.remove({
+                                        success: function (data) {
+                                            var crudStatus = _this.config.crudStatus;
+                                            if ((crudStatus &&
+                                                    data[crudStatus.key] === crudStatus.successValue)
+                                                    || !crudStatus) {
+                                                if (_this.page.attr('this-do') === 'delete')
+                                                    _this.back();
+                                                else {
+                                                    _this.page.find('[this-binding]').hide();
+                                                }
+                                                __this.trigger('delete.success', {
+                                                    response: this
+                                                });
+                                            }
+                                            else
+                                                __this.trigger('delete.failed',
+                                                        {
+                                                            response: this,
+                                                            responseData: data
+                                                        });
+                                        },
+                                        error: function () {
+                                            __this.trigger('delete.error', {
+                                                response: this
+                                            });
+                                        },
+                                        complete: function () {
+                                            __this.trigger('delete.complete', {
+                                                response: this
+                                            });
+                                        }
+                                    });
+                                })
+                                /*
+                                 * Click event
+                                 * Bind model to target
+                                 */
+                                .on('click', '[this-bind]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            bind = __this.attr('this-bind'),
+                                            _model = __this.closest('model,[this-type="model"],'
+                                                    + '[this-model]');
+                                    if (!bind)
+                                        return;
+                                    var _target = _this.page.find(internal.selector
+                                            .call(_this, bind,
+                                                    ':not([this-in-collection]):not([this-cache])'));
+                                    if (!_target.length)
+                                        return;
+                                    _target.attr('this-model', (_model.attr('this-model')
+                                            || _model.attr('this-id'))).attr('this-binding', '');
+                                    if (__this.hasAttr('this-read'))
+                                        _this.page.find('[this-model="' + (_model.attr('this-model')
+                                                || _model.attr('this-id')) + '"][this-binding]').hide();
+                                    else if (__this.hasAttr('this-update'))
+                                        _target.attr('this-tar', 'do:update');
+                                    else if (__this.hasAttr('this-create'))
+                                        _target.attr('this-tar', 'do:create');
+                                    internal.bindToModel.call(_this, _target, _model,
+                                            __this.attr('this-cache'));
+                                })
+                                /*
+                                 * Click event
+                                 * Toggles target on and off
+                                 */
+                                .on('click', '[this-toggle]', function (e) {
+                                    e.preventDefault();
+                                    _this.container.find(internal.selector.call(_this,
+                                            _this._(this).attr('this-toggle'))).toggle();
+                                })
+                                /*
+                                 * Hides target elements
+                                 */
+                                .on('click', '[this-hide]', function (e) {
+                                    e.preventDefault();
+                                    _this.container.find(internal.selector.call(_this,
+                                            _this._(this).attr('this-hide'))).hide();
+                                })
+                                /*
+                                 * Shows target elements
+                                 */
+                                .on('click', '[this-show]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _target = _this.container.find(internal.selector.call(_this,
+                                                    __this.attr('this-show')));
+                                    if (__this.attr('this-create')) {
+                                        _this.page.find('[this-binding]').hide();
+                                        var form = _target.is('form[this-model="'
+                                                + __this.attr('this-model') + '"]') ? _target :
+                                                _target.find('form[this-model="'
+                                                        + __this.attr('this-model') + '"]');
+                                        form.attr('this-do', 'create').attr('this-url',
+                                                __this.attr('this-create')).attr('this-binding', '');
+                                        if (__this.attr('this-model-uid'))
+                                            form.attr('this-model-uid', __this.attr('this-model-uid'));
+                                        form.removeAttr('this-mid');
+                                        if (form.length)
+                                            form.get(0).reset();
+                                    }
+                                    _target.show();
+                                })
+                                /*
+                                 * CREATE and UPDATE events
+                                 * Form submission
+                                 * 
+                                 */
+                                .on('submit', 'form[this-do="create"]:not([this-ignore-submit]),'
+                                        + ' form[this-do="update"]:not([this-ignore-submit])',
+                                        function (e) {
+                                            e.preventDefault();
+                                            var data = {},
+                                                    __this = _this._(this),
+                                                    creating = __this.attr('this-do') === 'create',
+                                                    method = creating ? 'post' : 'put';
+                                            if (!this.reportValidity()) {
+                                                __this.trigger('form.invalid.submission');
+                                                return;
+                                            }
+                                            __this.trigger('form.valid.submission');
+                                            // parse form elements' data into data object
+                                            _this.__.forEach(Array.from(this.elements),
+                                                    function () {
+                                                        if (!this.name)
+                                                            return;
+                                                        if (this.name.indexOf('[]') !== -1) {
+                                                            var name = this.name.replace('[]', '');
+                                                            if (!data[name]) {
+                                                                data[name] = [];
+                                                            }
+                                                            data[name].push(this.value);
+                                                        }
+                                                        else if (this.name.indexOf('[') !== -1) {
+                                                            var exp = this.name.replace(']', '').split('['),
+                                                                    _data = data,
+                                                                    lastKey = exp.pop();
+                                                            _this.__.forEach(exp, function (i, v) {
+                                                                if (!_data[v])
+                                                                    _data[v] = {};
+                                                                _data = _data[v];
+                                                            });
+                                                            _data[lastKey] = this.value;
+                                                        }
+                                                        else {
+                                                            data[this.name] = this.value;
+                                                        }
+                                                    });
+                                            var id = null;
+                                            if (__this.attr('this-mid'))
+                                                id = __this.attr('this-mid');
+                                            else if (_this.page.attr('this-mid'))
+                                                id = _this.page.attr('this-mid');
+                                            var _model = new Model(id, data, {
+                                                app: _this,
+                                                name: __this.attr('this-model') ||
+                                                        _this.page.attr('this-model'),
+                                                uid: __this.attr('this-uid') ||
+                                                        __this.attr('this-model-uid') ||
+                                                        _this.page.attr('this-model-uid'),
+                                                url: __this.attr('this-action') ||
+                                                        __this.attr('this-url') ||
+                                                        _this.page.attr('this-action') ||
+                                                        _this.page.attr('this-url'),
+                                                method: method
+                                            });
+                                            if (!internal.canContinue
+                                                    .call(_this, creating ? 'model.create'
+                                                            : 'model.update',
+                                                            [_model])) {
+                                                __this.trigger(creating ? 'model.create.canceled'
+                                                        : 'model.update.canceled');
+                                                return;
+                                            }
+                                            _model.save({
+                                                method: method,
+                                                success: function (data) {
+                                                    var model = _this.config.dataKey ?
+                                                            data[_this.config.dataKey] : data;
+                                                    var crudStatus = _this.config.crudStatus;
+                                                    if (((crudStatus &&
+                                                            data[crudStatus.key] ===
+                                                            crudStatus.successValue)
+                                                            || !crudStatus) && model) {
+                                                        if (creating) {
+                                                            __this.items[0].reset();
+                                                            if (!__this.hasAttr('this-binding') &&
+                                                                    !__this.closest('[this-binding]')
+                                                                    .length)
+                                                                _this.back();
+                                                            // hide creation form if binding
+                                                            else if (__this.hasAttr('this-binding'))
+                                                                __this.hide();
+                                                        }
+                                                        __this.trigger('form.submission.success',
+                                                                {
+                                                                    response: this,
+                                                                    responseData: data,
+                                                                    method: method.toUpperCase()
+                                                                });
+                                                    }
+                                                    else {
+                                                        __this.trigger('form.submission.failed',
+                                                                {
+                                                                    response: this,
+                                                                    responseData: data,
+                                                                    method: method.toUpperCase()
+                                                                });
+                                                    }
+                                                },
+                                                error: function () {
+                                                    __this.trigger('form.submission.error',
+                                                            {
+                                                                response: this,
+                                                                method: method.toUpperCase()
+                                                            });
+                                                },
+                                                complete: function () {
+                                                    __this.trigger('form.submission.complete',
+                                                            {
+                                                                response: this,
+                                                                method: method.toUpperCase()
+                                                            });
+                                                }
+                                            });
+                                        })
+                                /*
+                                 * Search Event
+                                 * Form submissiom 
+                                 */
+                                .on('submit', 'form[this-do="search"]', function (e) {
+                                    e.preventDefault();
+                                    var _form = _this._(this),
+                                            _search = _form.find('[this-search]');
+                                    if (!_search.attr('this-search')) {
+                                        _this.error('Invalid search target');
+                                        return;
+                                    }
+                                    var exp = _search.attr('this-search').split(':'),
+                                            selector = 'collection[this-id="' + exp[0]
+                                            + '"],[this-type="collection"][this-id="' + exp[0] + '"]',
+                                            keys = exp[1],
+                                            page = _form.attr('this-type') === 'page' ?
+                                            _form : _form.closest('page,[this-type="page"]'),
+                                            goto = _form.attr('goto') || page.attr('this-id'),
+                                            filter = '', _collection,
+                                            /* same page and query. don't duplicate state */
+                                            replaceState = _this.page.attr('this-id') === goto &&
+                                            _this.page.attr('this-query') === _search.val().trim();
+                                    if (keys)
+                                        keys = keys.split(',');
+                                    _this.__.forEach(keys, function (i, key) {
+                                        if (filter)
+                                            filter += ' || ';
+                                        filter += '_this.__.contains(filters.lcase(model#' + key
+                                                + '),filters.lcase("' + _search.val() + '"))';
+                                    });
+
+                                    // reload only the collection
+                                    if (_form.attr('this-reload')) {
+                                        _collection = page.find(internal.selector.call(_this,
+                                                _form.attr('this-reload'), ':not([this-cache])'));
+                                        _collection.attr('this-filter', filter).attr('this-search',
+                                                keys.join(','));
+                                        page.attr('this-query', _search.val().trim());
+                                        internal.loadCollection.call(_this, _collection, replaceState);
+                                    }
+                                    // load a page and the collection in it
+                                    else {
+                                        goto = internal.pageIDFromLink.call(this, goto);
+                                        var _page = _this._('page[this-id="' + goto
+                                                + '"]:not([this-current]):not([this-dead]),'
+                                                + '[this-type="page"][this-id="'
+                                                + goto + '"]:not([this-current]):not([this-dead])'),
+                                                _component = _page.find('[this-component="'
+                                                        + exp[0] + '"]');
+                                        _component.attr('this-filter', 'collection#' + exp[0] + ':'
+                                                + filter).attr('this-search', 'collection#'
+                                                + exp[0] + ':' + keys.join(','));
+                                        _this.tar['page#' + goto] = {
+                                            query: _search.val().trim()
+                                        };
+                                        if (_search.attr('this-ignore-cache'))
+                                            _this.tar['page#' + goto]['ignore-cache'] =
+                                                    _search.attr('this-ignore-cache');
+                                        _collection = _page.find(selector);
+                                        _collection.attr('this-filter', filter).attr('this-search',
+                                                keys.join(','));
+                                        _this.loadPage(goto, replaceState);
+                                    }
+                                });
+                        /*
+                         * State resuscitation
+                         */
+                        this._(window).on('popstate', function (e) {
+                            if (e.state)
+                                internal.restoreState.call(_this, e.state);
+                        });
+                        /*
+                         * Container events activation
+                         */
+                        this.__.forEach(this.events, function () {
+                            _this.container.on(this.event, this.selector, this.callback);
+                        });
+                    });
+                    this.__proto__.running = true;
+                    return this;
                 },
                 /**
                  * Updates a retrieved saved page
@@ -3388,11 +3625,9 @@
                                         .removeAttr('this-cache').outerHtml(), null, v),
                                         action = _collection.attr('this-prepend-new') ?
                                         'prepend' : 'append';
-                                _collection[action](tmpl.attr('this-mid', v)
-                                        .attr('this-uid', uid)
+                                _collection[action](tmpl.attr('this-mid', v).attr('this-uid', uid)
                                         .attr('this-type', 'model')
-                                        .attr('this-id', model_name)
-                                        .attr('this-url', _collection.attr('this-url') + v)
+                                        .attr('this-id', model_name).attr('this-url', _collection.attr('this-url') + v)
                                         .attr('this-in-collection', '')
                                         .outerHtml());
                                 _this.__.arrayRemoveIndex(arr, i);
@@ -3416,48 +3651,57 @@
                                 return;
                             _this.__.forEach(arr, function (id, v) {
                                 _model.filter(function () {
-                                    return this.getAttribute('this-mid') == id;
-                                })
-                                        .each(function () {
-                                            var __model = _this._(this);
-                                            if (__model.hasAttr('this-in-collection'))
-                                                in_collection = true;
-                                            var data = v,
-                                                    __data = internal.canContinue
-                                                    .call(_this, in_collection ?
-                                                            'collection.model.render'
-                                                            : 'model.render', [data]),
-                                                    _clone = __model.siblings('[this-cache]').clone();
-                                            if (!__data) {
-                                                if (in_collection)
-                                                    _model.parent().trigger('collection.model.render.canceled');
+                                    var __model = _this._(this);
+                                    // if model id is the updated id
+                                    return (__model.attr('this-mid') == id
+                                            // not updated before
+                                            && (!__model.hasAttr('this-updated')
+                                                    // or updated before
+                                                    || (__model.hasAttr('this-updated')
+                                                            // but has newer update
+                                                            && parseInt(__model.attr('this-updated'))
+                                                            < v.timestamp)));
+                                }).each(function () {
+                                    var __model = _this._(this);
+                                    if (__model.hasAttr('this-in-collection'))
+                                        in_collection = true;
+                                    var data = v.data,
+                                            __data = internal.canContinue
+                                            .call(_this, in_collection ?
+                                                    'collection.model.render'
+                                                    : 'model.render', [data]),
+                                            _clone = __model.siblings('[this-cache]').clone();
+                                    if (!__data) {
+                                        if (in_collection)
+                                            _model.parent().trigger('collection.model.render.canceled');
+                                        else
+                                            _model.trigger('model.render.canceled');
+                                        return;
+                                    }
+                                    else if (_this.__.isObject(__data))
+                                        data = __data;
+                                    // replace clone model collections with existing
+                                    // model collections
+                                    _clone.find('collection,[this-type="collection"]')
+                                            .each(function () {
+                                                var _cl_col = _this._(this),
+                                                        // loaded collection
+                                                        selector = 'collection[this-id="'
+                                                        + _cl_col.attr('this-id') + '"],'
+                                                        + '[this-type="collection"][this-id="'
+                                                        + _cl_col.attr('this-id') + '"]',
+                                                        _rl_col = _model.find(selector);
+                                                if (_rl_col.length)
+                                                    _cl_col.replaceWith(_rl_col.clone());
                                                 else
-                                                    _model.trigger('model.render.canceled');
-                                                return;
-                                            }
-                                            else if (_this.__.isObject(__data))
-                                                v = __data;
-                                            // replace clone model collections with existing
-                                            // model collections
-                                            _clone.find('collection,[this-type="collection"]')
-                                                    .each(function () {
-                                                        var _cl_col = _this._(this),
-                                                                // loaded collection
-                                                                selector = 'collection[this-id="'
-                                                                + _cl_col.attr('this-id') + '"],'
-                                                                + '[this-type="collection"][this-id="'
-                                                                + _cl_col.attr('this-id') + '"]',
-                                                                _rl_col = _model.find(selector);
-                                                        if (_rl_col.length)
-                                                            _cl_col.replaceWith(_rl_col.clone());
-                                                        else
-                                                            _cl_col.remove();
-                                                    });
-                                            var tmpl = internal.parseData.call(_this, v,
-                                                    _clone.removeAttr('this-cache').outerHtml(),
-                                                    null, false, true);
-                                            __model.html(tmpl.html()).show();
-                                        });
+                                                    _cl_col.remove();
+                                            });
+                                    var tmpl = internal.parseData.call(_this, data,
+                                            _clone.removeAttr('this-cache').outerHtml(), null,
+                                            false, true);
+                                    __model.html(tmpl.html()).show()
+                                            .attr('this-updated', v.timestamp);
+                                });
                             });
                             if (in_collection)
                                 delete updated[model_name];
@@ -3465,8 +3709,7 @@
                         });
                         this.__.forEach(deleted, function (model_name, arr) {
                             _this.__.forEach(arr, function (i, mid) {
-                                var _model = _this.page.find('model[this-id="' + model_name
-                                        + '"][this-mid="' + mid + '"]:not([this-cache]),'
+                                var _model = _this.page.find('model[this-id="' + model_name + '"][this-mid="' + mid + '"]:not([this-cache]),'
                                         + '[this-type="model"][this-id="'
                                         + model_name + '"][this-mid="' + mid + '"]:not([this-cache]),'
                                         + 'collection[this-model="' + model_name
@@ -3532,222 +3775,144 @@
                     }
                 },
                 /**
-                 * Checks that the type of container matches the given type
-                 * @param string type
-                 * @param string|_ container
-                 * @returns booean
+                 * Watches an element (collection | model) for updates
+                 * @param {_} elem
+                 * @returns {ThisApp}
                  */
-                is: function (type, container) {
-                    return this._(container).attr('this-type') === type || this._(container).is(type);
-                },
-                /**
-                 * Fetches the selector for a ThisApp type
-                 * @param string id May contain dot (.) in the format type.id
-                 * @param string append
-                 * @returns string
-                 */
-                selector: function (id, append) {
-                    id = id.split('#');
-                    if (!append)
-                        append = '';
-                    var attrs = id[id.length - 1].split('[');
-                    id[id.length - 1] = attrs[0];
-                    this.__.arrayRemoveIndex(attrs, 0);
-                    if (attrs.length)
-                        append += '[' + attrs.join('[');
-                    return id.length > 1 ? '[this-type="' + id[0] + '"][this-id="' + id[1] + '"]' + append + ',' + id[0] + '[this-id="' + id[1] + '"]' + append : '[this-id="' + id[0] + '"]' + append;
-                },
-                /**
-                 * Groups the function output on the console
-                 * @param {String} name
-                 * @param {Function} func The action to be performed in the group
-                 * @param (Boolean) isMethod Indicates whether the group name is a method name
-                 * @returns {mixed}
-                 */
-                groupConsoleOutput: function (name, func, isMethod) {
-                    if (isMethod)
-                        name += '(...)';
-                    if (internal.debugLevel.call(this) >= 2)
-                        this.console('group', name);
-                    var result = this.tryCatch(this.__.callable(func));
-                    if (internal.debugLevel.call(this) >= 2)
-                        this.console('groupEnd');
-                    return result;
-                },
-                /**
-                 * Fetches the debug level
-                 * @returns {Number}
-                 */
-                debugLevel: function () {
-                    if (this.__.isBoolean(this.config.debug))
-                        return this.config.debug ? 3 : 0;
-                    return this.config.debug;
-                }
-            }),
-            Transitions = Object.create({
-                show: function (pageOff, pageOn) {
-                    pageOff.remove();
-                    pageOn.show();
+                watch: function (elem) {
+                    elem = this._(elem);
+                    if (!elem.attr('this-id') || this.watching[elem.attr('this-id')]
+                            || !elem.attr('this-url'))
+                        return this;
+                    var isCollection = internal.is.call(this, 'collection', elem),
+                            model_name = elem.attr('this-model') || elem.attr('this-id');
+                    this.watching[elem.attr('this-id')] = {
+                        type: isCollection ? 'collection' : 'model',
+                        url: elem.attr('this-url'),
+                        mid: elem.attr('this-mid')
+                    };
+                    this.__.callable(this.watchCallback)(elem.attr('this-url'),
+                            function (resp) {
+                                // save model to collection
+                                var action = this.store(resp.event) || {};
+                                switch (resp.event) {
+                                    case 'created':
+                                        internal.modelToStore
+                                                .call(this, model_name, resp.id, resp.data,
+                                                        elem.attr('this-uid') ||
+                                                        elem.attr('this-model-uid'));
+                                        if (!action[model_name])
+                                            action[model_name] = [];
+                                        /* Remove model uid if exists to avoid duplicates */
+                                        action[model_name] = this.__
+                                                .arrayRemoveValue(action[model_name], resp.id, true);
+                                        action[model_name].push(resp.id);
+                                        break;
+                                    case 'updated':
+                                        var data = resp.data, id = resp.id;
+                                        // if update model, id is model attribute. Update real model
+                                        if (!isCollection && elem.attr('this-mid')) {
+                                            delete data[elem.attr('this-uid') || 'id'];
+                                            var _data = {};
+                                            _data[id] = data;
+                                            data = _data;
+                                            id = elem.attr('this-mid');
+                                        }
+                                        data = internal.modelToStore
+                                                .call(this, model_name, id, data,
+                                                        elem.attr('this-uid') ||
+                                                        elem.attr('this-model-uid'));
+                                        if (!action[model_name])
+                                            action[model_name] = {};
+                                        action[model_name][id] = {
+                                            data: data,
+                                            timestamp: Date.now()
+                                        };
+                                        break;
+                                    case 'deleted':
+                                        internal.removeModelFromStore.call(this, model_name, resp.id);
+                                        if (!action[model_name])
+                                            action[model_name] = [];
+                                        /* Indicate model as deleted */
+                                        action[model_name] = this.__
+                                                .arrayRemoveValue(action[model_name], resp.id, true);
+                                        action[model_name].push(resp.id);
+                                        break;
+                                }
+                                this.store(resp.event, action);
+                                // update current page
+                                internal.updatePage.call(this);
+                                elem.trigger('updated', {
+                                    event: resp.event,
+                                    response: resp
+                                });
+                            }.bind(this));
                     return this;
                 }
             }),
+            /**
+             * Variable filters
+             */
             Filters = Object.create({
                 /**
-                 * Changes the item to lower case
-                 * @param string|array item
-                 * @returns string|array
+                 * Helper function to check array or str and call function only on str
+                 * @param {string}|{array} str
+                 * @param {string} options
+                 * @param {function} funcA Try this function
+                 * @param {function} funcB Do this if first failed
+                 * @returns {string}|{array}
                  */
-                lowercase: function (item) {
-                    var _this = this;
-                    if (__.isArray(item)) {
-                        var arr = [];
-                        __.forEach(item, function (i, v) {
-                            var _item = _this.lcase(v);
-                            if (_item)
-                                arr.push(_item);
+                __: function (str, options, funcA, funcB) {
+                    if (__.isArray(str)) {
+                        var arr = [], _this = this;
+                        __.forEach(str, function (i, v) {
+                            arr.push(_this.__(v, options, funcA, funcB));
                         });
                         return arr;
                     }
-                    else if (__.isString(item))
-                        return item.toLowerCase();
-                },
-                /**
-                 * Changes the item to upper case
-                 * @param string|array item
-                 * @returns string|array
-                 */
-                uppercase: function (item) {
-                    var _this = this;
-                    if (__.isArray(item)) {
-                        var arr = [];
-                        __.forEach(item, function (i, v) {
-                            var _item = _this.ucase(v);
-                            if (_item)
-                                arr.push(_item);
-                        });
-                        return arr;
+                    else if (__.isString(str)) {
+                        options = this.__opts(options);
+                        options.unshift(str);
+                        return __.tryCatch(function () {
+                            return __.callable(funcA).apply(this, options);
+                        }.bind(this), function () {
+                            return __.callable(funcB).apply(this, options);
+                        }.bind(this));
                     }
-                    else if (__.isString(item))
-                        return item.toUpperCase();
                 },
                 /**
-                 * Shortcut to ucwords
-                 * @param string|array item
-                 * @param string options
-                 * @returns string|array
-                 */
-                capitalize: function (item, options) {
-                    return this.ucwords(item, options);
-                },
-                /**
-                 * Shortcut to lcfirst
-                 * @param {string} item
+                 * Processes options string to array
+                 * @param {string} options
                  * @returns {Array}
                  */
-                smallize: function (item) {
-                    return this.lcfirst(item);
+                __opts: function (options) {
+                    options = options.replace(/\\,/g, '__fcomma__').split(',');
+                    __.forEach(options, function (i, v) {
+                        options[i] = v.replace(/__fcomma__/g, ',');
+                    });
+                    return options;
                 },
                 /**
-                 * Shortcut to lowercase()
-                 * @param {string} item
-                 * @returns {Array}
-                 */
-                lcase: function (item) {
-                    return this.lowercase(item);
-                },
-                /**
-                 * Shortcut to uppercase()
-                 * @param {string} item
-                 * @returns {Array}
-                 */
-                ucase: function (item) {
-                    return this.uppercase(item);
-                },
-                /**
-                 * Changes the item's first letter to upper case
+                 * Changes camel case to hypen case
                  * @param string|array item
                  * @returns string|array
                  */
-                ucfirst: function (item) {
+                camelToHyphen: function (item) {
                     var _this = this;
                     if (__.isArray(item)) {
                         var arr = [];
                         __.forEach(item, function (i, v) {
-                            var _item = _this.ucfirst(v);
-                            if (_item)
-                                arr.push(_item);
-                        });
-                        return arr;
-                    }
-                    else if (__.isString(item))
-                        return item[0].toUpperCase() + item.substr(1);
-                },
-                /**
-                 * Changes the item's first letter to lower case
-                 * @param string|array item
-                 * @returns string|array
-                 */
-                lcfirst: function (item) {
-                    var _this = this;
-                    if (__.isArray(item)) {
-                        var arr = [];
-                        __.forEach(item, function (i, v) {
-                            var _item = _this.lcfirst(v);
-                            if (_item)
-                                arr.push(_item);
-                        });
-                        return arr;
-                    }
-                    else if (__.isString(item))
-                        return item[0].toLowerCase() + item.substr(1);
-                },
-                /**
-                 * Capitalizes the first letter of each word
-                 * @param string|array item
-                 * @param string options Only option is - which indicates that first letter after 
-                 * hyphens should
-                 * be changed to upper case too
-                 * @returns string|array
-                 */
-                ucwords: function (item, options) {
-                    var _this = this;
-                    if (__.isArray(item)) {
-                        var arr = [];
-                        __.forEach(item, function (i, v) {
-                            var _item = _this.ucwords(v, options);
-                            arr.push(_item);
-                        });
-                        return arr;
-                    }
-                    else if (__.isString(item))
-                        return item.replace(options === '-' ? /[^-'\s]+/g : /[^\s]+/g, function (word) {
-                            return word.replace(/^./, function (first) {
-                                return first.toUpperCase();
-                            });
-                        });
-                },
-                /**
-                 * Changes snake case to camel case
-                 * @param string|array item
-                 * @param boolean ucfirst
-                 * @returns string|array
-                 */
-                snakeToCamel: function (item, ucfirst) {
-                    var _this = this;
-                    if (__.isArray(item)) {
-                        var arr = [];
-                        __.forEach(item, function (i, v) {
-                            var _item = _this.snakeToCamel(v, ucfirst);
+                            var _item = _this.camelToSnake(v);
                             if (_item)
                                 arr.push(_item);
                         });
                         return arr;
                     }
                     else if (__.isString(item)) {
-                        var _item = item.replace(/(\_\w)/g, function (w) {
-                            return w[1].toUpperCase();
+                        var _item = item.replace(/([A-Z])/g, function (i) {
+                            return '-' + i.toLowerCase();
                         });
-                        return ucfirst ? this.ucfirst(_item) : _item;
+                        return this.lcfirst(_item);
                     }
                 },
                 /**
@@ -3774,27 +3939,13 @@
                     }
                 },
                 /**
-                 * Changes camel case to hypen case
+                 * Shortcut to ucwords
                  * @param string|array item
+                 * @param string options
                  * @returns string|array
                  */
-                camelToHyphen: function (item) {
-                    var _this = this;
-                    if (__.isArray(item)) {
-                        var arr = [];
-                        __.forEach(item, function (i, v) {
-                            var _item = _this.camelToSnake(v);
-                            if (_item)
-                                arr.push(_item);
-                        });
-                        return arr;
-                    }
-                    else if (__.isString(item)) {
-                        var _item = item.replace(/([A-Z])/g, function (i) {
-                            return '-' + i.toLowerCase();
-                        });
-                        return this.lcfirst(_item);
-                    }
+                capitalize: function (item, options) {
+                    return this.ucwords(item, options);
                 },
                 /**
                  * Checks if the given value contains the given options
@@ -3845,33 +3996,6 @@
                     return obj;
                 },
                 /**
-                 * Trims the given string or array of strings
-                 * @param {Array}|{String} str
-                 * @returns {Array}|{String}
-                 */
-                trim: function (str) {
-                    if (__.isArray(str)) {
-                        var _this = this, arr = [];
-                        __.forEach(str, function (i, v) {
-                            arr.push(_this.trim(v));
-                        });
-                        return arr;
-                    }
-                    else if (__.isString(str))
-                        return str.trim();
-                },
-                /**
-                 * Splits the str into an array by the given separator
-                 * @param {string}|{array} str
-                 * @param {string} separator
-                 * @returns {Array}
-                 */
-                split: function (str, separator) {
-                    return this.__(str, separator, function (str, separator) {
-                        return str.split(separator);
-                    });
-                },
-                /**
                  * Joins the array into a string with the given separator
                  * @param {string}|{array} str
                  * @param {string} separator
@@ -3881,6 +4005,52 @@
                     if (!__.isArray(str))
                         return str;
                     return str.join(separator);
+                },
+                /**
+                 * Shortcut to lowercase()
+                 * @param {string} item
+                 * @returns {Array}
+                 */
+                lcase: function (item) {
+                    return this.lowercase(item);
+                },
+                /**
+                 * Changes the item's first letter to lower case
+                 * @param string|array item
+                 * @returns string|array
+                 */
+                lcfirst: function (item) {
+                    var _this = this;
+                    if (__.isArray(item)) {
+                        var arr = [];
+                        __.forEach(item, function (i, v) {
+                            var _item = _this.lcfirst(v);
+                            if (_item)
+                                arr.push(_item);
+                        });
+                        return arr;
+                    }
+                    else if (__.isString(item))
+                        return item[0].toLowerCase() + item.substr(1);
+                },
+                /**
+                 * Changes the item to lower case
+                 * @param string|array item
+                 * @returns string|array
+                 */
+                lowercase: function (item) {
+                    var _this = this;
+                    if (__.isArray(item)) {
+                        var arr = [];
+                        __.forEach(item, function (i, v) {
+                            var _item = _this.lcase(v);
+                            if (_item)
+                                arr.push(_item);
+                        });
+                        return arr;
+                    }
+                    else if (__.isString(item))
+                        return item.toLowerCase();
                 },
                 /**
                  * Performs a replace operation on the given string
@@ -3902,37 +4072,151 @@
                             });
                 },
                 /**
-                 * Helper function to check array or str and call function only on str
-                 * @param {string}|{array} str
-                 * @param {string} options
-                 * @param {function} funcA Try this function
-                 * @param {function} funcB Do this if first failed
-                 * @returns {string}|{array}
+                 * Shortcut to lcfirst
+                 * @param {string} item
+                 * @returns {Array}
                  */
-                __: function (str, options, funcA, funcB) {
-                    if (__.isArray(str)) {
-                        var arr = [], _this = this;
-                        __.forEach(str, function (i, v) {
-                            arr.push(_this.__(v, options, funcA, funcB));
+                smallize: function (item) {
+                    return this.lcfirst(item);
+                },
+                /**
+                 * Changes snake case to camel case
+                 * @param string|array item
+                 * @param boolean ucfirst
+                 * @returns string|array
+                 */
+                snakeToCamel: function (item, ucfirst) {
+                    var _this = this;
+                    if (__.isArray(item)) {
+                        var arr = [];
+                        __.forEach(item, function (i, v) {
+                            var _item = _this.snakeToCamel(v, ucfirst);
+                            if (_item)
+                                arr.push(_item);
                         });
                         return arr;
                     }
-                    else if (__.isString(str)) {
-                        options = this.__opts(options);
-                        options.unshift(str);
-                        return __.tryCatch(function () {
-                            return __.callable(funcA).apply(this, options);
-                        }.bind(this), function () {
-                            return __.callable(funcB).apply(this, options);
-                        }.bind(this));
+                    else if (__.isString(item)) {
+                        var _item = item.replace(/(\_\w)/g, function (w) {
+                            return w[1].toUpperCase();
+                        });
+                        return ucfirst ? this.ucfirst(_item) : _item;
                     }
                 },
-                __opts: function (options) {
-                    options = options.replace(/\\,/g, '__fcomma__').split(',');
-                    __.forEach(options, function (i, v) {
-                        options[i] = v.replace(/__fcomma__/g, ',');
+                /**
+                 * Splits the str into an array by the given separator
+                 * @param {string}|{array} str
+                 * @param {string} separator
+                 * @returns {Array}                  */
+                split: function (str, separator) {
+                    return this.__(str, separator, function (str, separator) {
+                        return str.split(separator);
                     });
-                    return options;
+                },
+                /**
+                 * Trims the given string or array of strings
+                 * @param {Array}|{String} str
+                 * @returns {Array}|{String}
+                 */
+                trim: function (str) {
+                    if (__.isArray(str)) {
+                        var _this = this, arr = [];
+                        __.forEach(str, function (i, v) {
+                            arr.push(_this.trim(v));
+                        });
+                        return arr;
+                    }
+                    else if (__.isString(str))
+                        return str.trim();
+                },
+                /**
+                 * Shortcut to uppercase()
+                 * @param {string} item
+                 * @returns {Array}
+                 */
+                ucase: function (item) {
+                    return this.uppercase(item);
+                },
+                /**
+                 * Changes the item's first letter to upper case
+                 * @param string|array item
+                 * @returns string|array
+                 */
+                ucfirst: function (item) {
+                    var _this = this;
+                    if (__.isArray(item)) {
+                        var arr = [];
+                        __.forEach(item, function (i, v) {
+                            var _item = _this.ucfirst(v);
+                            if (_item)
+                                arr.push(_item);
+                        });
+                        return arr;
+                    }
+                    else if (__.isString(item))
+                        return item[0].toUpperCase() + item.substr(1);
+                },
+                /**
+                 * Capitalizes the first letter of each word
+                 * @param string|array item
+                 * @param string options Only option is - which indicates that first letter after 
+                 * hyphens should
+                 * be changed to upper case too
+                 * @returns string|array
+                 */
+                ucwords: function (item, options) {
+                    var _this = this;
+                    if (__.isArray(item)) {
+                        var arr = [];
+                        __.forEach(item, function (i, v) {
+                            var _item = _this.ucwords(v, options);
+                            arr.push(_item);
+                        });
+                        return arr;
+                    }
+                    else if (__.isString(item))
+                        return item.replace(options === '-' ? /[^-'\s]+/g : /[^\s]+/g, function (word) {
+                            return word.replace(/^./, function (first) {
+                                return first.toUpperCase();
+                            });
+                        });
+                },
+                /**
+                 * Changes the item to upper case
+                 * @param string|array item
+                 * @returns string|array
+                 */
+                uppercase: function (item) {
+                    var _this = this;
+                    if (__.isArray(item)) {
+                        var arr = [];
+                        __.forEach(item, function (i, v) {
+                            var _item = _this.ucase(v);
+                            if (_item)
+                                arr.push(_item);
+                        });
+                        return arr;
+                    }
+                    else if (__.isString(item))
+                        return item.toUpperCase();
+                }
+            }),
+            /**
+             * Page transition effects
+             * 
+             * Effect function would be passed three parameters:
+             * 
+             * currentPage - current page been navigated away from
+             * newPage - new page been navigated to
+             * options - POJO of options passed by app developer
+             * 
+             * The function is expected to return an integer which is the number of seconds to wait
+             * before currentPage is removed from the dom
+             */
+            Transitions = Object.create({
+                "switch": function (currentPage, newPage, options) {
+                    newPage.show();
+                    return 0;
                 }
             }),
             /**
@@ -3961,14 +4245,39 @@
                     return url;
                 }
                 var _Model = Object.create({
-                    name: props && props.name ? props.name : null,
                     app: props && props.app ? props.app : null,
+                    attributes: __.isObject(attributes) ? attributes : {},
+                    id: id, collection: props && props.collection ? props.collection : null,
+                    method: props && props.method ? props.method : null,
+                    name: props && props.name ? props.name : null,
                     uid: props && props.uid ? props.uid : 'id',
                     url: props && props.url ? props.url : null,
-                    id: id,
-                    collection: props && props.collection ? props.collection : null,
-                    method: props && props.method ? props.method : null,
-                    attributes: __.isObject(attributes) ? attributes : {},
+                    /**
+                     * Binds the model to the given element
+                     * @param {string}|{HTMLElement}|{_} elem
+                     * @returns {Model}
+                     */
+                    bind: function (elem) {
+                        elem = this.app._(elem);
+                        elem.attr('this-mid', this.id)
+                                .attr('this-uid', this.uid)
+                                .attr('this-url', this.url);
+                        elem = internal.loadModel.call(this.app, elem, this.attributes, false);
+                        elem.show();
+                        if (!elem.is('form')) {
+                            elem.find('form[this-loaded]').remove();
+                            elem = elem.find('form');
+                            if (!elem.length)
+                                return this;
+                        }
+                        internal.loadForms.call(this.app, elem, this.attributes);
+                        return this;
+                    },
+                    /**
+                     * Initailizes Model attributes, creating setters and getters for them.
+                     * @param {Object} attr
+                     * @returns {void}
+                     */
                     init: function (attr) {
                         this['get' + Filters.snakeToCamel(attr, true)] = function () {
                             return this.attributes[attr];
@@ -3977,120 +4286,6 @@
                             this.attributes[attr] = val;
                             return this;
                         };
-                    },
-                    /**
-                     * Converts the model to a url string
-                     * @returns {String}
-                     */
-                    toURL: function () {
-                        return toURL(this.attributes);
-                    },
-                    /**
-                     * Persists the model. If not exists, it is created.
-                     * @param {Object} config Keys may include cacheOnly (default: FALSE),
-                     * method (default: PUT|POST), success, error, complete
-                     * @returns boolean
-                     */
-                    save: function (config) {
-                        config = this.app.__.extend({}, config);
-                        var _this = this, method = this.id ? 'PUT' : 'POST';
-                        if (!this.app) {
-                            console.error('Invalid model object');
-                            return false;
-                        }
-                        else if (!this.name) {
-                            _this.app.error('Cannot save an unnamed model.');
-                            return false;
-                        }
-
-                        if (this.method)
-                            method = this.method;
-                        if (this.id && config.cacheOnly)
-                            /* save model to collection */
-                            internal.modelToStore.call(this.app, this.name, this.id, this.attributes,
-                                    this.uid);
-                        else if (_this.url) {
-                            var _success = function (data, id) {
-                                var model = _this.app.config.dataKey ?
-                                        data[_this.app.config.dataKey] : data;
-                                if (model) {
-                                    // Don't cache for update if watching for updates already
-                                    if (!_this.app.watchCallback) {
-                                        /* save model to collection */
-                                        internal.modelToStore.call(_this.app, _this.name, _this.id,
-                                                model, _this.uid);
-                                        var _action = _this.id ? 'updated' : 'created',
-                                                action = _this.app.store(_action) || {};
-                                    }
-                                    /* update model's collection */
-                                    if (_this.collection)
-                                        _this.collection.models[_this.id] = model;
-
-                                    /* saved existing model */
-                                    if (_this.id) {
-                                        if (!_this.app.watchCallback) {
-                                            if (!action[_this.name])
-                                                action[_this.name] = {};
-                                            action[_this.name][_this.id] = model;
-                                            _this.app.store(_action, action);
-                                        }
-                                    }
-                                    /* saved new model */
-                                    else {
-                                        if (!_this.app.watchCallback) {
-                                            _this.id = id || model[_this.uid];
-                                            /* update the url */
-                                            _this.url += _this.id;
-                                            if (!action[_this.name])
-                                                action[_this.name] = [];
-                                            /* Remove model uid if exists to avoid duplicates */
-                                            action[_this.name] = _this.app.__
-                                                    .arrayRemoveValue(action[_this.name],
-                                                            _this.id, true);
-                                            action[_this.name].push(_this.id);
-                                            _this.app.store(_action, action);
-                                        }
-                                        if (_this.collection)
-                                            _this.collection.length++;
-                                    }
-
-                                    _this.attributes = model;
-                                    // Don't update if watching for updates already
-                                    if (!_this.app.watchCallback)
-                                        // update current page 
-                                        internal.updatePage.call(_this.app);
-                                }
-                                _this.app.__.callable(config.success).call(_this.app, data);
-                                _this.app.__.callable(config.complete).call(_this.app);
-                            },
-                                    _error = function (e) {
-                                        _this.app.__.callable(config.error).call(this, e);
-                                        _this.app.__.callable(config.complete).call(this, e);
-                                    };
-                            if (this.app.dataTransport)
-                                this.app.__.callable(this.app.dataTransport)
-                                        .call(this.app, {
-                                            url: this.url,
-                                            id: this.id,
-                                            data: this.attributes,
-                                            action: this.id ? 'update' : 'create',
-                                            success: _success,
-                                            error: _error
-                                        });
-                            else
-                                this.app.ajax({
-                                    type: config.method || method,
-                                    url: _this.app.config.baseURL ? _this.app.config.baseURL +
-                                            _this.url : _this.url, data: this.toURL(),
-                                    success: _success,
-                                    error: _error
-                                });
-                            return true;
-                        }
-                        else {
-                            _this.app.error('Cannot save model to server: No URL supplied.');
-                        }
-                        return false;
                     },
                     /**
                      * Removes the model
@@ -4144,11 +4339,10 @@
                                 }
                                 _this.app.__.callable(config.success).call(this, data);
                                 _this.app.__.callable(config.complete).call(this);
-                            },
-                                    _error = function (e) {
-                                        _this.app.__.callable(config.error).call(this, e);
-                                        _this.app.__.callable(config.complete).call(this, e);
-                                    };
+                            }, _error = function (e) {
+                                _this.app.__.callable(config.error).call(this, e);
+                                _this.app.__.callable(config.complete).call(this, e);
+                            };
                             if (this.app.dataTransport)
                                 this.app.__.callable(this.app.dataTransport)
                                         .call(this.app, {
@@ -4172,19 +4366,120 @@
                         return true;
                     },
                     /**
-                     * Binds the model to the given element
-                     * @param {string}|{HTMLElement}|{_} elem
-                     * @returns {Model}
+                     * Persists the model. If not exists, it is created.
+                     * @param {Object} config Keys may include cacheOnly (default: FALSE),
+                     * method (default: PUT|POST), success, error, complete
+                     * @returns boolean
                      */
-                    bind: function (elem) {
-                        elem = this.app._(elem);
-                        elem.attr('this-mid', this.id)
-                                .attr('this-uid', this.uid)
-                                .attr('this-url', this.url);
-                        internal.loadModel.call(this.app, elem, this.attributes, true);
-                        internal.loadForms.call(this.app, elem.is('form') ? elem
-                                : elem.find('form'), this.attributes);
-                        return this;
+                    save: function (config) {
+                        config = this.app.__.extend({}, config);
+                        var _this = this, method = this.id ? 'PUT' : 'POST';
+                        if (!this.app) {
+                            console.error('Invalid model object');
+                            return false;
+                        }
+                        else if (!this.name) {
+                            _this.app.error('Cannot save an unnamed model.');
+                            return false;
+                        }
+
+                        if (this.method)
+                            method = this.method;
+                        if (this.id && config.cacheOnly)
+                            /* save model to collection */
+                            internal.modelToStore.call(this.app, this.name, this.id, this.attributes,
+                                    this.uid);
+                        else if (_this.url) {
+                            var _success = function (data, id) {
+                                var model = _this.app.config.dataKey ?
+                                        data[_this.app.config.dataKey] : data;
+                                if (model) {
+                                    // Don't cache for update if watching for updates already
+                                    if (!_this.app.watchCallback) {
+                                        // save model to collection and set whole data as model
+                                        model = internal.modelToStore
+                                                .call(_this.app, _this.name, _this.id, model,
+                                                        _this.uid);
+                                        var _action = _this.id ? 'updated' : 'created',
+                                                action = _this.app.store(_action) || {};
+                                    }
+                                    // update model's collection
+                                    if (_this.collection)
+                                        _this.collection.models[_this.id] = model;
+
+                                    // saved existing model for dom update
+                                    if (_this.id && !_this.app.watchCallback) {
+                                        if (!action[_this.name])
+                                            action[_this.name] = {};
+                                        action[_this.name][_this.id] = {
+                                            data: model,
+                                            timestamp: Date.now()
+                                        };
+                                        _this.app.store(_action, action);
+                                    }
+                                    // saved new model for dom update
+                                    else {
+                                        if (!_this.app.watchCallback) {
+                                            _this.id = id || model[_this.uid];
+                                            // update the url
+                                            _this.url += _this.id;
+                                            if (!action[_this.name])
+                                                action[_this.name] = [];
+                                            // Remove model uid if exists to avoid duplicates
+                                            action[_this.name] = _this.app.__
+                                                    .arrayRemoveValue(action[_this.name],
+                                                            _this.id, true);
+                                            action[_this.name].push(_this.id);
+                                            _this.app.store(_action, action);
+                                        }
+                                        if (_this.collection)
+                                            _this.collection.length++;
+                                    }
+
+                                    _this.attributes = model;
+                                    // Don't update if watching for updates already
+                                    if (!_this.app.watchCallback)
+                                        // update current page 
+                                        internal.updatePage.call(_this.app);
+                                }
+                                _this.app.__.callable(config.success).call(_this.app, data);
+                                _this.app.__.callable(config.complete).call(_this.app);
+                            },
+                                    _error = function (e) {
+                                        _this.app.__.callable(config.error).call(this, e);
+                                        _this.app.__.callable(config.complete).call(this, e);
+                                    };
+                            if (this.app.dataTransport)
+                                this.app.__.callable(this.app.dataTransport)
+                                        .call(this.app, {
+                                            url: this.url,
+                                            id: this.id,
+                                            data: this.attributes,
+                                            action: this.id ? 'update' : 'create',
+                                            success: _success,
+                                            error: _error
+                                        });
+                            else
+                                this.app.ajax({
+                                    type: config.method || method,
+                                    url: _this.app.config.baseURL ? _this.app.config.baseURL +
+                                            _this.url : _this.url, data: this.toURL(),
+                                    success: _success,
+                                    error: _error
+                                });
+                            return true;
+                        }
+                        else {
+                            _this.app.error('Cannot save model to server: No URL supplied.');
+                        }
+                        return false;
+                    },
+                    /**
+                     * Converts the model to a url string
+                     * @returns {String}
+                     */
+                    toURL: function () {
+                        return toURL(this.attributes);
                     }
                 });
                 if (__.isObject(attributes)) {
@@ -4205,32 +4500,27 @@
              */
             Collection = function (models, props) {
                 var _Collection = Object.create({
-                    name: props && props.name ? props.name : null, app: props && props.app ? props.app : null, uid: props && props.uid ? props.uid : 'id',
-                    url: props && props.url ? props.url : null, current_index: -1,
+                    app: props && props.app ? props.app : null,
+                    current_index: -1,
                     models: __.isObject(models) ? models : {},
+                    name: props && props.name ? props.name : null,
+                    uid: props && props.uid ? props.uid : 'id',
+                    url: props && props.url ? props.url : null,
                     /**
-                     * Fetch the model at the index location
-                     * @param {integer} index                      * @returns {Model}
-                     */
-                    get: function (index) {
-                        var key = Object.keys(this.models)[index];
-                        if (key)
-                            this.parent.current_index = index;
-                        return this.model(key);
-                    },
-                    /**
-                     * Fetches the first model in the collection
-                     * @returns {Model}
-                     */
-                    first: function () {
-                        return this.get(0);
-                    },
-                    /**
-                     * Fetches the last model in the collection
-                     * @returns {Model}
-                     */
-                    last: function () {
-                        return this.get(this.length - 1);
+                     * Adds a model to the collection
+                     * @param {Object} attributes 
+                     * @param {Object} config @see Model.save()
+                     * @returns {Model}                      */
+                    add: function (attributes, config) {
+                        var model = new Model(null, attributes, {
+                            name: this.name, app: this.app,
+                            uid: this.uid,
+                            url: this.url,
+                            collection: this
+                        });
+                        if (model.save(config))
+                            return model;
+                        return false;
                     },
                     /**
                      * Fetches the current model
@@ -4240,19 +4530,20 @@
                         return this.get(this.parent.current_index || 0);
                     },
                     /**
-                     * Fetchs the next model
+                     * Fetches the first model in the collection
                      * @returns {Model}
                      */
-                    next: function () {
-                        return this.get(this.parent.current_index + 1);
+                    first: function () {
+                        return this.get(0);
                     },
                     /**
-                     * Rewinds the collection back to the start
-                     * @returns {Collection}
-                     */
-                    rewind: function () {
-                        this.parent.current_index = -1;
-                        return this;
+                     * Fetch the model at the index location
+                     * @param {integer} index                      * @returns {Model}                      */
+                    get: function (index) {
+                        var key = Object.keys(this.models)[index];
+                        if (key)
+                            this.parent.current_index = index;
+                        return this.model(key);
                     },
                     /**
                      * Checks whether there's a model after the current one
@@ -4263,6 +4554,13 @@
                                 model = this.next();
                         this.parent.current_index = current_index;
                         return model !== null;
+                    },
+                    /**
+                     * Fetches the last model in the collection
+                     * @returns {Model}
+                     */
+                    last: function () {
+                        return this.get(this.length - 1);
                     },
                     /**
                      * Fetches a model from the collection
@@ -4281,21 +4579,11 @@
                                 }) : null;
                     },
                     /**
-                     * Adds a model to the collection
-                     * @param {Object} attributes 
-                     * @param {Object} config @see Model.save()
+                     * Fetchs the next model
                      * @returns {Model}
                      */
-                    add: function (attributes, config) {
-                        var model = new Model(null, attributes, {
-                            name: this.name, app: this.app,
-                            uid: this.uid,
-                            url: this.url,
-                            collection: this
-                        });
-                        if (model.save(config))
-                            return model;
-                        return false;
+                    next: function () {
+                        return this.get(this.parent.current_index + 1);
                     },
                     /**
                      * Removes the model
@@ -4321,11 +4609,10 @@
                                             _this.length = 0;
                                             _this.app.__.callable(config.success).call(_this, data);
                                             _this.app.__.callable(config.complete).call(_this);
-                                        },
-                                        _error = function (e) {
-                                            _this.app.__.callable(config.error).call(_this, e);
-                                            _this.app.__.callable(config.complete).call(_this);
-                                        };
+                                        }, _error = function (e) {
+                                    _this.app.__.callable(config.error).call(_this, e);
+                                    _this.app.__.callable(config.complete).call(_this);
+                                };
                                 if (this.app.dataTransport)
                                     this.__.callable(this.app.dataTransport)
                                             .call(this, {
@@ -4351,6 +4638,14 @@
                         delete this.models[model_id];
                         this.length--;
                         return model;
+                    },
+                    /**
+                     * Rewinds the collection back to the start
+                     * @returns {Collection}
+                     */
+                    rewind: function () {
+                        this.parent.current_index = -1;
+                        return this;
                     }
                 });
                 _Collection.length = props && props.length ? props.length : 0;
@@ -4389,6 +4684,14 @@
             }
             return this;
         },
+        /**
+         * Checks if a transition exists with the given name
+         *           * @param string name
+         * @returns boolean
+         */
+        exists: function (name) {
+            return Transitions[name] !== undefined;
+        },
         /**          * Overwrites a transition type if it already exists and adds it otherwise
          * 
          * @param string name Identifier to the transition. This is also what developers would
@@ -4406,14 +4709,6 @@
                 Transitions[name] = func;
             }
             return this;
-        },
-        /**
-         * Checks if a transition exists with the given name
-         *           * @param string name
-         * @returns boolean
-         */
-        exists: function (name) {
-            return Transitions[name] !== undefined;
         }
     };
     /**
@@ -4436,6 +4731,15 @@
             return this;
         },
         /**
+         * Checks if a filter exists with the given name
+         * 
+         * @param string name
+         * @returns boolean
+         */
+        exists: function (name) {
+            return Transitions[name] !== undefined;
+        },
+        /**
          * Overwrites a filter if it already exist or adds it otherwise
          * 
          * @param string name Identifier to the filter. This is also what developers would pipe
@@ -4450,15 +4754,6 @@
                 Filters[name] = func;
             }
             return this;
-        },
-        /**
-         * Checks if a filter exists with the given name
-         * 
-         * @param string name
-         * @returns boolean
-         */
-        exists: function (name) {
-            return Transitions[name] !== undefined;
         }
     };
     /**
@@ -4479,22 +4774,19 @@
         });
     };
     ThisApp.prototype = {
-        /**
-         * Indicates whether the data transporter is online or not. If not, cached data may be used
-         */
-        transporterOnline: false,
-        /**
-         * Array of elements being watched for updates
-         */
-        watching: {},
+        __: __,
         /**
          * Callback to call before events happen
          */
         beforeCallbacks: {},
         /**
-         * App events
+         * Number of collections still loading
          */
-        events: [],
+        collections: 0,
+        /**
+         * Number of components still loading
+         */
+        components: 0,
         /**
          * App configuration object
          */
@@ -4520,7 +4812,7 @@
             titleContainer: null,
             /** 			 * The transition effect to use between pages
              */
-            transition: 'show',
+            transition: 'switch',
             /**
              * The options for the transition effect
              */
@@ -4545,24 +4837,40 @@
                 },
                 js: './assets/js',
                 css: './assets/css'
+            },
+            /**
+             * Indicates the status info for crud operations
+             */
+            crudStatus: {
+                key: 'status', // the key that holds the operation status
+                successValue: true // the key value that indicates success
             }
         },
+        /**
+         * App events
+         */
+        events: [],
+        /**
+         * Number of models still loading
+         */
+        models: 0,
+        /**
+         * Object holding element types whose unrequired assets have been removed for the current page
+         */
+        removedAssets: {},
         /**
          * Holds values to pass on to target when loaded
          */
         tar: {},
         /**
-         * Number of components still loading
+         * Indicates whether the data transporter is online or not. If not, cached data may be used
          */
-        components: 0,
+        transporterOnline: false,
         /**
-         * Number of collections still loading
+         * Array of elements being watched for updates
          */
-        collections: 0,
-        /**          * Number of models still loading
-         */
-        models: 0,
-        __: __, /**
+        watching: {},
+        /**
          * Captures the object for manipulation
          * @param mixed selector
          * @param boolean debug
@@ -4571,295 +4879,26 @@
             return _(selector, debug || this.config.debug);
         },
         /**
-         * Set the base url for the app          * @param string url
-         * @returns ThisApp          */
-        setBaseUrl: function (url) {
-            return internal.groupConsoleOutput.call(this, 'setBaseUrl',
-                    function () {
-                        this.config.baseURL = url;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the app debug mode
-         * @param boolean debug Default is TRUE
-         * @returns ThisApp
+         * Sends an AJAX request
+         * @param object config
+         * Keys include:
+         * type (string): GET | POST | PATCH | PUT | DELETE
+         * url (string): The url to connect to. Default is current url
+         * data (string|object}: The data to send with the request
+         * success (function): Function to call when a success response is gotten. The response data
+         * is passed as a parameter
+         * error (function) : Function to call when error occurs
+         * complete (function): Function to call when a response has been received, error or success.          * @returns ajax object
          */
-        debug: function (debug) {
-            return internal.groupConsoleOutput.call(this, 'debug',
+        ajax: function (config) {
+            return internal.groupConsoleOutput.call(this, 'ajax',
                     function () {
-                        this.config.debug = debug || false;
-                        this.__.__proto__.debug = this.config.debug;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the key in the response which holds the data array          * @param string key
-         * @returns ThisApp
-         */
-        setDataKey: function (key) {
-            return internal.groupConsoleOutput.call(this, 'setDataKey',
-                    function () {
-                        this.config.dataKey = key;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the container that would always hold the page title
-         * @param string container
-         * @returns ThisApp
-         */
-        setTitleContainer: function (container) {
-            return internal.groupConsoleOutput.call(this, 'setTitleContainer',
-                    function () {
-                        this.config.titleContainer = this.running ?
-                                this._(container) : container;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Set the transition to use between pages
-         * @param string|func transition To see string options, call method getAvailableTransitions.
-         * If function, the function is passed two parameters - the old page and the new page
-         * @param object options The options for the transition
-         * @returns ThisApp
-         */
-        setTransition: function (transition, options) {
-            return internal.groupConsoleOutput.call(this, 'setTransition',
-                    function () {
-                        this.config.transition = transition;
-                        this.config.transitionOptions = options;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Gets a list of available transitions
-         * @returns array
-         */
-        getAvailableTransitions: function () {
-            return internal.groupConsoleOutput.call(this, 'getAvailableTransitions',
-                    function () {
-                        return Object.keys(Transitions);
-                    }, true);
-        },
-        /**
-         * Gets a list of available filters
-         * @returns array          */
-        getAvailableFilters: function () {
-            return internal.groupConsoleOutput.call(this, 'getAvailableFilters',
-                    function () {
-                        return Object.keys(Filters);
-                    }, true);
-        },
-        /**
-         * Sets the default layout for the application
-         * @param string layout ID of the layout container
-         * @returns ThisApp
-         */
-        setLayout: function (layout) {
-            return internal.groupConsoleOutput.call(this, 'setLayout',
-                    function () {
-                        this.config.layout = layout;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the path to pages' location
-         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
-         * the path is assumed to follow the set base url.
-         * @param (string) ext The extension for pages. This should include the dot (.). Default is
-         * .html
-         * @returns {ThisApp}
-         */
-        setPagesPath: function (path, ext) {
-            return internal.groupConsoleOutput.call(this, 'setPagesPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.pages = {
-                            dir: path,
-                            ext: ext || '.html'
-                        };
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the path to layouts' location
-         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
-         * the path is assumed to follow the set base url.
-         * @param (string) ext The extension for layouts. This should include the dot (.). Default is
-         * .html
-         * @returns {ThisApp}
-         */
-        setLayoutsPath: function (path, ext) {
-            return internal.groupConsoleOutput.call(this, 'setLayoutsPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.layouts = {
-                            dir: path,
-                            ext: ext || '.html'
-                        };
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the path to components' location
-         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
-         * the path is assumed to follow the set base url.
-         * @param (string) ext The extension for components. This should include the dot (.). Default is
-         * .html
-         * @returns {ThisApp}
-         */
-        setComponentsPath: function (path, ext) {
-            return internal.groupConsoleOutput.call(this, 'setComponentsPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.components = {
-                            dir: path, ext: ext || '.html'
-                        };
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the path to js scripts' location
-         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
-         * the path is assumed to follow the set base url.
-         * @returns {ThisApp}
-         */
-        setJSPath: function (path) {
-            return internal.groupConsoleOutput.call(this, 'setJSPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.js = path;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets the path to css styles' location
-         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
-         * the path is assumed to follow the set base url.
-         * @returns {ThisApp}
-         */
-        setCSSPath: function (path) {
-            return internal.groupConsoleOutput.call(this, 'setCSSPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.css = path;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Initializes the app
-         * @param string page The ID of the page
-         * @param boolean fromState Indicates whether to load the start page from state if avaiable
-         * or regenerate it
-         * @returns app
-         */
-        start: function (page, fromState) {
-            return internal.groupConsoleOutput.call(this, 'start',
-                    function () {
-                        if (this.running)
-                            return this;
-                        if (page)
-                            this.config.startWith = page;
-                        this.container = this._(this.config.container).html('');
-                        this.firstPage = true;
-                        internal.setup.call(this);
-                        var target_page = internal.pageIDFromLink.call(this, location.hash);
-                        if (fromState !== false && history.state &&
-                                target_page === this.store('last_page')) {
-                            internal.restoreState.call(this, history.state);
-                        }
-                        else {
-                            this.loadPage(target_page || this.config.startWith ||
-                                    this._('page[this-default-page]:not([this-current]):not([this-dead]),'
-                                            + '[this-type="pages"] [this-default-page]')
-                                    .attr('this-id'));
-                        }
-                        return this;
-                    }, true);
-        },
-        /**
-         * Registers a callbact to be called before an event happens. If the callback returns false,
-         * the event is terminated.
-         * @param {string} event
-         * @param {function} callback
-         * @returns {ThisApp}
-         */
-        before: function (event, callback) {
-            return internal.groupConsoleOutput.call(this, 'before',
-                    function () {
-                        this.beforeCallbacks[event] = callback;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Loads the given page
-         * @param {string} page ID of the page
-         * @param {boolean} replaceInState Indicates whether to replace the current page's state with
-         * the new page state instead of creating a different state for it.
-         * @returns {ThisApp}
-         */
-        loadPage: function (page, replaceInState) {
-            return internal.groupConsoleOutput.call(this, 'loadPage',
-                    function () {
-                        if (!page)
-                            return;
-                        this.oldPage = _();
-                        var newPage = this._('page[this-id="' + page
-                                + '"]:not([this-current]):not([this-dead]),'
-                                + '[this-type="pages"]>[this-id="' + page + '"]');
-                        if (newPage.length > 1) {
-                            this.error('Target page matches multiple pages!');
+                        if (!this.__.isObject(config)) {
+                            this.console('error', 'Method expects an object parameter. '
+                                    + typeof config + ' given!');
                             return this;
                         }
-                        if (!newPage.length) {
-                            if (this.config.paths && this.config.paths.pages) {
-                                var _this = this;
-                                internal.fullyFromURL.call(this, 'page', page, function (elem) {
-                                    internal.pageFound.call(_this, elem, replaceInState);
-                                }, function () {
-                                    internal.notAPage.call(_this, page);
-                                });
-                                return this;
-                            }
-                            internal.notAPage.call(this, page);
-                            return this;
-                        }
-                        this.__proto__.components = 0;
-                        this.__proto__.collections = 0;
-                        this.__proto__.models = 0;
-                        internal.pageFound.call(this, newPage, replaceInState);
-                        return this;
-                    }, true);
-        },
-        /**
-         * Sets up the function to call when a page is not found
-         * @param {function}|{string} callback or id of page to load
-         * @returns {ThisApp}
-         */
-        pageNotFound: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'pageNotFound',
-                    function () {
-                        this.notFound = callback;
-                        return this;
-                    }, true);
-        },
-        /**
-         * Returns the app to the home page          * @returns ThisApp
-         */
-        home: function () {
-            return internal.groupConsoleOutput.call(this, 'home',
-                    function () {
-                        this.loadPage(this.config.startWith ||
-                                this._('page[this-default-page]:not([this-current]):not([this-dead]),'
-                                        + '[this-type="pages"] [this-default-page]')
-                                .attr('this-id'));
-                        return this;
+                        return this.__.ajax(config);
                     }, true);
         },
         /**
@@ -4880,6 +4919,106 @@
                     }, true);
         },
         /**
+         * Registers a callbact to be called before an event happens. If the callback returns false,
+         * the event is terminated.
+         * @param {string} event
+         * @param {function} callback          * @returns {ThisApp}
+         */
+        before: function (event, callback) {
+            return internal.groupConsoleOutput.call(this, 'before',
+                    function () {
+                        this.beforeCallbacks[event] = callback;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Fetches a collection of model
+         * @param {string} model_name
+         * @param {String} url
+         * @param {function} success          * @param {function} error
+         * @returns {Collection}
+         */
+        collection: function (model_name, url, data, success, error) {
+            return internal.groupConsoleOutput.call(this, 'collection',
+                    function () {
+                        if (!model_name)
+                            return new Collection([], {app: this});
+                        if (!data) {
+                            var collection = internal.cache.call(this, 'model', model_name);
+                            if (collection && collection.data)
+                                data = collection.data;
+                        }
+                        else if (data) {
+                            if (this.config.dataKey && !data[this.config.dataKey]) {
+                                var _data = {};
+                                _data[this.config.dataKey] = data;
+                                data = _data;
+                            }
+                            internal.cache.call(this, 'model', model_name, data);
+                        }
+                        if (data)
+                            return new Collection(data, {
+                                name: model_name,
+                                app: this, uid: collection.uid || 'id',
+                                url: collection.url || null, length: collection.length || 0});
+                        else if (this.dataTransport) {
+                            var _collection = this._('collection[this-model="' + model_name
+                                    + '"][this-loaded],[this-type="collection"][this-model="' + model_name
+                                    + '"][this-loaded]');
+                            if (!_collection.length)
+                                _collection = this._('collection[this-id="' + model_name
+                                        + '"][this-loaded],[this-type="collection"][this-id="' + model_name + '"][this-loaded]');
+                            if (!_collection.length)
+                                _collection = this._('<collection this-model="' + model_name + '" this-url="'
+                                        + (url || model_name) + '" />');
+                            _collection.attr('this-no-updates');
+                            var _this = this;
+                            return this.request(_collection, function (data, uid) {
+                                return _this.__.callable(success).call(_this,
+                                        new Collection(data, {
+                                            name: model_name,
+                                            app: _this,
+                                            uid: _collection.attr('this-model-uid') || uid || 'id',
+                                            url: _collection.attr('this-url'),
+                                            length: Object.keys(data).length || 0
+                                        }));
+                            }, error);
+                        }
+                    }, true);
+        },
+        /**
+         * The function called when logging a message
+         * @param {string} msg
+         * @returns {ThisApp}
+         */
+        console: function (method, param) {
+            if (this.config.debug)
+                console[method].apply(null, this.__.isArray(param) ? param : [param]);
+            return this;
+        },
+        /**
+         * Sets the app debug mode
+         * @param boolean debug Default is TRUE
+         * @returns ThisApp
+         */
+        debug: function (debug) {
+            return internal.groupConsoleOutput.call(this, 'debug',
+                    function () {
+                        this.config.debug = debug || false;
+                        this.__.__proto__.debug = this.config.debug;
+                        return this;
+                    }, true);
+        },
+        /**
+         * The function called when an error occurs
+         * @param string msg
+         * @returns ThisApp
+         */
+        error: function (msg) {
+            this.console('warn', msg);
+            return this;
+        },
+        /**
          * Takes the app forward one step in history
          * @returns ThisApp
          */
@@ -4893,45 +5032,75 @@
                     }, true);
         },
         /**
-         * A shortcut to method on()
-         * @param string event
-         * @param string target ID of the page to target. It could also be in forms TYPE or TYPE#ID e.g
-         * collection#users. This means the target is a collection of id `users`. Target all collection
-         * by specifying only collection
-         * Multiple elements may be targeted by separating their selectors by a comma.
-         * @param function callback          * @returns ThisApp
-         */
-        when: function (event, target, callback) {
-            return internal.groupConsoleOutput.call(this, 'when',
+         * Gets a list of available filters
+         * @returns array          */
+        getAvailableFilters: function () {
+            return internal.groupConsoleOutput.call(this, 'getAvailableFilters',
                     function () {
-                        var selector = "", targets = target.split(',');
-                        if (selector)
-                            selector += ', ';
-                        this.__.forEach(targets, function (i, v) {
-                            switch (target) {
-                                case "page":
-                                    selector += 'page,[this-type="page"]';
-                                    break;
-                                case "collection":
-                                    selector += 'collection,[this-type="collection"]';
-                                    break;
-                                case "model":
-                                    selector += 'model,[this-type="model"]';
-                                    break;
-                                case "component":
-                                    selector += 'component,[this-type="component"]';
-                                    break;
-                                default:
-                                    var exp = v.split('#');
-                                    if (exp.length > 1 && exp[0]) {
-                                        selector += '[this-type="' + exp[0] + '"][this-id="' + exp[1] + '"]';
-                                    }
-                                    else {
-                                        selector += '[this-id="' + v + '"]';
-                                    }
+                        return Object.keys(Filters);
+                    }, true);
+        },
+        /**
+         * Gets a list of available transitions
+         * @returns array
+         */
+        getAvailableTransitions: function () {
+            return internal.groupConsoleOutput.call(this, 'getAvailableTransitions',
+                    function () {
+                        return Object.keys(Transitions);
+                    }, true);
+        },
+        /**
+         * Returns the app to the home page          * @returns ThisApp
+         */
+        home: function () {
+            return internal.groupConsoleOutput.call(this, 'home',
+                    function () {
+                        this.loadPage(this.config.startWith ||
+                                this._('page[this-default-page]:not([this-current]):not([this-dead]),'
+                                        + '[this-type="pages"] [this-default-page]')
+                                .attr('this-id'));
+                        return this;
+                    }, true);
+        },
+        /**
+         * Loads the given page
+         * @param {string} pageID ID of the page
+         * @param {boolean} replaceInState Indicates whether to replace the current page's state with
+         * the new page state instead of creating a different state for it.
+         * @returns {ThisApp}
+         */
+        loadPage: function (pageID, replaceInState) {
+            return internal.groupConsoleOutput.call(this, 'loadPage',
+                    function () {
+                        if (!pageID)
+                            return;
+                        this.oldPage = _();
+                        var newPage = this._('page[this-id="' + pageID
+                                + '"]:not([this-current]):not([this-dead]),'
+                                + '[this-type="pages"]>[this-id="' + pageID + '"]');
+                        if (newPage.length > 1) {
+                            this.error('Target page matches multiple pages!');
+                            return this;
+                        }
+                        if (!newPage.length) {
+                            if (this.config.paths && this.config.paths.pages) {
+                                var _this = this;
+                                internal.fullyFromURL.call(this, 'page', pageID, function (elem) {
+                                    internal.pageFound.call(_this, elem, replaceInState);
+                                }, function () {
+                                    internal.notAPage.call(_this, pageID);
+                                });
+                                return this;
                             }
-                        });
-                        return this.on(event, selector, callback);
+                            internal.notAPage.call(this, pageID);
+                            return this;
+                        }
+                        this.__proto__.components = 0;
+                        this.__proto__.collections = 0;
+                        this.__proto__.models = 0;
+                        internal.pageFound.call(this, newPage, replaceInState);
+                        return this;
                     }, true);
         },
         /**
@@ -4970,27 +5139,34 @@
                     }, true);
         },
         /**
-         * Sends an AJAX request
-         * @param object config
-         * Keys include:
-         * type (string): GET | POST | PATCH | PUT | DELETE
-         * url (string): The url to connect to. Default is current url
-         * data (string|object}: The data to send with the request
-         * success (function): Function to call when a success response is gotten. The response data
-         * is passed as a parameter
-         * error (function) : Function to call when error occurs
-         * complete (function): Function to call when a response has been received, error or success.
-         * @returns ajax object
+         * Sets up the function to call when a page is not found
+         * @param {function}|{string} callback or id of page to load
+         * @returns {ThisApp}
          */
-        ajax: function (config) {
-            return internal.groupConsoleOutput.call(this, 'ajax',
+        pageNotFound: function (callback) {
+            return internal.groupConsoleOutput.call(this, 'pageNotFound',
                     function () {
-                        if (!this.__.isObject(config)) {
-                            this.console('error', 'Method ajax() expects an object parameter. '
-                                    + typeof config + ' given');
-                            return this;
+                        this.notFound = callback;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Reloads the current page
+         * @param {Boolean} resources Indicates whether to reload all resources as well.
+         * @param {Boolean} layouts Indicates whether to reload all layouts as well.
+         * @returns {ThisApp}
+         */
+        reload: function (resources, layouts) {
+            return internal.groupConsoleOutput.call(this, 'reload',
+                    function () {
+                        this.store('last_page', null);
+                        if (resources)
+                            location.reload();
+                        else {
+                            this.reloadLayouts = layouts || false;
+                            this.loadPage(location.hash.substr(1), true);
                         }
-                        return this.__.ajax(config);
+                        return this;
                     }, true);
         },
         /**          
@@ -5010,6 +5186,9 @@
                                     + typeof url + ' given');
                             return this;
                         }
+                        else if (this.__.isObject(url)) {
+                            url = url.attr('this-url');
+                        }
                         if (!url.startsWith('./') && !url.startsWith('../') && url.indexOf('://') === -1)
                             url = this.config.baseURL + url;
                         return this.ajax({
@@ -5024,36 +5203,199 @@
                     }, true);
         },
         /**
-         * Sets a function to call to watch for server side changes to model collections
-         * @param {function} callback Function would be passed 3 parameters - url, success callback
-         * and error callback
-         * @returns {ThisApp}
-         */
-        watch: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'watch',
+         * Set the base url for the app          * @param string url
+         * @returns ThisApp          */
+        setBaseUrl: function (url) {
+            return internal.groupConsoleOutput.call(this, 'setBaseUrl',
                     function () {
-                        this.watchCallback = callback;
+                        this.config.baseURL = url;
                         return this;
                     }, true);
         },
         /**
-         * The function called when an error occurs
-         * @param string msg
-         * @returns ThisApp
-         */
-        error: function (msg) {
-            this.console('warn', msg);
-            return this;
-        },
-        /**
-         * The function called when logging a message
-         * @param {string} msg
+         * Sets the path to components' location
+         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
+         * the path is assumed to follow the set base url.
+         * @param (string) ext The extension for components. This should include the dot (.). Default is
+         * .html
          * @returns {ThisApp}
          */
-        console: function (method, param) {
-            if (this.config.debug)
-                console[method].apply(null, this.__.isArray(param) ? param : [param]);
-            return this;
+        setComponentsPath: function (path, ext) {
+            return internal.groupConsoleOutput.call(this, 'setComponentsPath',
+                    function () {
+                        if (!this.config.paths)
+                            this.config.paths = {};
+                        this.__proto__.config.paths.components = {
+                            dir: path, ext: ext || '.html'
+                        };
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the path to css styles' location
+         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
+         * the path is assumed to follow the set base url.
+         * @returns {ThisApp}
+         */
+        setCSSPath: function (path) {
+            return internal.groupConsoleOutput.call(this, 'setCSSPath',
+                    function () {
+                        if (!this.config.paths)
+                            this.config.paths = {};
+                        this.__proto__.config.paths.css = path;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the key in the response which holds the data array          * @param string key
+         * @returns ThisApp
+         */
+        setDataKey: function (key) {
+            return internal.groupConsoleOutput.call(this, 'setDataKey',
+                    function () {
+                        this.config.dataKey = key;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the the transport system to use for data connection.
+         * @param {function} callback The callback would be passed a single parameter which is an
+         * object of configuration for the transportation with keys action (create,update,read,delete),
+         * id, url, data (only for create and update), success callback, error callback
+         * @returns {ThisApp}          */
+        setDataTransport: function (callback) {
+            return internal.groupConsoleOutput.call(this, 'setDataTranport',
+                    function () {
+                        if (callback)
+                            this.dataTransport = callback;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the default layout for the application
+         * @param string layout ID of the layout container
+         * @returns ThisApp
+         */
+        setDefaultLayout: function (layout) {
+            return internal.groupConsoleOutput.call(this, 'setLayout',
+                    function () {
+                        this.config.layout = layout;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the path to js scripts' location
+         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
+         * the path is assumed to follow the set base url.
+         * @returns {ThisApp}
+         */
+        setJSPath: function (path) {
+            return internal.groupConsoleOutput.call(this, 'setJSPath',
+                    function () {
+                        if (!this.config.paths)
+                            this.config.paths = {};
+                        this.__proto__.config.paths.js = path;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the path to layouts' location
+         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
+         * the path is assumed to follow the set base url.
+         * @param (string) ext The extension for layouts. This should include the dot (.). Default is
+         * .html
+         * @returns {ThisApp}
+         */
+        setLayoutsPath: function (path, ext) {
+            return internal.groupConsoleOutput.call(this, 'setLayoutsPath',
+                    function () {
+                        if (!this.config.paths)
+                            this.config.paths = {};
+                        this.__proto__.config.paths.layouts = {
+                            dir: path,
+                            ext: ext || '.html'
+                        };
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the path to pages' location
+         * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
+         * the path is assumed to follow the set base url.
+         * @param (string) ext The extension for pages. This should include the dot (.). Default is
+         * .html
+         * @returns {ThisApp}
+         */
+        setPagesPath: function (path, ext) {
+            return internal.groupConsoleOutput.call(this, 'setPagesPath',
+                    function () {
+                        if (!this.config.paths)
+                            this.config.paths = {};
+                        this.__proto__.config.paths.pages = {
+                            dir: path,
+                            ext: ext || '.html'
+                        };
+                        return this;
+                    }, true);
+        },
+        /**
+         * Sets the container that would always hold the page title
+         * @param string container
+         * @returns ThisApp
+         */
+        setTitleContainer: function (container) {
+            return internal.groupConsoleOutput.call(this, 'setTitleContainer',
+                    function () {
+                        this.config.titleContainer = this.running ?
+                                this._(container) : container;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Set the transition to use between pages
+         * @param string|func transition To see string options, call method getAvailableTransitions.
+         * If function, the function is passed two parameters - the old page and the new page
+         * @param object options The options for the transition
+         * @returns ThisApp
+         */
+        setTransition: function (transition, options) {
+            return internal.groupConsoleOutput.call(this, 'setTransition',
+                    function () {
+                        this.config.transition = transition;
+                        this.config.transitionOptions = options;
+                        return this;
+                    }, true);
+        },
+        /**
+         * Initializes the app
+         * @param string page The ID of the page
+         * @param boolean fromState Indicates whether to load the start page from state if avaiable
+         * or regenerate it
+         * @returns app
+         */
+        start: function (page, fromState) {
+            return internal.groupConsoleOutput.call(this, 'start',
+                    function () {
+                        if (this.running)
+                            return this;
+                        if (page)
+                            this.config.startWith = page;
+                        this.container = this._(this.config.container).html('');
+                        this.firstPage = true;
+                        internal.setup.call(this);
+                        var target_page = internal.pageIDFromLink.call(this, location.hash);
+                        if (fromState !== false && history.state &&
+                                target_page === this.store('last_page')) {
+                            internal.restoreState.call(this, history.state);
+                        }
+                        else {
+                            this.loadPage(target_page || this.config.startWith ||
+                                    this._('page[this-default-page]:not([this-current]):not([this-dead]),'
+                                            + '[this-type="pages"] [this-default-page]')
+                                    .attr('this-id'));
+                        }
+                        return this;
+                    }, true);
         },
         /**
          * Stores or retrieves stored data
@@ -5101,85 +5443,58 @@
                     }.bind(this));
         },
         /**
-         * Reloads the current page
-         * @returns ThisApp
-         */
-        reload: function () {
-            return internal.groupConsoleOutput.call(this, 'reload',
-                    function () {
-                        location.reload();
-                        return this;
-                    }, true);
-        },
-        /**
-         * Fetches a collection of model
-         * @param {string} model_name
-         * @param {String} url
-         * @param {function} success          * @param {function} error
-         * @returns {Collection}
-         */
-        collection: function (model_name, url, data, success, error) {
-            return internal.groupConsoleOutput.call(this, 'collection',
-                    function () {
-                        if (!model_name)
-                            return new Collection([], {app: this});
-                        if (!data) {
-                            var collection = internal.cache.call(this, 'model', model_name);
-                            if (collection && collection.data)
-                                data = collection.data;
-                        }
-                        else if (data) {
-                            if (this.config.dataKey && !data[this.config.dataKey]) {
-                                var _data = {};
-                                _data[this.config.dataKey] = data;
-                                data = _data;
-                            }
-                            internal.cache.call(this, 'model', model_name, data);
-                        }
-                        if (data)
-                            return new Collection(data, {
-                                name: model_name,
-                                app: this, uid: collection.uid || 'id',
-                                url: collection.url || null,
-                                length: collection.length || 0});
-                        else if (this.dataTransport) {
-                            var _collection = this._('collection[this-model="' + model_name
-                                    + '"][this-loaded],[this-type="collection"][this-model="' + model_name
-                                    + '"][this-loaded]');
-                            if (!_collection.length)
-                                _collection = this._('collection[this-id="' + model_name
-                                        + '"][this-loaded],[this-type="collection"][this-id="' + model_name + '"][this-loaded]');
-                            if (!_collection.length)
-                                _collection = this._('<collection this-model="' + model_name + '" this-url="'
-                                        + (url || model_name) + '" />');
-                            _collection.attr('this-no-updates');
-                            var _this = this;
-                            return this.request(_collection, function (data, uid) {
-                                return _this.__.callable(success).call(_this,
-                                        new Collection(data, {
-                                            name: model_name,
-                                            app: _this,
-                                            uid: _collection.attr('this-model-uid') || uid || 'id',
-                                            url: _collection.attr('this-url'),
-                                            length: Object.keys(data).length || 0
-                                        }));
-                            }, error);
-                        }
-                    }, true);
-        },
-        /**
-         * Sets the the transport system to use for data connection.
-         * @param {function} callback The callback would be passed a single parameter which is an
-         * object of configuration for the transportation with keys action (create,update,read,delete),
-         * id, url, data (only for create and update), success callback, error callback
+         * Sets a function to call to watch for server side changes to model collections
+         * @param {function} callback Function would be passed 3 parameters - url, success callback
+         * and error callback
          * @returns {ThisApp}
          */
-        setDataTransport: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'setDataTranport',
+        watch: function (callback) {
+            return internal.groupConsoleOutput.call(this, 'watch',
                     function () {
-                        if (callback)
-                            this.dataTransport = callback;
+                        this.watchCallback = callback;
                         return this;
+                    }, true);
+        },
+        /**
+         * A shortcut to method on()
+         * @param string event
+         * @param string target ID of the page to target. It could also be in forms TYPE or TYPE#ID e.g
+         * collection#users. This means the target is a collection of id `users`. Target all collection
+         * by specifying only collection
+         * Multiple elements may be targeted by separating their selectors by a comma.
+         * @param function callback          * @returns ThisApp
+         */
+        when: function (event, target, callback) {
+            return internal.groupConsoleOutput.call(this, 'when',
+                    function () {
+                        var selector = "", targets = target.split(',');
+                        if (selector)
+                            selector += ', ';
+                        this.__.forEach(targets, function (i, v) {
+                            switch (target) {
+                                case "page":
+                                    selector += 'page,[this-type="page"]';
+                                    break;
+                                case "collection":
+                                    selector += 'collection,[this-type="collection"]';
+                                    break;
+                                case "model":
+                                    selector += 'model,[this-type="model"]';
+                                    break;
+                                case "component":
+                                    selector += 'component,[this-type="component"]';
+                                    break;
+                                default:
+                                    var exp = v.split('#');
+                                    if (exp.length > 1 && exp[0]) {
+                                        selector += '[this-type="' + exp[0] + '"][this-id="' + exp[1] + '"]';
+                                    }
+                                    else {
+                                        selector += '[this-id="' + v + '"]';
+                                    }
+                            }
+                        });
+                        return this.on(event, selector, callback);
                     }, true);
         }
     };

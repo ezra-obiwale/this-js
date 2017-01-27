@@ -314,6 +314,17 @@
                 }
             ]
         },
+        "page.loaded": {
+            "id": "page.loaded",
+            "description": "Triggered when a page has been fully loaded",
+            "on": "pages",
+            "links": [
+                {
+                    "label": "pages",
+                    "goto": "pages"
+                }
+            ]
+        },
         "updated": {
             "id": "updated",
             "description": "Indicates that a collection or model has be updated. Event details will contain event and response",
