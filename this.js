@@ -311,13 +311,17 @@
                     var result = [];
                     this.each(function () {
                         if (selector) {
-                            var id = false;
+                            var id = false, query = '', _this = this;
                             if (!this.id) {
                                 this.id = 'rANd' + Math.ceil(Math.random() * 100);
                                 id = true;
                             }
-                            result = result.concat(Array.from(document.querySelectorAll('#'
-                                    + this.id + '>' + selector)));
+                            __.forEach(selector.split(','), function (i, sel) {
+                                if (query)
+                                    query += ',';
+                                query += '#' + _this.id + '>' + sel;
+                            });
+                            result = result.concat(Array.from(document.querySelectorAll(query)));
                             if (id)
                                 this.removeAttribute('id');
                             return;
@@ -867,7 +871,6 @@
                     });
                     this.items = replaced;
                     return this;
-//                    return _(replaced, this.debug);
                 },
                 /**
                  * Fetches all siblings of matched elements
@@ -877,13 +880,20 @@
                 siblings: function (selector) {
                     var siblings = [];
                     this.each(function () {
-                        var rId = false;
+                        var rId = false, query = '', _this = this;
                         if (!this.id) {
                             this.id = 'rANd' + Math.ceil(Math.random() * 100);
                             rId = true;
                         }
+                        if (selector) {
+                            __.forEach(selector.split(','), function (i, sel) {
+                                if (query)
+                                    query += ',';
+                                query += sel + ':not(#' + _this.id + ')';
+                            });
+                        }
                         siblings = siblings.concat(_(this.parentElement, this.debug)
-                                .children((selector || '') + ':not(#' + this.id + ')').items);
+                                .children(query).items);
                         if (rId)
                             this.removeAttribute('id');
                     });
@@ -1007,7 +1017,7 @@
                 val: function (value) {
                     var val;
                     this.each(function () {
-                        if (value) {
+                        if (value !== undefined) {
                             this.value = value;
                             return;
                         }
@@ -1230,8 +1240,7 @@
                                 .removeClass('loading');
                     }
                     else {
-                        container.attr('this-uid', id)
-                                .attr('this-mid', data[id]);
+                        container.attr('this-uid', id).attr('this-mid', data[id]);
                         container.html(_temp.html());
                     }
                     return this;
@@ -1244,7 +1253,8 @@
                  */
                 doTar: function (__this, noShow) {
                     __this = this._(__this);
-                    var type = __this.attr('this-type') || __this.items[0].tagName.toLowerCase(),
+                    var tagName = __this.length ? __this.items[0].tagName.toLowerCase() : '',
+                            type = __this.attr('this-type') || tagName,
                             tar = type + '#' + __this.attr('this-id');
                     if (this.tar[tar]) {
                         if (type === 'page' && this.tar[tar].reading) {
@@ -1299,15 +1309,16 @@
                     _layout = this.reloadLayouts ? _() :
                             this.container.find('layout[this-id="'
                                     + __layout.attr('this-extends')
-                                    + '"],[this-type="layout"][this-id="'
-                                    + __layout.attr('this-extends') + '"]');
+                                    + '"]:not([this-cache]),[this-type="layout"][this-id="'
+                                    + __layout.attr('this-extends') + '"]:not([this-cache])');
                     // layout doesn't exist in container
                     if (!_layout.length)
                         // get from templates
-                        _layout = this._('[this-type="layouts"] layout[this-id="'
+                        _layout = this.templates.find('[this-type="layouts"] layout[this-id="'
                                 + __layout.attr('this-extends') + '"],'
                                 + '[this-type="layouts"] [this-type="layout"][this-id="'
-                                + __layout.attr('this-extends') + '"]').clone();
+                                + __layout.attr('this-extends') + '"]').clone()
+                                .removeAttr('this-cache');
                     // doesn't exist in templates
                     if (!_layout.length) {
                         // get from filesystem
@@ -1392,22 +1403,28 @@
                     internal.loadAssets.call(this, _layout);
                     var _this = this;
                     if (_layout && _layout.length) {
-                        if (!this.container.find('layout[this-id="'
-                                + _layout.attr('this-id')
-                                + '"],[this-type="layout"][this-id="' + _layout.attr('this-id') + '"]').length)
-                            this.container.html(_layout.show());
+//                        if (!this.container.find('layout[this-id="'
+//                                + _layout.attr('this-id')
+//                                + '"],[this-type="layout"][this-id="'
+//                                + _layout.attr('this-id')
+//                                + '"]').length)
+                        this.container.html(_layout.show());
+                        _layout.trigger('layout.loaded');
                     }
                     else
                         this.container.html(this.page);
-                    this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
-                            + '"]:not([this-dead]),'
-                            + '[this-type="page"][this-id="'
-                            + this.page.attr('this-id')
-                            + '"]:not([this-dead])')
+                    this.page = this.container
+                            .find('page[this-id="' + this.page.attr('this-id')
+                                    + '"]:not([this-dead]),'
+                                    + '[this-type="page"][this-id="'
+                                    + this.page.attr('this-id')
+                                    + '"]:not([this-dead])')
                             .attr('this-current', '')
                             .removeAttr('this-layout')
                             .show();
-                    this.page.find('[this-type]').hide();
+                    this.container.find('[this-type]:not([this-type="page"]):not(page)'
+                            + ':not(layout):not([this-type="layout"])'
+                            + ':not(component):not([this-type="component"])').hide();
                     internal.loadAssets.call(this, this.page, function () {
                         internal.loadComponents.call(this, function () {
                             this.page = internal.doTar.call(this, this.page);
@@ -1470,12 +1487,13 @@
                                     }
                                     elem.attr('this-id', id);
                                 }
-                                if (!_this._('[this-type="' + type + 's"]').length) {
-                                    _this._('body').append('<div this-type="' + type
-                                            + 's" style="display:none" />');
+                                else {
+                                    if (elem.length > 1)
+                                        elem = _this._('<div/>').html(elem);
+                                    if (!elem.attr('this-url'))
+                                        elem.attr('this-url', id);
                                 }
-                                _this._('[this-type="' + type + 's"]').append(elem);
-                                _this.__.callable(success).call(this, elem);
+                                _this.__.callable(success).call(this, elem.clone());
                             },
                             function (e) {
                                 _this.__.callable(error).call(this, e);
@@ -1535,9 +1553,6 @@
                     if (!value && value != 0)
                         return;
                     return value;
-//                    var _key = key.split('.');
-                    //                    return raw ? value : '<span this-for="' + _key[_key.length - 1] + '">' + value
-                    //                            + '</span>';
                 },
                 /**
                  * Groups the function output on the console
@@ -1568,8 +1583,7 @@
                     /* evaluates filter */
                     if (filter && !eval(filter.trim()))
                         return;
-                    content = this._(document.createElement('div'))
-                            .html(content);
+                    content = this._('<div/>').html(content);
                     var _this = this, level = 0, matched = {};
                     content.find('[this-each]').each(function () {
                         var __this = _this._(this).attr('this-muted', '');
@@ -1662,7 +1676,7 @@
                             name : this.config.paths[type] + name,
                             _this = this;
                     if (type === 'css') {
-                        var current = this._('link[this-id="' + name + '"]');
+                        var current = this.container.find('link[this-id="' + name + '"]');
                         // if exists already, mark as current and move to next
                         if (current.length) {
                             current.attr('this-loaded', '');
@@ -1688,7 +1702,8 @@
                         elem.prepend(link);
                     }
                     else if (type === 'js') {
-                        var current = this._('script[this-id="' + name + '"]');
+                        var current = this._('script[this-id="' + name + '"][this-app="'
+                                + this.container.attr('this-id') + '"]');
                         // if exists already, mark as current and move to next
                         if (current.length) {
                             current.attr('this-loaded', '');
@@ -1708,6 +1723,7 @@
                                 .attr('type', 'application/javascript')
                                 .attr('this-for', elem.attr('this-type'))
                                 .attr('this-loaded', '')
+                                .attr('this-app', this.container.attr('this-id'))
                                 .attr('this-id', name);
                         script.items[0].onload = function () {
                             _this.__.callable(callback).call(_this);
@@ -1727,7 +1743,8 @@
                  */
                 loadAssets: function (elem, callback) {
                     var _this = this,
-                            elemType = elem.attr('this-type') || elem.items[0].tagName.toLowerCase(),
+                            tagName = elem.length ? elem.items[0].tagName.toLowerCase() : '',
+                            elemType = elem.attr('this-type') || tagName,
                             leaveUnrequired;
                     if (elem.attr('this-load-css') && !elem.hasAttr('this-with-css')) {
                         // load comma-separated css files
@@ -1740,7 +1757,8 @@
 
                     // mark all scripts as old by removing attribute `this-loaded`
                     if (!Object.keys(this.removedAssets).length)
-                        this._('script').removeAttr('this-loaded');
+                        this._('script[this-app="' + this.container.attr('this-id') + '"]')
+                                .removeAttr('this-loaded');
 
                     if (elem.attr('this-load-js-first') && !elem.hasAttr('this-with-first-js'))
                     {
@@ -1755,8 +1773,8 @@
                                     // remove elem-type css and js files that don't belong to
                                     // the elem type
                                     if (!removedAssets)
-                                        _this._('script[this-for="' + elemType
-                                                + '"]:not([this-loaded])')
+                                        _this._('script[this-app="' + _this.container.attr('this-id')
+                                                + '"][this-for="' + elemType + '"]:not([this-loaded])')
                                                 .remove();
                                     // call callback function
                                     _this.__.callable(callback).call(_this);
@@ -1767,7 +1785,8 @@
                     }
                     // remove elem-type js files that don't belong to the elem type
                     if (!leaveUnrequired && !this.removedAssets[elemType])
-                        this._('script[this-for="' + elemType + '"]:not([this-loaded])')
+                        this._('script[this-app="' + this.container.attr('this-id')
+                                + '"][this-for="' + elemType + '"]:not([this-loaded])')
                                 .remove();
                     // indicate that unrequired assets have been removed to avoid removal of currently
                     // required assets
@@ -1788,10 +1807,25 @@
                  */
                 loadCollection: function (__this, replaceState, looping, chain, data) {
                     __this = this._(__this).addClass('loading');
+                    if (!__this.attr('this-model'))
+                        __this.attr('this-model', __this.attr('this-id'));
+                    // ensure collection content is grouped together
+                    if (__this.children().length > 1)
+                        __this.innerWrap('<div/>');
+                    // cache collection if not exist in dom as unloaded
+                    if (!this.templates.children('collection[this-id="' + __this.attr('this-id') +
+                            '"],[this-type="collection"][this-id="'
+                            + __this.attr('this-id') + '"]').length) {
+                        var cache = __this.removeAttr('this-loaded')
+                                .removeClass('loading').attr('this-cache', '').hide().outerHtml()
+                                .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
+                        this.page.append(cache);
+                    }
+
                     var _this = this,
                             content = __this.html(),
                             model_name = __this.attr('this-model'),
-                            model_to_bind = _this.page.find('model[this-id="' + model_name
+                            model_to_bind = this.container.find('model[this-id="' + model_name
                                     + '"],[this-type="model"][this-id="' + model_name
                                     + '"]');
 
@@ -1852,7 +1886,7 @@
                  */
                 loadCollections: function (replaceState, chain) {
                     var _this = this;
-                    var collections = this.page.find('collection:not([this-loaded])'
+                    var collections = this.container.find('collection:not([this-loaded])'
                             + ':not([this-cache]):not([this-data]),'
                             + '[this-type="collection"]:not([this-loaded]):not([this-cache])'
                             + ':not([this-data])');
@@ -1860,69 +1894,60 @@
                     if (chain && !collections.length)
                         internal.loadForms.call(this, null, null, replaceState, chain);
                     collections.each(function () {
-                        var __this = _this._(this).addClass('loading');
-                        if (!__this.attr('this-model'))
-                            __this.attr('this-model', __this.attr('this-id'));
-                        // ensure collection content is grouped together
-                        if (__this.children().length > 1)
-                            __this.innerWrap('<div/>');
-                        // cache collection if not exist in dom as unloaded
-                        if (!_this._('collection[this-id="' + __this.attr('this-id') +
-                                '"]:not(.loading),[this-type="collection"][this-id="'
-                                + __this.attr('this-id') + '"]:not(.loading)').length) {
-                            var cache = __this.removeAttr('this-loaded')
-                                    .removeClass('loading').attr('this-cache', '').hide().outerHtml()
-                                    .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
-                            _this.page.append(cache);
-                        }
-                        __this.removeClass('loading');
-                        internal.loadCollection.call(_this, __this, replaceState, true, chain);
+                        internal.loadCollection.call(_this, this, replaceState, true, chain);
                     });
                     return this;
                 },
                 /**
                  * Loads a single component
-                 * @param {_} __this
-                 * @param {_} component
+                 * @param {_} __this The component placeholder
                  * @param function callback To be called when all components have been loaded
+                 * @param {_} component The component template
                  * @returns {void}
                  */
-                loadComponent: function (__this, component, callback) {
-                    var _this = this,
-                            collection_id;
-                    this.__.forEach(__this.attr(), function (i, attr) {
-                        if (attr.name === 'this-component' || attr.name === 'this-url')
-                            return;
-                        if ((attr.name === 'this-filter' || attr.name === 'this-search')
-                                && _this.__.contains(attr.value, ':')) {
-                            var split = attr.value.split(':'),
-                                    target = _this.__.arrayRemoveIndex(split, 0),
-                                    value = split.join(':'),
-                                    selector = '[this-id="' + target + '"]';
-                            if (_this.__.contains(target, '#')) {
-                                split = target.split('#');
-                                selector = split[0] + '[this-id="' + split[1]
-                                        + '"],[this-type="' + split[0]
-                                        + '"][this-id="' + split[1] + '"]';
-                                collection_id = split[1];
+                loadComponent: function (__this, callback, component) {
+                    __this = this._(__this);
+                    var _this = this;
+                    // component does not exist
+                    if (!this._(component).length) {
+                        if (__this.attr('this-url')) {
+                            var cached = this.templates
+                                    .children('component[this-url="' + __this.attr('this-url') + '"],'
+                                            + '[this-type="component"][this-url="'
+                                            + __this.attr('this-url') + '"]');
+                            if (cached.length)
+                                internal.loadComponent.call(this, __this, callback, cached.clone()
+                                        .removeAttr('this-url'));
+                            else {
+                                internal.fullyFromURL
+                                        .call(_this, 'component', __this.attr('this-url'),
+                                                function (data) {
+                                                    internal.loadComponent
+                                                            .call(_this, __this, callback, _this._(data)
+                                                                    .clone());
+                                                },
+                                                function () {
+                                                    _this.__.callable(callback).call(_this);
+                                                });
                             }
-                            component.find(selector).attr(attr.name, value);
-                            return;
                         }
-
-                        component.attr(attr.name, attr.value);
-                    });
-                    if (!component.attr('this-type') && !component.is('collection')
-                            && !component.is('model'))
-                        component.attr('this-type', 'component');
-                    if (component.attr('this-type') === 'component' || component.is('component')) {
-                        component.attr('this-loaded', '').show();
+                        else {
+                            component = this.templates.children('[component[this-id="'
+                                    + __this.attr('this-component') + '"],'
+                                    + '[this-type="component"][this-id="'
+                                    + __this.attr('this-component')
+                                    + '"]').clone();
+                            internal.loadComponent.call(_this, __this, callback, component);
+                        }
+                        return internal;
                     }
-                    else {// hide non-components, e.g. collection, until system shows them
-                        component.hide();
-                    }
-                    __this.replaceWith(component).trigger('component.loaded');
-                    this.__proto__.components--;
+                    component = this._(component);
+                    if (component.is('component') || component.attr('this-type') === 'component')
+                        component.removeAttr('this-url');
+                    // component exists
+                    __this.html(component).trigger('component.loaded').show();
+                    if (this.__proto__.components)
+                        this.__proto__.components--;
                     if (!this.__proto__.components)
                         this.__.callable(callback).call(this);
                 },
@@ -1933,35 +1958,12 @@
                  */
                 loadComponents: function (callback) {
                     var _this = this,
-                            components = this.page.find('[this-component]');
+                            components = this.container.find('[this-component]');
                     this.__proto__.components += components.length;
                     if (!components.length)
                         this.__.callable(callback).call(this);
                     components.each(function () {
-                        var __this = _this._(this);
-                        if (__this.attr('this-url')) {
-                            internal.fullyFromURL
-                                    .call(_this, 'component', __this.attr('this-url'),
-                                            function (data) {
-                                                var component = _this._(data);
-                                                if (component.length > 1)
-                                                    component = component.wrap('<div/>').parent();
-                                                internal.loadComponent
-                                                        .call(_this, __this, _this._(data), callback);
-                                            },
-                                            function () {
-                                                _this.__.callable(callback).call(_this);
-                                            });
-                        }
-                        else {
-                            var component = _this._('component[this-id="'
-                                    + __this.attr('this-component')
-                                    + '"]:not([this-loaded]),[this-type="component"][this-id="'
-                                    + __this.attr('this-component')
-                                    + '"]:not([this-loaded]),[this-type="components"]>[this-id="'
-                                    + __this.attr('this-component') + '"]').clone();
-                            internal.loadComponent.call(_this, __this, component, callback);
-                        }
+                        internal.loadComponent.call(_this, this, callback);
                     });
                     return this;
                 },
@@ -2127,11 +2129,12 @@
                         if (!key)
                             return;
                         var data = _this.__.extend({}, model, true),
-                                keys = _this.__.contains(key, '.') ? keys = key.split('.') : keys = [key];
+                                keys = _this.__.contains(key, '.') ? key.split('.') : [key];
                         _this.__.forEach(keys, function (i, v) {
                             data = data[v];
                         });
-                        if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox') {
+                        if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox')
+                        {
                             // using attribute so that redumping content 
                             // would still work fine
                             if (__this.attr('value') == data || data == on)
@@ -2148,12 +2151,12 @@
                             });
                             // using attribute so that redumping content 
                             // would still work fine
-                            //                            __this.find('[value="' + data + '"]').attr('selected', 'selected');
+                            __this.find('[value="' + data + '"]').attr('selected', 'selected');
                             return;
                         }
                         // using attribute so that redumping content 
                         // would still work fine
-                        __this.attr('value', data);
+                        __this.attr('value', data || '');
                     });
                     return this;
                 },
@@ -2167,7 +2170,7 @@
                     var _this = this, isPage = false;
                     if (!forms) {
                         isPage = this.page.is('form');
-                        forms = isPage ? this.page : this.page.find('form');
+                        forms = isPage ? this.page : this.container.find('form');
                     }
                     forms.each(function () {
                         var __this = _this._(this),
@@ -2189,8 +2192,7 @@
                             return;
                         if (!model)
                             model = internal.modelFromStore.call(_this, mid, model_name);
-                        if (model)
-                            internal.loadFormElements.call(_this, elements, model);
+                        internal.loadFormElements.call(_this, elements, model);
                         __this.attr('this-loaded', '').trigger('form.loaded');
                     });
                     if (chain)
@@ -2209,12 +2211,14 @@
                         // get existing layout in container if not asked to reload layouts
                         _layout = this.reloadLayouts ? _layout :
                                 this.container.find('layout[this-id="' + layout
-                                        + '"],[this-type="layout"][this-id="' + layout + '"]');
+                                        + '"],[this-type="layout"][this-id="'
+                                        + layout + '"]');
                         // layout does not exist in container
                         if (!_layout.length) {
                             // get layout template
-                            _layout = this._('[this-type="layouts"] layout[this-id="' + layout + '"],'
-                                    + '[this-type="layouts"] [this-type="layout"][this-id="'
+                            _layout = this.templates.children('layout[this-id="'
+                                    + layout + '"],'
+                                    + '[this-type="layout"][this-id="'
                                     + layout + '"]').clone().attr('this-loaded', '');
                             // layout doesn't exist
                             if (!_layout.length) {
@@ -2519,9 +2523,8 @@
                 notAPage: function (page) {
                     this.error('Page [' + page + '] not found');
                     if (this.__.isString(this.notFound)) {
-                        page = this._(internal.selector.call(this, this.notFound
-                                .startsWith('page#') ? this.notFound : 'page#' + this.notFound,
-                                ':not([this-current]):not([this-dead])'));
+                        page = this.templates.children(internal.selector.call(this, this.notFound
+                                .startsWith('page#') ? this.notFound : 'page#' + this.notFound));
                         if (!page.length) {
                             return this.error('Page [' + this.notFound + '] also not found');
                         }
@@ -2538,7 +2541,8 @@
                  */
                 pageFound: function (page, replaceInState) {
                     if (internal.is.call(this, 'page', page)) {
-                        if (!internal.canContinue.call(this, 'page.load', [page.items[0]])) {
+                        if (!internal.canContinue.call(this, 'page.load', [page.items[0]]))
+                        {
                             page.trigger('page.load.canceled');
                             return this;
                         }
@@ -2549,7 +2553,7 @@
                         }
                         if (this.store('last_page') === page.attr('this-id'))
                             replaceInState = true;
-                        this.page = page.clone();
+                        this.page = page.clone().removeAttr('this-cache');
                         internal.loadLayouts.call(this, replaceInState);
                     }
                     else {
@@ -2623,7 +2627,7 @@
                     if (this.firstPage) {
                         if (restored)
                             // watch collections and models on current page
-                            this.page.find('collection[this-loaded],[this-type="collection"]'
+                            this.container.find('collection[this-loaded],[this-type="collection"]'
                                     + '[this-loaded],model[this-loaded],[this-type="model"]'
                                     + '[this-loaded]').each(function () {
                                 internal.watch.call(_this, this);
@@ -2733,7 +2737,6 @@
                         _this.__.forEach(_data, function (key, value) {
                             var __data = {
                                 key: key,
-                                //                                _model: data,
                                 value: value
                             },
                             _content = internal.inLoop.call(_this, __data, filter, content);
@@ -2860,8 +2863,8 @@
                     }
                     this.container.html(state.content);
                     this.page = this.container.find('page[this-id="' + state.id
-                            + '"]:not([this-dead]),[this-type="page"][this-id="' + state.id
-                            + '"]:not([this-dead])');
+                            + '"]:not([this-dead]),[this-type="page"][this-id="'
+                            + state.id + '"]:not([this-dead])');
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(state.title);
                     this.store('last_page', state.id);
@@ -2869,11 +2872,12 @@
                     this.__proto__.collections = 0;
                     this.__proto__.models = 0;
                     this.removedAssets = {};
-                    this._('layouts,[this-type="layouts"]').each(function () {
-                        internal.loadAssets.call(_this, _this._(this)
-                                .removeAttr('this-with-first-js')
-                                .removeAttr('this-with-js'));
-                    });
+                    this.container.find('[this-type="layout"]')
+                            .each(function () {
+                                internal.loadAssets.call(_this, _this._(this)
+                                        .removeAttr('this-with-first-js')
+                                        .removeAttr('this-with-js'));
+                            });
                     internal.loadAssets.call(this, this.page
                             .removeAttr('this-with-first-js')
                             .removeAttr('this-with-js'), function () {
@@ -2952,10 +2956,9 @@
                                         _this.loadPage(last_page);
                                     }
                                     else if (_this.config.startWith) {
-                                        if (this._('page[this-id="' + _this.config.startWith
-                                                + '"]:not([this-current]):not([this-dead]),'
-                                                + '[this-type="pages"]>[this-id="'
-                                                + _this.config.startWith + '"]').length)
+                                        if (this.templates.children('page[this-id="'
+                                                + _this.config.startWith
+                                                + '"]').length)
                                             _this.loadPage(_this.config.startWith);
                                     }
                                     else {
@@ -2966,38 +2969,38 @@
                                 }
                             };
                         // look for the app container
-                        this.container = this._('[this-app-container]');
+                        this.container = this.config.container ?
+                                this._('[this-id="' + this.config.container + '"]') :
+                                this._('[this-app-container]');
                         // use the body tag if no container is set
                         if (!this.container.length)
                             this.container = this._('body');
-                        // wrap page templates in pages container
-                        if (!this._('page,[this-type="pages"]').length) {
-                            this._('body').append('<div this-type="pages" style="display:none"/>')
-                                    .find('[this-type="pages"]')
-                                    .append(this._('[this-type="page"]:not([this-loaded])')
-                                            .hide());
-                        }
-                        // wrap component templates in components container
-                        if (this._('component, [this-type="component"]').length &&
-                                !this._('[this-type="components"]').length) {
-                            this._('body').append('<div this-type="components" style="display:none"/>')
-                                    .find('[this-type="components"]')
-                                    .append(this._('[this-type="component"]').hide());
-                        }
-                        // wrap layout templates in layouts container
-                        if (this._('layout,[this-type="layout"]').length &&
-                                !this._('[this-type="layouts"]').length) {
-                            this._('body').append('<div this-type="layouts" style="display:none"/>')
-                                    .find('[this-type="layouts"]')
-                                    .append(this._('layout:not([this-loaded]),'
-                                            + '[this-type="layout"]:not([this-loaded])')
-                                            .hide());
-                        }
-                        // hide all types (pages, models, collections, layouts, components, etc)
-                        this._('page:not([this-loaded]),model:not([this-loaded]),'
-                                + 'collection:not([this-loaded]),layout:not([this-loaded]),'
-                                + 'component:not([this-loaded]),[this-type]:not([this-loaded])')
-                                .hide();
+                        else if (!this.container.attr('this-id'))
+                            this.container.attr('this-id', Math.ceil(Math.random() * 9999));
+                        // mark all loaded element's children as loaded too
+                        this.container.find('[this-loaded] [this-type], [this-loaded] page,'
+                                + '[this-loaded] layout, [this-loaded] component,'
+                                + '[this-loaded] model, [this-loaded] collection')
+                                .attr('this-loaded', '');
+                        if (!this._('[this-type="templates"][this-app="' +
+                                this.container.attr('this-id') + '"]').length)
+                            this._('body').append('<div this-type="templates" this-app="' +
+                                    this.container.attr('this-id') + '" style="display:none"/>');
+                        this.templates = this._('[this-type="templates"][this-app="' +
+                                this.container.attr('this-id') + '"]')
+                                // put all unloaded element into appropriat template section
+                                .html(
+                                        // hide all types not loaded (pages, models, collections, layouts,
+                                        // components, etc)
+                                        this.container.find('page:not([this-loaded]),model:not([this-loaded]),'
+                                                + 'collection:not([this-loaded]),layout:not([this-loaded]),'
+                                                + 'component:not([this-loaded]),'
+                                                + '[this-type="page"]:not([this-loaded]),'
+                                                + '[this-type="model"]:not([this-loaded]),'
+                                                + '[this-type="collection"]:not([this-loaded]),'
+                                                + '[this-type="layout"]:not([this-loaded]),'
+                                                + '[this-type="component"]:not([this-loaded])')
+                                        .hide());
                         if (this.config.titleContainer)
                             this.config.titleContainer = this._(this.config.titleContainer,
                                     this.config.debug);
@@ -3026,10 +3029,10 @@
                                             // reload value: collection| 
                                             var reload = __this.attr('this-reload'),
                                                     // template to reload
-                                                    toReload = _this._(internal.selector
-                                                            .call(_this, reload, ':not([this-loaded])')),
+                                                    toReload = _this.templates.children(internal.selector
+                                                            .call(_this, reload)),
                                                     // target to reload
-                                                    _reload = _this.page.find(internal.selector
+                                                    _reload = _this.container.find(internal.selector
                                                             .call(_this, reload, '[this-loaded]'));
                                             if (!toReload.length) {
                                                 _this.error('Reload target not found');
@@ -3162,7 +3165,7 @@
                                  */
                                 .on('click', '[this-create][this-form]', function () {
                                     var __this = _this._(this);
-                                    _this.page.find('form[this-id="'
+                                    _this.container.find('form[this-id="'
                                             + __this.attr('this-form')
                                             + '"]:not([this-cache])')
                                             .removeAttr([
@@ -3175,7 +3178,9 @@
                                                 "this-model-uid": __this.attr('this-model-uid') || '',
                                                 "this-binding": ""
                                             })
-                                            .show();
+                                            .show()
+                                            .find('input:not([type="radio"]):not([type="checkbox"])')
+                                            .val('');
                                 })
                                 /*
                                  * DELETE event - Show Page
@@ -3233,6 +3238,26 @@
                                     _this.loadPage(goto);
                                     e.stop = true;
                                 })
+                                /**
+                                 * DELETE event
+                                 * 
+                                 * Transfers the delete action to the bounded element's [this-delete]
+                                 * descendant.
+                                 */
+                                .on('click', '[this-bind][this-delete]', function (e) {
+                                    e.stop = true;
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _model = __this.closest('model,[this-type="model"]');
+                                    _this.container.find('[this-id="' + __this.attr('this-bind') + '"]')
+                                            .attr({
+                                                'this-model': _model.attr('this-id'),
+                                                'this-mid': _model.attr('this-mid'),
+                                                'this-do': 'delete',
+                                                'this-uid': _model.attr('this-uid') || 'id',
+                                                'this-action': _model.attr('this-url')
+                                            }).show();
+                                })
                                 /*
                                  * DELETE event
                                  * 
@@ -3250,10 +3275,11 @@
                                     if (e.stop)
                                         return;
                                     e.preventDefault();
-                                    var __this = _this._(this);
-                                    var _model = __this.closest('model,[this-type="model"]'),
+                                    var __this = _this._(this),
+                                            _model = __this.closest('model,[this-type="model"]'),
                                             _do = __this.closest('[this-do="delete"]'),
-                                            __model = new Model(_model.attr('this-mid'), {}, {
+                                            __model = new Model(_model.attr('this-mid') ||
+                                                    _do.attr('this-mid'), {}, {
                                                 app: _this,
                                                 name: __this.attr('this-model') ||
                                                         _model.attr('this-id') ||
@@ -3279,18 +3305,12 @@
                                                 if (_this.page.attr('this-do') === 'delete')
                                                     _this.back();
                                                 else {
-                                                    _this.page.find('[this-binding]').hide();
+                                                    _this.container.find('[this-binding]').hide();
                                                 }
-                                                __this.trigger('delete.success', {
-                                                    response: this
-                                                });
+                                                __this.trigger('delete.success', {response: this});
                                             }
                                             else
-                                                __this.trigger('delete.failed',
-                                                        {
-                                                            response: this,
-                                                            responseData: data
-                                                        });
+                                                __this.trigger('delete.failed', {response: this});
                                         },
                                         error: function () {
                                             __this.trigger('delete.error', {
@@ -3316,7 +3336,7 @@
                                                     + '[this-model]');
                                     if (!bind)
                                         return;
-                                    var _target = _this.page.find(internal.selector
+                                    var _target = _this.container.find(internal.selector
                                             .call(_this, bind,
                                                     ':not([this-in-collection]):not([this-cache])'));
                                     if (!_target.length)
@@ -3324,8 +3344,9 @@
                                     _target.attr('this-model', (_model.attr('this-model')
                                             || _model.attr('this-id'))).attr('this-binding', '');
                                     if (__this.hasAttr('this-read'))
-                                        _this.page.find('[this-model="' + (_model.attr('this-model')
-                                                || _model.attr('this-id')) + '"][this-binding]').hide();
+                                        _this.container.find('[this-model="'
+                                                + (_model.attr('this-model') || _model.attr('this-id'))
+                                                + '"][this-binding]').hide();
                                     else if (__this.hasAttr('this-update'))
                                         _target.attr('this-tar', 'do:update');
                                     else if (__this.hasAttr('this-create'))
@@ -3359,7 +3380,7 @@
                                             _target = _this.container.find(internal.selector.call(_this,
                                                     __this.attr('this-show')));
                                     if (__this.attr('this-create')) {
-                                        _this.page.find('[this-binding]').hide();
+                                        _this.container.find('[this-binding]').hide();
                                         var form = _target.is('form[this-model="'
                                                 + __this.attr('this-model') + '"]') ? _target :
                                                 _target.find('form[this-model="'
@@ -3431,10 +3452,10 @@
                                                 uid: __this.attr('this-uid') ||
                                                         __this.attr('this-model-uid') ||
                                                         _this.page.attr('this-model-uid'),
-                                                url: __this.attr('this-action') ||
-                                                        __this.attr('this-url') ||
-                                                        _this.page.attr('this-action') ||
-                                                        _this.page.attr('this-url'),
+                                                url: __this.attr('this-url') ||
+                                                        __this.attr('this-action') ||
+                                                        _this.page.attr('this-url') ||
+                                                        _this.page.attr('this-action'),
                                                 method: method
                                             });
                                             if (!internal.canContinue
@@ -3541,10 +3562,9 @@
                                     // load a page and the collection in it
                                     else {
                                         goto = internal.pageIDFromLink.call(this, goto);
-                                        var _page = _this._('page[this-id="' + goto
-                                                + '"]:not([this-current]):not([this-dead]),'
-                                                + '[this-type="page"][this-id="'
-                                                + goto + '"]:not([this-current]):not([this-dead])'),
+                                        var _page = _this.templates.children('page[this-id="'
+                                                + goto + '"],[this-type="page"][this-id="'
+                                                + goto + '"]'),
                                                 _component = _page.find('[this-component="'
                                                         + exp[0] + '"]');
                                         _component.attr('this-filter', 'collection#' + exp[0] + ':'
@@ -3589,9 +3609,9 @@
                             updated = internal.cache.call(this, 'updated') || {},
                             collection = internal.cache.call(this, 'model') || {},
                             _this = this,
-                            _collections = this.page.find('collection[this-loaded],'
+                            _collections = this.container.find('collection[this-loaded],'
                                     + '[this-type="collection"][this-loaded]'),
-                            _models = this.page.find('model:not([this-cache]),'
+                            _models = this.container.find('model:not([this-cache]),'
                                     + '[this-type="model"]:not([this-cache])'),
                             touched = {
                                 deleted: {},
@@ -3603,7 +3623,7 @@
                     /* Add created models to collection list */
                     if (_collections.length) {
                         this.__.forEach(created, function (model_name, arr) {
-                            var _collection = _this.page.find('collection[this-model="' + model_name
+                            var _collection = _this.container.find('collection[this-model="' + model_name
                                     + '"][this-loaded],[this-type="collection"][this-model="'
                                     + model_name + '"][this-loaded]');
                             if (!_collection.length)
@@ -3639,7 +3659,7 @@
                     }
                     if (_models.length) {
                         this.__.forEach(updated, function (model_name, arr) {
-                            var _model = _this.page.find('model[this-id="' + model_name
+                            var _model = _this.container.find('model[this-id="' + model_name
                                     + '"]:not([this-cache]),[this-type="model"][this-id="'
                                     + model_name + '"]:not([this-cache]),'
                                     + 'collection[this-model="' + model_name
@@ -3709,7 +3729,8 @@
                         });
                         this.__.forEach(deleted, function (model_name, arr) {
                             _this.__.forEach(arr, function (i, mid) {
-                                var _model = _this.page.find('model[this-id="' + model_name + '"][this-mid="' + mid + '"]:not([this-cache]),'
+                                var _model = _this.container.find('model[this-id="' + model_name
+                                        + '"][this-mid="' + mid + '"]:not([this-cache]),'
                                         + '[this-type="model"][this-id="'
                                         + model_name + '"][this-mid="' + mid + '"]:not([this-cache]),'
                                         + 'collection[this-model="' + model_name
@@ -4312,12 +4333,11 @@
                         if (config.cacheOnly)
                             internal.removeModelFromStore.call(this.app, this.name, this.id);
                         else if (this.url) {
-                            var _success = function (data, id) {
-                                var model = _this.app.config.dataKey ?
-                                        data[_this.app.config.dataKey] : data;
-                                if (model) {
-                                    _this.id = id || model[_this.uid];
-                                    _this.attributes = model;
+                            var _success = function (data) {
+                                var crudStatus = _this.app.config.crudStatus;
+                                if ((crudStatus &&
+                                        data[crudStatus.key] === crudStatus.successValue)
+                                        || !crudStatus) {
                                     if (!_this.app.watchCallback) {
                                         internal.removeModelFromStore.call(_this.app, _this.name,
                                                 _this.id);
@@ -4392,8 +4412,11 @@
                         else if (_this.url) {
                             var _success = function (data, id) {
                                 var model = _this.app.config.dataKey ?
-                                        data[_this.app.config.dataKey] : data;
-                                if (model) {
+                                        data[_this.app.config.dataKey] : data,
+                                        crudStatus = _this.app.config.crudStatus;
+                                if (((crudStatus &&
+                                        data[crudStatus.key] === crudStatus.successValue)
+                                        || !crudStatus) && model) {
                                     // Don't cache for update if watching for updates already
                                     if (!_this.app.watchCallback) {
                                         // save model to collection and set whole data as model
@@ -4404,7 +4427,7 @@
                                                 action = _this.app.store(_action) || {};
                                     }
                                     // update model's collection
-                                    if (_this.collection)
+                                    if (_this.collection && _this.id)
                                         _this.collection.models[_this.id] = model;
 
                                     // saved existing model for dom update
@@ -4463,7 +4486,8 @@
                                 this.app.ajax({
                                     type: config.method || method,
                                     url: _this.app.config.baseURL ? _this.app.config.baseURL +
-                                            _this.url : _this.url, data: this.toURL(),
+                                            _this.url : _this.url,
+                                    data: this.toURL(),
                                     success: _success,
                                     error: _error
                                 });
@@ -4488,7 +4512,7 @@
                     });
                 }
                 _Model.parent = _Model.__proto__;
-                delete _Model.init;
+                delete _Model.parent.init;
                 return _Model;
             },
             /**
@@ -4962,14 +4986,18 @@
                                 app: this, uid: collection.uid || 'id',
                                 url: collection.url || null, length: collection.length || 0});
                         else if (this.dataTransport) {
-                            var _collection = this._('collection[this-model="' + model_name
-                                    + '"][this-loaded],[this-type="collection"][this-model="' + model_name
+                            var _collection = this.container.find('collection[this-model="'
+                                    + model_name
+                                    + '"][this-loaded],[this-type="collection"][this-model="'
+                                    + model_name
                                     + '"][this-loaded]');
                             if (!_collection.length)
-                                _collection = this._('collection[this-id="' + model_name
-                                        + '"][this-loaded],[this-type="collection"][this-id="' + model_name + '"][this-loaded]');
+                                _collection = this.container.find('collection[this-id="' + model_name
+                                        + '"][this-loaded],[this-type="collection"][this-id="'
+                                        + model_name + '"][this-loaded]');
                             if (!_collection.length)
-                                _collection = this._('<collection this-model="' + model_name + '" this-url="'
+                                _collection = this.container.find('<collection this-model="'
+                                        + model_name + '" this-url="'
                                         + (url || model_name) + '" />');
                             _collection.attr('this-no-updates');
                             var _this = this;
@@ -5057,10 +5085,29 @@
             return internal.groupConsoleOutput.call(this, 'home',
                     function () {
                         this.loadPage(this.config.startWith ||
-                                this._('page[this-default-page]:not([this-current]):not([this-dead]),'
+                                this.container
+                                .find('page[this-default-page]:not([this-current]):not([this-dead]),'
                                         + '[this-type="pages"] [this-default-page]')
                                 .attr('this-id'));
                         return this;
+                    }, true);
+        },
+        /**
+         * Loads an element (collection, model, component, or layout)
+         * @param {HTMLElement}|{_} elem
+         * @returns {ThisApp}
+         */
+        load: function (elem) {
+            return internal.groupConsoleOutput.call(this, 'home',
+                    function () {
+                        elem = this._(elem);
+                        if (!elem.length)
+                            return this;
+                        var type = elem.attr('this-type') || elem.get(0).tagName.toLowerCase(),
+                                method = 'load' + type[0].toUpperCase() + type.substr(1);
+                        if (!internal[method])
+                            return this;
+                        internal[method].call(this, elem);
                     }, true);
         },
         /**
@@ -5076,9 +5123,9 @@
                         if (!pageID)
                             return;
                         this.oldPage = _();
-                        var newPage = this._('page[this-id="' + pageID
-                                + '"]:not([this-current]):not([this-dead]),'
-                                + '[this-type="pages"]>[this-id="' + pageID + '"]');
+                        var newPage = this.templates.children('page[this-id="'
+                                + pageID + '"],'
+                                + '[this-type="page"][this-id="' + pageID + '"]');
                         if (newPage.length > 1) {
                             this.error('Target page matches multiple pages!');
                             return this;
@@ -5086,11 +5133,13 @@
                         if (!newPage.length) {
                             if (this.config.paths && this.config.paths.pages) {
                                 var _this = this;
-                                internal.fullyFromURL.call(this, 'page', pageID, function (elem) {
-                                    internal.pageFound.call(_this, elem, replaceInState);
-                                }, function () {
-                                    internal.notAPage.call(_this, pageID);
-                                });
+                                internal.fullyFromURL.call(this, 'page', pageID,
+                                        function (elem) {
+                                            internal.pageFound.call(_this, elem, replaceInState);
+                                        },
+                                        function () {
+                                            internal.notAPage.call(_this, pageID);
+                                        });
                                 return this;
                             }
                             internal.notAPage.call(this, pageID);
@@ -5380,7 +5429,6 @@
                             return this;
                         if (page)
                             this.config.startWith = page;
-                        this.container = this._(this.config.container).html('');
                         this.firstPage = true;
                         internal.setup.call(this);
                         var target_page = internal.pageIDFromLink.call(this, location.hash);
@@ -5390,7 +5438,7 @@
                         }
                         else {
                             this.loadPage(target_page || this.config.startWith ||
-                                    this._('page[this-default-page]:not([this-current]):not([this-dead]),'
+                                    this.templates.children('page[this-default-page],'
                                             + '[this-type="pages"] [this-default-page]')
                                     .attr('this-id'));
                         }
@@ -5472,6 +5520,9 @@
                             selector += ', ';
                         this.__.forEach(targets, function (i, v) {
                             switch (target) {
+                                case "layout":
+                                    selector += 'layout,[this-type="layout"]';
+                                    break;
                                 case "page":
                                     selector += 'page,[this-type="page"]';
                                     break;
