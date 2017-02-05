@@ -196,7 +196,8 @@
             "value": "string",
             "description": [
                 "This is the id of the form to target",
-                "Combined with `this-create`, clicking the element prepares and opens the given form for model creation."
+                "Combined with `this-create`, clicking the element prepares and opens the given form for model creation.",
+                "The form must exist in the current page and would be loaded in the same page."
             ],
             "on": "link elements",
             "links": ["this-create", "this-id"]

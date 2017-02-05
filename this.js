@@ -145,7 +145,7 @@
                  * success (function): Function to call when a success response is gotten. The response data
                  * is passed as a parameter
                  * error (function) : Function to call when error occurs
-                 * complete (function): Function to call when a response has been received, error or success.
+                 * complete (function): Function to call when a response has been received, error or success
                  * @returns ajax object
                  */
                 ajax: function (config) {
@@ -711,7 +711,7 @@
                  * @returns __
                  */
                 on: function (event, selector, callback) {
-                    if (arguments.length === 2) {
+                    if (this.isFunction(selector) && !callback) {
                         callback = selector;
                         selector = null;
                     }
@@ -892,6 +892,8 @@
                                 query += sel + ':not(#' + _this.id + ')';
                             });
                         }
+                        else
+                            query = ':not(#' + _this.id + ')';
                         siblings = siblings.concat(_(this.parentElement, this.debug)
                                 .children(query).items);
                         if (rId)
@@ -1236,7 +1238,6 @@
                         if (container.attr('this-model'))
                             _temp.attr('this-id', container.attr('this-model'));
                         container.append(_temp.show())
-                                .removeAttr('this-cache')
                                 .removeClass('loading');
                     }
                     else {
@@ -1309,16 +1310,15 @@
                     _layout = this.reloadLayouts ? _() :
                             this.container.find('layout[this-id="'
                                     + __layout.attr('this-extends')
-                                    + '"]:not([this-cache]),[this-type="layout"][this-id="'
-                                    + __layout.attr('this-extends') + '"]:not([this-cache])');
+                                    + '"],[this-type="layout"][this-id="'
+                                    + __layout.attr('this-extends') + '"]');
                     // layout doesn't exist in container
                     if (!_layout.length)
                         // get from templates
-                        _layout = this.templates.find('[this-type="layouts"] layout[this-id="'
+                        _layout = this.templates.children('[this-type="layouts"] layout[this-id="'
                                 + __layout.attr('this-extends') + '"],'
                                 + '[this-type="layouts"] [this-type="layout"][this-id="'
-                                + __layout.attr('this-extends') + '"]').clone()
-                                .removeAttr('this-cache');
+                                + __layout.attr('this-extends') + '"]').clone();
                     // doesn't exist in templates
                     if (!_layout.length) {
                         // get from filesystem
@@ -1361,7 +1361,7 @@
                                     },
                                     function () {
                                     },
-                                    {}, 'text');
+                                    null, 'text');
                         }
                         else {
                             _layout.find('[this-content]')
@@ -1451,7 +1451,7 @@
                                     internal.loadModels.call(_this, replaceInState, true);
                                 },
                                         function () {
-                                        }, {}, 'text');
+                                        }, null, 'text');
                             }
                             else {
                                 internal.loadModels.call(this, replaceInState, true);
@@ -1486,18 +1486,22 @@
                                                 .html(data);
                                     }
                                     elem.attr('this-id', id);
+                                    _this.templates.append(elem);
                                 }
                                 else {
                                     if (elem.length > 1)
                                         elem = _this._('<div/>').html(elem);
                                     if (!elem.attr('this-url'))
                                         elem.attr('this-url', id);
+                                    _this.templates.append(_this._('<div this-type="component"'
+                                            + ' this-url="' + id + '" />')
+                                            .html(elem.clone().removeAttr('this-url')));
                                 }
                                 _this.__.callable(success).call(this, elem.clone());
                             },
                             function (e) {
                                 _this.__.callable(error).call(this, e);
-                            }, {}, 'text');
+                            }, null, 'text');
                 },
                 /**
                  * Fetches the value of the variable on a deep level
@@ -1807,6 +1811,14 @@
                  */
                 loadCollection: function (__this, replaceState, looping, chain, data) {
                     __this = this._(__this).addClass('loading');
+                    // collection must have an id
+                    if (!__this.attr('this-id')) {
+                        __this.removeClass('loading');
+                        if (looping)
+                            this.__proto__.collections--;
+                        if (chain && !this.collections)
+                            internal.loadForms.call(this, null, null, replaceState, chain);
+                    }
                     if (!__this.attr('this-model'))
                         __this.attr('this-model', __this.attr('this-id'));
                     // ensure collection content is grouped together
@@ -1817,24 +1829,19 @@
                             '"],[this-type="collection"][this-id="'
                             + __this.attr('this-id') + '"]').length) {
                         var cache = __this.removeAttr('this-loaded')
-                                .removeClass('loading').attr('this-cache', '').hide().outerHtml()
+                                .removeClass('loading').hide().outerHtml()
                                 .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
-                        this.page.append(cache);
+                        this.templates.append(cache);
                     }
 
                     var _this = this,
-                            content = __this.html(),
+                            content = __this.removeAttr('this-cache').html(),
                             model_name = __this.attr('this-model'),
                             model_to_bind = this.container.find('model[this-id="' + model_name
                                     + '"],[this-type="model"][this-id="' + model_name
                                     + '"]');
 
-                    __this = internal.doTar.call(this, __this, true);
-                    __this.html(__this.children().attr('this-cache', __this.attr('this-model') || '')
-                            .hide().outerHtml()
-                            .replace(/\(\{/g, '__obrace2__')
-                            .replace(/\}\)/g, '__cbrace2__'));
-
+                    __this = internal.doTar.call(this, __this, true).html('');
                     if (model_name && model_to_bind.length)
                         model_to_bind.attr('this-bind', true);
 
@@ -1875,7 +1882,7 @@
                         looping: looping,
                         chain: chain,
                         replaceState: replaceState,
-                        requestData: requestData
+                        requestData: Object.keys(requestData).length ? requestData : null
                     });
                     return this;
                 },
@@ -1887,8 +1894,8 @@
                 loadCollections: function (replaceState, chain) {
                     var _this = this;
                     var collections = this.container.find('collection:not([this-loaded])'
-                            + ':not([this-cache]):not([this-data]),'
-                            + '[this-type="collection"]:not([this-loaded]):not([this-cache])'
+                            + ':not([this-data]),'
+                            + '[this-type="collection"]:not([this-loaded])'
                             + ':not([this-data])');
                     this.__proto__.collections += collections.length;
                     if (chain && !collections.length)
@@ -1937,14 +1944,20 @@
                                     + '[this-type="component"][this-id="'
                                     + __this.attr('this-component')
                                     + '"]').clone();
+                            if (!component.length) {
+                                if (this.__proto__.components)
+                                    this.__proto__.components--;
+                                if (!this.__proto__.components)
+                                    this.__.callable(callback).call(this);
+                            }
                             internal.loadComponent.call(_this, __this, callback, component);
                         }
                         return internal;
                     }
-                    component = this._(component);
+                    component = this._(component).clone();
                     if (component.is('component') || component.attr('this-type') === 'component')
                         component.removeAttr('this-url');
-                    // component exists
+                    // load component
                     __this.html(component).trigger('component.loaded').show();
                     if (this.__proto__.components)
                         this.__proto__.components--;
@@ -1958,12 +1971,17 @@
                  */
                 loadComponents: function (callback) {
                     var _this = this,
-                            components = this.container.find('[this-component]');
+                            components = this.container.find('[this-component]'),
+                            loaded = 0;
                     this.__proto__.components += components.length;
                     if (!components.length)
                         this.__.callable(callback).call(this);
                     components.each(function () {
-                        internal.loadComponent.call(_this, this, callback);
+                        internal.loadComponent.call(_this, this, function () {
+                            loaded++;
+                            if (loaded === components.length)
+                                _this.__.callable(callback).call(_this);
+                        });
                     });
                     return this;
                 },
@@ -2185,6 +2203,7 @@
                             __this.find('[this-search]').attr('value', _this.page.attr('this-query'));
                             return;
                         }
+                        // parse tar
                         internal.doTar.call(_this, __this, true);
                         var mid = __this.attr('this-mid') || _this.page.attr('this-mid'),
                                 model_name = __this.attr('this-model') || _this.page.attr('this-model');
@@ -2262,7 +2281,7 @@
                                                 internal.finalizePageLoad.call(_this, _layout,
                                                         replaceInState);
                                             },
-                                            {}, 'text');
+                                            null, 'text');
                                 }
                                 else {
                                     _layout.find('[this-content]').html(_this.page);
@@ -2294,7 +2313,13 @@
                 loadModel: function (target, data, replaceState, chain, looping) {
                     var __this = this._(target),
                             content = __this.hide().outerHtml(),
-                            _this = this;
+                            _this = this,
+                            common_selector = '',
+                            type = __this.attr('this-type') || __this.get(0).tagName.toLowerCase();
+                    if (__this.attr('this-id'))
+                        common_selector += '[this-id="' + __this.attr('this-id') + '"]';
+                    if (__this.attr('this-model'))
+                        common_selector += '[this-model="' + __this.attr('this-model') + '"]';
                     __this = internal.doTar.call(this, __this, true);
                     if (!data && !__this.attr('this-url')) {
                         this.__proto__.models--;
@@ -2302,21 +2327,22 @@
                             internal.loadCollections.call(this, replaceState, chain);
                         return;
                     }
-                    if (__this.siblings('[this-cache="' + __this.attr('this-id')
-                            + '"]').length) {
 
+                    if (this.templates.children(type + common_selector + ',[this-type="' + type + '"]'
+                            + common_selector).length) {
                         // necessary in case of binding and target has already been used
-                        content = __this.siblings('[this-cache="' + __this.attr('this-id') + '"]')
+                        content = this.templates.children(type + common_selector
+                                + ',[this-type="' + type + '"]' + common_selector)
                                 .hide().outerHtml();
                     }
                     else { // keep a copy for later use
                         var cache = _this._(content
                                 .replace(/\(\{/g, '__obrace2__')
-                                .replace(/\}\)/g, '__cbrace2__'))
-                                .attr('this-cache', __this.attr('this-id'));
-                        __this.parent().append(cache.hide());
+                                .replace(/\}\)/g, '__cbrace2__'));
+                        this.templates.append(cache.hide());
                     }
-                    __this.html(content);
+                    __this.replaceWith(content);
+
                     var success = function (data) {
                         internal.loadData.call(_this, __this, data, content, true, true);
                         __this.attr('this-loaded', '').trigger('model.loaded');
@@ -2482,6 +2508,55 @@
                     }
                 },
                 /**
+                 * Loops elem through the given data
+                 * @param {type} data
+                 * @param {_}|HTLElement elem
+                 * @param {string} filter
+                 * @param {string} content
+                 * @returns {_}
+                 */
+                loop: function (data, elem, filter, content) {
+                    if (!data)
+                        return;
+                    elem = this._(elem);
+                    var child = elem.children().get(0),
+                            _this = this,
+                            level;
+                    if (!content)
+                        content = elem.html();
+                    if (child) {
+                        switch (child.tagName.toLowerCase()) {
+                            case "td":
+                                level = 3;
+                                content = this._('<table />').html(content).outerHtml();
+                                break;
+                            case "tr":
+                                level = 2;
+                                content = this._('<table />').html(content).outerHtml();
+                                break;
+                        }
+                    }
+                    this.__.forEach(data, function (key, value) {
+                        var __data = {
+                            key: key,
+                            value: value
+                        },
+                        _content = internal.inLoop.call(_this, __data, filter, content);
+                        if (!_content)
+                            return;
+                        _content = internal.processExpressions.call(_this, _content, __data);
+                        var _variables = internal.parseBrackets.call(_this, '{{', '}}', _content),
+                                _content = _this._(internal.fillVariables
+                                        .call(_this, _variables, __data, _content)
+                                        .replace(/{{key}}/g, key));
+                        while (level) {
+                            _content = _content.children();
+                            level--;
+                        }
+                        elem.append(_content.show());
+                    });
+                },
+                /**
                  * Fetches a model from a collection store
                  * @param string model_id
                  * @param string collection_id
@@ -2522,6 +2597,9 @@
                  */
                 notAPage: function (page) {
                     this.error('Page [' + page + '] not found');
+                    this.container.trigger('page.not.found', {
+                        pageId: page
+                    });
                     if (this.__.isString(this.notFound)) {
                         page = this.templates.children(internal.selector.call(this, this.notFound
                                 .startsWith('page#') ? this.notFound : 'page#' + this.notFound));
@@ -2553,7 +2631,7 @@
                         }
                         if (this.store('last_page') === page.attr('this-id'))
                             replaceInState = true;
-                        this.page = page.clone().removeAttr('this-cache');
+                        this.page = page.clone();
                         internal.loadLayouts.call(this, replaceInState);
                     }
                     else {
@@ -2667,6 +2745,8 @@
                  * @returns {object}
                  */
                 parseBrackets: function (oBrace, cBrace, content) {
+                    if (!content)
+                        return [];
                     return this.__.tryCatch(function () {
                         return content.match(new RegExp(oBrace + '\\s*[^' + cBrace + ']+\\s*'
                                 + cBrace, 'gi')) || [];
@@ -2696,27 +2776,13 @@
                     }
                     _temp.find('[this-each]').each(function () {
                         var __this = _this._(this),
-                                _data = data[__this.attr('this-each')],
-                                filter = __this.attr('this-filter'),
                                 each = __this.attr('this-each').trim(),
+                                _data = data[each],
+                                filter = __this.attr('this-filter'),
                                 content = __this.removeAttr('this-muted')
                                 .html()
                                 .replace(/__obrace__/g, '{{').replace(/__cbrace__/g, '}}')
-                                .replace(/__obrace2__/g, '({').replace(/__cbrace2__/g, '})'),
-                                level = 0,
-                                child = __this.children().get(0);
-                        if (child) {
-                            switch (child.tagName.toLowerCase()) {
-                                case "td":
-                                    level = 3;
-                                    content = _this._('<table />').html(content).outerHtml();
-                                    break;
-                                case "tr":
-                                    level = 2;
-                                    content = _this._('<table />').html(content).outerHtml();
-                                    break;
-                            }
-                        }
+                                .replace(/__obrace2__/g, '({').replace(/__cbrace2__/g, '})');
 
                         __this.removeAttr('this-filter').html('');
                         // this-each is not a model key
@@ -2734,25 +2800,7 @@
                         }
                         if (!_this.__.isObject(_data, true))
                             return;
-                        _this.__.forEach(_data, function (key, value) {
-                            var __data = {
-                                key: key,
-                                value: value
-                            },
-                            _content = internal.inLoop.call(_this, __data, filter, content);
-                            if (!_content)
-                                return;
-                            _content = internal.processExpressions.call(_this, _content, __data);
-                            var _variables = internal.parseBrackets.call(_this, '{{', '}}', _content),
-                                    _content = _this._(internal.fillVariables
-                                            .call(_this, _variables, __data, _content)
-                                            .replace(/{{key}}/g, key));
-                            while (level) {
-                                _content = _content.children();
-                                level--;
-                            }
-                            __this.append(_content);
-                        });
+                        internal.loop.call(_this, _data, __this, filter, content);
                         __this.removeAttr('this-each');
                     });
                     if (isModel) {
@@ -3004,6 +3052,7 @@
                         if (this.config.titleContainer)
                             this.config.titleContainer = this._(this.config.titleContainer,
                                     this.config.debug);
+                        var autocomplete_timeout;
                         this.container
                                 /* reload current page or loaded collection|model */
                                 .on('click', '[this-reload],[this-reload-page],[this-reload-layouts]',
@@ -3046,7 +3095,7 @@
                                                             attr = attr.join(':');
                                                             toReload.attr(name, attr);
                                                         });
-                                            _reload.replaceWith(toReload.clone().removeAttr('this-cache'));
+                                            _reload.replaceWith(toReload.clone());
                                             internal.loadCollection.call(_this, _reload, true);
                                         })
                                 /* go to the default page */
@@ -3165,9 +3214,8 @@
                                  */
                                 .on('click', '[this-create][this-form]', function () {
                                     var __this = _this._(this);
-                                    _this.container.find('form[this-id="'
-                                            + __this.attr('this-form')
-                                            + '"]:not([this-cache])')
+                                    _this.container.find('form[this-id="' + __this.attr('this-form')
+                                            + '"]')
                                             .removeAttr([
                                                 "this-binding", "this-mid", "this-uid", "this-url"
                                             ])
@@ -3334,11 +3382,10 @@
                                             bind = __this.attr('this-bind'),
                                             _model = __this.closest('model,[this-type="model"],'
                                                     + '[this-model]');
-                                    if (!bind)
+                                    if (!bind || !_model.length)
                                         return;
                                     var _target = _this.container.find(internal.selector
-                                            .call(_this, bind,
-                                                    ':not([this-in-collection]):not([this-cache])'));
+                                            .call(_this, bind, ':not([this-in-collection])'));
                                     if (!_target.length)
                                         return;
                                     _target.attr('this-model', (_model.attr('this-model')
@@ -3351,8 +3398,7 @@
                                         _target.attr('this-tar', 'do:update');
                                     else if (__this.hasAttr('this-create'))
                                         _target.attr('this-tar', 'do:create');
-                                    internal.bindToModel.call(_this, _target, _model,
-                                            __this.attr('this-cache'));
+                                    internal.bindToModel.call(_this, _target, _model);
                                 })
                                 /*
                                  * Click event
@@ -3425,11 +3471,13 @@
                                                             }
                                                             data[name].push(this.value);
                                                         }
-                                                        else if (this.name.indexOf('[') !== -1) {
+                                                        else if (this.name.indexOf('[') !== -1)
+                                                        {
                                                             var exp = this.name.replace(']', '').split('['),
                                                                     _data = data,
                                                                     lastKey = exp.pop();
-                                                            _this.__.forEach(exp, function (i, v) {
+                                                            _this.__.forEach(exp, function (i, v)
+                                                            {
                                                                 if (!_data[v])
                                                                     _data[v] = {};
                                                                 _data = _data[v];
@@ -3553,7 +3601,7 @@
                                     // reload only the collection
                                     if (_form.attr('this-reload')) {
                                         _collection = page.find(internal.selector.call(_this,
-                                                _form.attr('this-reload'), ':not([this-cache])'));
+                                                _form.attr('this-reload')));
                                         _collection.attr('this-filter', filter).attr('this-search',
                                                 keys.join(','));
                                         page.attr('this-query', _search.val().trim());
@@ -3581,6 +3629,58 @@
                                                 keys.join(','));
                                         _this.loadPage(goto, replaceState);
                                     }
+                                })
+                                /**
+                                 * Autocomplete
+                                 */
+                                .on('keyup', '[this-autocomplete][this-list]', function () {
+                                    clearTimeout(autocomplete_timeout);
+                                    var __this = _this._(this),
+                                            min_chars = __this.attr('this-min-chars') || 3,
+                                            url = __this.attr('this-autocomplete')
+                                            || __this.attr('this-url'),
+                                            _list = _this.container.find('[this-type="list"][this-id="'
+                                                    + __this.attr('this-list') + '"],list[this-id="'
+                                                    + __this.attr('this-list') + '"]');
+                                    // do nothing if chars are less than required
+                                    if (__this.val().length < min_chars)
+                                        return;
+                                    url += (url.indexOf('?') === -1) ? '?' : '&';
+                                    url += 'q=' + __this.val();
+                                    autocomplete_timeout = setTimeout(function () {
+                                        _this.request(url, function (data) {
+                                            internal.loop.call(_this, _this.config.dataKey ?
+                                                    data[_this.config.dataKey] : data, _list,
+                                                    __this.attr('this-filter'));
+                                        });
+                                    }, __this.attr('this-delay') || 300);
+                                });
+                        this.when('page.loaded', 'page', function () {
+                            _this.container.find('[this-autocomplete][this-list]')
+                                    .each(function () {
+                                        var __this = _this._(this),
+                                                _list = _this.container.find('[this-type="list"][this-id="'
+                                                        + __this.attr('this-list') + '"],list[this-id="'
+                                                        + __this.attr('this-list') + '"]');
+                                        if (_list.length > 1)
+                                            _list.innerWrap('<div />');
+                                        _list.children().hide();
+                                    });
+                        })
+                                .when('component.loaded', 'component', function () {
+                                    var component = _this._(this);
+                                    _this.container.find('[this-autocomplete][this-list]')
+                                            .each(function () {
+                                                var __this = _this._(this),
+                                                        _list = component
+                                                        .find('[this-type="list"][this-id="'
+                                                                + __this.attr('this-list')
+                                                                + '"],list[this-id="'
+                                                                + __this.attr('this-list') + '"]');
+                                                if (_list.length > 1)
+                                                    _list.innerWrap('<div />');
+                                                _list.children().hide();
+                                            });
                                 });
                         /*
                          * State resuscitation
@@ -3611,8 +3711,7 @@
                             _this = this,
                             _collections = this.container.find('collection[this-loaded],'
                                     + '[this-type="collection"][this-loaded]'),
-                            _models = this.container.find('model:not([this-cache]),'
-                                    + '[this-type="model"]:not([this-cache])'),
+                            _models = this.container.find('model,[this-type="model"]'),
                             touched = {
                                 deleted: {},
                                 created: false,
@@ -3641,13 +3740,16 @@
                                 else if (_this.__.isObject(__data))
                                     data = __data;
                                 var tmpl = internal.parseData.call(_this, data,
-                                        _collection.children('[this-cache]').clone()
-                                        .removeAttr('this-cache').outerHtml(), null, v),
+                                        _this.templates.children('collection[this-model="' + model_name
+                                                + '"],[this-type="collection"][this-model="'
+                                                + model_name + '"]').children().clone().outerHtml(),
+                                        null, v),
                                         action = _collection.attr('this-prepend-new') ?
                                         'prepend' : 'append';
                                 _collection[action](tmpl.attr('this-mid', v).attr('this-uid', uid)
                                         .attr('this-type', 'model')
-                                        .attr('this-id', model_name).attr('this-url', _collection.attr('this-url') + v)
+                                        .attr('this-id', model_name)
+                                        .attr('this-url', _collection.attr('this-url') + v)
                                         .attr('this-in-collection', '')
                                         .outerHtml());
                                 _this.__.arrayRemoveIndex(arr, i);
@@ -3660,8 +3762,8 @@
                     if (_models.length) {
                         this.__.forEach(updated, function (model_name, arr) {
                             var _model = _this.container.find('model[this-id="' + model_name
-                                    + '"]:not([this-cache]),[this-type="model"][this-id="'
-                                    + model_name + '"]:not([this-cache]),'
+                                    + '"],[this-type="model"][this-id="'
+                                    + model_name + '"],'
                                     + 'collection[this-model="' + model_name
                                     + '"]>[this-type="model"],'
                                     + '[this-type="collection"][this-model="' + model_name
@@ -3682,15 +3784,29 @@
                                                             && parseInt(__model.attr('this-updated'))
                                                             < v.timestamp)));
                                 }).each(function () {
-                                    var __model = _this._(this);
-                                    if (__model.hasAttr('this-in-collection'))
+                                    var __model = _this._(this),
+                                            _clone;
+                                    if (__model.hasAttr('this-in-collection')) {
                                         in_collection = true;
+                                        var _collection = __model.parent();
+                                        _clone = _this.templates.children('collection[this-model="'
+                                                + _collection.attr('this-model')
+                                                + '"],[this-type="collection"][this-model="'
+                                                + _collection.attr('this-model') + '"]').children()
+                                                .clone();
+                                    }
+                                    else {
+                                        _clone = _this.templates.children('model[this-id="'
+                                                + __model.attr('this-id')
+                                                + '"],[this-type="collection"][this-id="'
+                                                + __model.attr('this-id') + '"]')
+                                                .clone();
+                                    }
                                     var data = v.data,
                                             __data = internal.canContinue
                                             .call(_this, in_collection ?
                                                     'collection.model.render'
-                                                    : 'model.render', [data]),
-                                            _clone = __model.siblings('[this-cache]').clone();
+                                                    : 'model.render', [data]);
                                     if (!__data) {
                                         if (in_collection)
                                             _model.parent().trigger('collection.model.render.canceled');
@@ -3700,7 +3816,7 @@
                                     }
                                     else if (_this.__.isObject(__data))
                                         data = __data;
-                                    // replace clone model collections with existing
+                                    // replace clone model's collections with existing
                                     // model collections
                                     _clone.find('collection,[this-type="collection"]')
                                             .each(function () {
@@ -3717,8 +3833,7 @@
                                                     _cl_col.remove();
                                             });
                                     var tmpl = internal.parseData.call(_this, data,
-                                            _clone.removeAttr('this-cache').outerHtml(), null,
-                                            false, true);
+                                            _clone.outerHtml(), null, false, true);
                                     __model.html(tmpl.html()).show()
                                             .attr('this-updated', v.timestamp);
                                 });
@@ -3730,9 +3845,9 @@
                         this.__.forEach(deleted, function (model_name, arr) {
                             _this.__.forEach(arr, function (i, mid) {
                                 var _model = _this.container.find('model[this-id="' + model_name
-                                        + '"][this-mid="' + mid + '"]:not([this-cache]),'
+                                        + '"][this-mid="' + mid + '"],'
                                         + '[this-type="model"][this-id="'
-                                        + model_name + '"][this-mid="' + mid + '"]:not([this-cache]),'
+                                        + model_name + '"][this-mid="' + mid + '"],'
                                         + 'collection[this-model="' + model_name
                                         + '"]>[this-type="model"][this-mid="' + mid + '"],'
                                         + '[this-type="collection"][this-model="' + model_name
@@ -4252,7 +4367,7 @@
                 function toURL(attributes, _key) {
                     var url = '';
                     __.forEach(attributes, function (key, value) {
-                        if (_key)
+                        if (_key) // parsing for object
                             key = __.isString(key) ? _key + '[' + key + ']' : _key + '[]';
                         if (url)
                             url += '&';
@@ -5100,14 +5215,15 @@
         load: function (elem) {
             return internal.groupConsoleOutput.call(this, 'home',
                     function () {
-                        elem = this._(elem);
-                        if (!elem.length)
-                            return this;
-                        var type = elem.attr('this-type') || elem.get(0).tagName.toLowerCase(),
-                                method = 'load' + type[0].toUpperCase() + type.substr(1);
-                        if (!internal[method])
-                            return this;
-                        internal[method].call(this, elem);
+                        var _this = this;
+                        this._(elem).each(function () {
+                            var type = this.getAttribute('this-type') || this.tagName.toLowerCase(),
+                                    method = 'load' + type[0].toUpperCase() + type.substr(1);
+                            if (!internal[method])
+                                return;
+                            internal[method].call(_this, this);
+                        });
+                        return this;
                     }, true);
         },
         /**
@@ -5130,7 +5246,7 @@
                             this.error('Target page matches multiple pages!');
                             return this;
                         }
-                        if (!newPage.length) {
+                        else if (!newPage.length) {
                             if (this.config.paths && this.config.paths.pages) {
                                 var _this = this;
                                 internal.fullyFromURL.call(this, 'page', pageID,
