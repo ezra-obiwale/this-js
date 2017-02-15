@@ -1112,7 +1112,7 @@
                             model = new Model(_model.attr('mid'), data, {
                                 name: _model.attr('this-id'),
                                 app: _this,
-                                uid: _model.attr('this-uid') || 'id',
+                                uid: _model.attr('this-uid'),
                                 url: _model.attr('this-url')
                             });
                             model.bind(_target);
@@ -1221,27 +1221,28 @@
                     if (isModel)
                         content = internal.processExpressions.call(this, content, data);
                     container = this._(container).hide();
-                    var _temp = internal.parseData.call(this, data, content, variables, false, isModel),
-                            id = container.attr('this-model-uid') || container.attr('this-uid')
-                            || 'id';
+                    var _temp = internal.parseData
+                            .call(this, data, content, variables, false, isModel),
+                            uid = container.attr('this-model-uid') ||
+                            container.attr('this-uid') || '',
+                            id = internal.getUIDValue.call(this, data, uid);
                     while (level) {
                         _temp = _temp.children();
                         level--;
                     }
                     if (!isModel) {
-                        _temp.attr('this-mid', (data[id] || data[id] == 0 ? data[id] : ''))
-                                .attr('this-uid', id)
+                        _temp.attr('this-mid', id)
+                                .attr('this-uid', uid)
                                 .attr('this-type', 'model')
                                 .attr('this-in-collection', '')
-                                .attr('this-url', container.attr('this-url')
-                                        + (data[id] || data[id] == 0 ? data[id] : ''));
+                                .attr('this-url', container.attr('this-url') + id);
                         if (container.attr('this-model'))
                             _temp.attr('this-id', container.attr('this-model'));
                         container.append(_temp.show())
                                 .removeClass('loading');
                     }
                     else {
-                        container.attr('this-uid', id).attr('this-mid', data[id]);
+                        container.attr('this-uid', uid).attr('this-mid', id);
                         container.html(_temp.html());
                     }
                     return this;
@@ -1533,6 +1534,32 @@
                     return exps;
                 },
                 /**
+                 * Fetches the value of the uid of the given data
+                 * @param {object} data
+                 * @param {string} uid If not provided, the default in the config is fallen
+                 * back to
+                 * @returns {mixed}
+                 */
+                getUIDValue: function (data, uid) {
+                    return this.tryCatch(function () {
+                        uid = uid || this.config.modelUID;
+                        var value;
+                        if (!data)
+                            return value;
+                        this.__.forEach(uid.split('.'), function (i, v) {
+                            if (!i) // first uid part. set value to data at v
+                                value = data[v];
+                            else if (value) // not first uid part. value should exist. 
+                                //set value to data at v of value
+                                value = value[v];
+                        });
+                        return value;
+                    },
+                            function () {
+                                return null;
+                            });
+                },
+                /**
                  * Retrieves the value of the variable from the data and filters it if required
                  * @param {string} variable
                  * @param {object} data
@@ -1809,7 +1836,8 @@
                  * exists on __this, it is monitored for changes to the data.
                  * @returns {void}
                  */
-                loadCollection: function (__this, replaceState, looping, chain, data) {
+                loadCollection: function (__this, replaceState, looping, chain, data)
+                {
                     __this = this._(__this).addClass('loading');
                     // collection must have an id
                     if (!__this.attr('this-id')) {
@@ -2043,7 +2071,7 @@
                                 // the template element
                                 child = container.children().get(0),
                                 // unique id key for models
-                                uid = container.attr('this-model-uid') || 'id',
+                                uid = container.attr('this-model-uid'),
                                 // the url of the collection/model
                                 url = container.attr('this-url');
                         if (child) {
@@ -2060,10 +2088,14 @@
                             }
                         }
                         this.__.forEach(data, function (index, model) {
+                            // get id from model with uid
+                            var id = internal.getUIDValue.call(_this, model, uid);
                             // if saving data is allowed
-                            if (save !== false)
-                                // set model into data to save. use uid if available, or else index
-                                _data.data[model[uid] || index] = model;
+                            if (save !== false) {
+                                // set model into data to save. use id if available,
+                                // or else index
+                                _data.data[id || index] = model;
+                            }
                             // process content as being in a loop
                             var _content = internal.inLoop.call(_this, {
                                 index: index,
@@ -2079,9 +2111,20 @@
                                         index: index,
                                         model: model
                                     }));
+                            if (!uid)
+                                uid = _this.config.modelUID;
+                            var uid_parts = uid.split('.').reverse(),
+                                    _id = {}, top_uid = uid_parts.pop();
                             // uid must exist in model
-                            if (!model[uid])
-                                model[uid] = index;
+                            if (!model[top_uid]) {
+                                $.each(uid_parts, function (i, v) {
+                                    if (!i)
+                                        _id[v] = id || index;
+                                    else
+                                        _id[v] = _id;
+                                });
+                                model[top_uid] = _id;
+                            }
                             // continue loading
                             internal.doLoad.call(_this, container, model, _content, variables,
                                     false, level);
@@ -2089,7 +2132,7 @@
                         // if saving data is allowed
                         if (save !== false) {
                             // save uid
-                            _data.uid = container.attr('this-model-uid') || 'id';
+                            _data.uid = uid;
                             // save url
                             _data.url = url;
                         }
@@ -2110,8 +2153,10 @@
                         // saving is allowed
                         if (save !== false) {
                             save_as = container.attr('this-id');
+                            var id = internal.getUIDValue
+                                    .call(this, data, container.attr('this-uid'));
                             // store data under its uid
-                            _data.data[data[container.attr('this-uid') || 'id']] = data;
+                            _data.data[id] = data;
                             // get url without the model id
                             // split into array by /
                             var _url = container.attr('this-url').split('/');
@@ -2583,7 +2628,8 @@
                         var collection = internal.cache.call(this, 'model', model_name)
                                 || {data: {}, uid: uid, length: 0};
                         if (!model_id)
-                            model_id = model[collection.uid || uid];
+                            model_id = internal.getUIDValue.call[this, model,
+                                    collection.uid || uid];
                         model = this.__.extend(collection.data[model_id], model, true);
                         collection.data[model_id] = model;
                         internal.cache.call(this, 'model', model_name, collection, false);
@@ -3175,7 +3221,8 @@
                                         _this.tar['page#' + goto]['model-uid'] =
                                                 __this.attr('this-model-uid');
                                     else if (model.attr('this-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = model.attr('this-uid');
+                                        _this.tar['page#' + goto]['model-uid'] = model
+                                                .attr('this-uid');
                                 })
                                 /*
                                  * CREATE event
@@ -3197,7 +3244,8 @@
                                         action: url
                                     };
                                     if (__this.attr('this-model'))
-                                        _this.tar['page#' + goto]['model'] = __this.attr('this-model');
+                                        _this.tar['page#' + goto]['model'] = __this
+                                                .attr('this-model');
                                     if (__this.attr('this-model-uid'))
                                         _this.tar['page#' + goto]['model-uid'] = __this
                                                 .attr('this-model-uid');
@@ -3212,12 +3260,14 @@
                                  * `this-model` must be provided unless the target
                                  * form already has the required attributes.
                                  */
-                                .on('click', '[this-create][this-form]', function () {
+                                .on('click', '[this-create][this-form]', function ()
+                                {
                                     var __this = _this._(this);
-                                    _this.container.find('form[this-id="' + __this.attr('this-form')
-                                            + '"]')
+                                    _this.container.find('form[this-id="'
+                                            + __this.attr('this-form') + '"]')
                                             .removeAttr([
-                                                "this-binding", "this-mid", "this-uid", "this-url"
+                                                "this-binding", "this-mid", "this-uid",
+                                                "this-url"
                                             ])
                                             .attr({
                                                 "this-do": "create",
@@ -3240,7 +3290,8 @@
                                  * `this-model` may be provided if target isn't
                                  * in a model container or target page doesn't have these attributes.
                                  */
-                                .on('click', '[this-goto][this-delete]', function () {
+                                .on('click', '[this-goto][this-delete]', function ()
+                                {
                                     var __this = _this._(this),
                                             model = __this.closest('model,[this-type="model"]'),
                                             url = __this.attr('this-delete')
@@ -3302,7 +3353,7 @@
                                                 'this-model': _model.attr('this-id'),
                                                 'this-mid': _model.attr('this-mid'),
                                                 'this-do': 'delete',
-                                                'this-uid': _model.attr('this-uid') || 'id',
+                                                'this-uid': _model.attr('this-uid'),
                                                 'this-action': _model.attr('this-url')
                                             }).show();
                                 })
@@ -3333,7 +3384,7 @@
                                                         _model.attr('this-id') ||
                                                         _do.attr('this-model'),
                                                 uid: _model.attr('this-uid') ||
-                                                        _do.attr('this-uid') || 'id',
+                                                        _do.attr('this-uid'),
                                                 url: __this.attr('this-delete') ||
                                                         _model.attr('this-url') ||
                                                         _do.attr('this-action')
@@ -3722,13 +3773,14 @@
                     /* Add created models to collection list */
                     if (_collections.length) {
                         this.__.forEach(created, function (model_name, arr) {
-                            var _collection = _this.container.find('collection[this-model="' + model_name
+                            var _collection = _this.container.find('collection[this-model="'
+                                    + model_name
                                     + '"][this-loaded],[this-type="collection"][this-model="'
                                     + model_name + '"][this-loaded]');
                             if (!_collection.length)
                                 return;
                             var __collection = collection[model_name],
-                                    uid = __collection.uid;
+                                    uid = __collection.uid || '';
                             _this.__.forEach(arr, function (i, v) {
                                 var data = __collection.data[v],
                                         __data = internal.canContinue
@@ -3740,13 +3792,15 @@
                                 else if (_this.__.isObject(__data))
                                     data = __data;
                                 var tmpl = internal.parseData.call(_this, data,
-                                        _this.templates.children('collection[this-model="' + model_name
+                                        _this.templates.children('collection[this-model="'
+                                                + model_name
                                                 + '"],[this-type="collection"][this-model="'
-                                                + model_name + '"]').children().clone().outerHtml(),
-                                        null, v),
+                                                + model_name + '"]').children().clone()
+                                        .outerHtml(), null, v),
                                         action = _collection.attr('this-prepend-new') ?
                                         'prepend' : 'append';
-                                _collection[action](tmpl.attr('this-mid', v).attr('this-uid', uid)
+                                _collection[action](tmpl.attr('this-mid', v)
+                                        .attr('this-uid', uid)
                                         .attr('this-type', 'model')
                                         .attr('this-id', model_name)
                                         .attr('this-url', _collection.attr('this-url') + v)
@@ -3948,7 +4002,9 @@
                                         var data = resp.data, id = resp.id;
                                         // if update model, id is model attribute. Update real model
                                         if (!isCollection && elem.attr('this-mid')) {
-                                            delete data[elem.attr('this-uid') || 'id'];
+                                            var id = internal.getUIDValue
+                                                    .call(this, data, elem.attr('this-uid'));
+                                            delete data[id];
                                             var _data = {};
                                             _data[id] = data;
                                             data = _data;
@@ -4383,10 +4439,11 @@
                 var _Model = Object.create({
                     app: props && props.app ? props.app : null,
                     attributes: __.isObject(attributes) ? attributes : {},
-                    id: id, collection: props && props.collection ? props.collection : null,
+                    id: id,
+                    collection: props && props.collection ? props.collection : null,
                     method: props && props.method ? props.method : null,
                     name: props && props.name ? props.name : null,
-                    uid: props && props.uid ? props.uid : 'id',
+                    uid: props && props.uid ? props.uid : '',
                     url: props && props.url ? props.url : null,
                     /**
                      * Binds the model to the given element
@@ -4522,8 +4579,8 @@
                             method = this.method;
                         if (this.id && config.cacheOnly)
                             /* save model to collection */
-                            internal.modelToStore.call(this.app, this.name, this.id, this.attributes,
-                                    this.uid);
+                            internal.modelToStore.call(this.app, this.name, this.id,
+                                    this.attributes, this.uid);
                         else if (_this.url) {
                             var _success = function (data, id) {
                                 var model = _this.app.config.dataKey ?
@@ -4532,18 +4589,20 @@
                                 if (((crudStatus &&
                                         data[crudStatus.key] === crudStatus.successValue)
                                         || !crudStatus) && model) {
+                                    id = id || internal.getUIDValue
+                                            .call(_this.app, model, _this.uid);
                                     // Don't cache for update if watching for updates already
                                     if (!_this.app.watchCallback) {
                                         // save model to collection and set whole data as model
                                         model = internal.modelToStore
-                                                .call(_this.app, _this.name, _this.id, model,
+                                                .call(_this.app, _this.name, id, model,
                                                         _this.uid);
                                         var _action = _this.id ? 'updated' : 'created',
                                                 action = _this.app.store(_action) || {};
                                     }
                                     // update model's collection
-                                    if (_this.collection && _this.id)
-                                        _this.collection.models[_this.id] = model;
+                                    if (_this.collection)
+                                        _this.collection.models[id] = model;
 
                                     // saved existing model for dom update
                                     if (_this.id && !_this.app.watchCallback) {
@@ -4558,7 +4617,7 @@
                                     // saved new model for dom update
                                     else {
                                         if (!_this.app.watchCallback) {
-                                            _this.id = id || model[_this.uid];
+                                            _this.id = id;
                                             // update the url
                                             _this.url += _this.id;
                                             if (!action[_this.name])
@@ -4643,7 +4702,7 @@
                     current_index: -1,
                     models: __.isObject(models) ? models : {},
                     name: props && props.name ? props.name : null,
-                    uid: props && props.uid ? props.uid : 'id',
+                    uid: props && props.uid ? props.uid : '',
                     url: props && props.url ? props.url : null,
                     /**
                      * Adds a model to the collection
@@ -4930,35 +4989,31 @@
          * App configuration object
          */
         config: {
-            /**
-             * ID of the page to start the app with
-             */
-            startWith: null,
             /** 			 * The base url upon which other urls are built
              */
             baseURL: location.origin + location.pathname,
             /**
-             * Indicates whether the app should run in debug mode or not.
+             * Indicates the status info for crud operations
              */
-            debug: false,
+            crudStatus: {
+                key: 'status', // the key that holds the operation status
+                successValue: true // the key value that indicates success
+            },
             /**
              * The key in each ajax response which holds the actual object or array of objects
              */
             dataKey: 'data',
             /**
-             * The selector that holds the title of each page
+             * Indicates whether the app should run in debug mode or not.
              */
-            titleContainer: null,
-            /** 			 * The transition effect to use between pages
-             */
-            transition: 'switch',
-            /**
-             * The options for the transition effect
-             */
-            transitionOptions: {},
+            debug: false,
             /** 			 * The default layout for the application
              */
             layout: null,
+            /**
+             * Default uid for models and collections if not explicitly defined
+             */
+            modelUID: 'id',
             /**              * Paths to pages, layouts and components
              */
             paths: {
@@ -4978,12 +5033,20 @@
                 css: './assets/css'
             },
             /**
-             * Indicates the status info for crud operations
+             * ID of the page to start the app with
              */
-            crudStatus: {
-                key: 'status', // the key that holds the operation status
-                successValue: true // the key value that indicates success
-            }
+            startWith: null,
+            /**
+             * The selector that holds the title of each page
+             */
+            titleContainer: null,
+            /** 			 * The transition effect to use between pages
+             */
+            transition: 'switch',
+            /**
+             * The options for the transition effect
+             */
+            transitionOptions: {}
         },
         /**
          * App events
@@ -5098,7 +5161,8 @@
                         if (data)
                             return new Collection(data, {
                                 name: model_name,
-                                app: this, uid: collection.uid || 'id',
+                                app: this,
+                                uid: collection.uid,
                                 url: collection.url || null, length: collection.length || 0});
                         else if (this.dataTransport) {
                             var _collection = this.container.find('collection[this-model="'
@@ -5121,7 +5185,7 @@
                                         new Collection(data, {
                                             name: model_name,
                                             app: _this,
-                                            uid: _collection.attr('this-model-uid') || uid || 'id',
+                                            uid: _collection.attr('this-model-uid') || uid,
                                             url: _collection.attr('this-url'),
                                             length: Object.keys(data).length || 0
                                         }));
