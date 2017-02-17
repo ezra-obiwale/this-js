@@ -313,7 +313,7 @@
                         if (selector) {
                             var id = false, query = '', _this = this;
                             if (!this.id) {
-                                this.id = 'rANd' + Math.ceil(Math.random() * 100);
+                                this.id = __.randomString();
                                 id = true;
                             }
                             __.forEach(selector.split(','), function (i, sel) {
@@ -329,6 +329,13 @@
                         result = result.concat(Array.from(this.children));
                     });
                     return _(result, this.debug);
+                },
+                /**
+                 * Generates random string 
+                 * @returns {string}
+                 */
+                randomString: function () {
+                    return 'rANd' + Math.ceil(Math.random() * 100);
                 },
                 /**
                  * Clones the first item
@@ -586,6 +593,12 @@
                  */
                 hide: function () {
                     return this.each(function () {
+                        if (!_(this, this.debug).attr('this-display')) {
+                            if (this.style.display === 'none')
+                                _(this, this.debug).attr('this-display', '');
+                            else
+                                _(this, this.debug).attr('this-display', this.style.display || '');
+                        }
                         this.style.display = 'none';
                     });
                 },
@@ -882,7 +895,7 @@
                     this.each(function () {
                         var rId = false, query = '', _this = this;
                         if (!this.id) {
-                            this.id = 'rANd' + Math.ceil(Math.random() * 100);
+                            this.id = __.randomString();
                             rId = true;
                         }
                         if (selector) {
@@ -908,7 +921,9 @@
                 show: function () {
                     return this.each(function () {
                         if (this.style.display === 'none')
-                            this.style.display = 'inherit';
+                            this.style.display = _(this, this.debug).attr('this-display')
+                                    || '';
+                        _(this, this.debug).removeAttr('this-display');
                     });
                 },
                 /**
@@ -1124,6 +1139,32 @@
                     return this;
                 },
                 /**
+                 * Binds an elem to the given object
+                 * @param {_}|{HTMLElement} elem
+                 * @param {Object} object
+                 * @param {string}|{integer} key The unique identifier of the object, if coming
+                 * from a list
+                 * @returns {_}
+                 */
+                bindToObject: function (elem, object, key) {
+                    elem = this._(elem);
+                    var _this = this;
+                    elem.find('[this-each]').each(function () {
+                        internal.loop.call(_this, object, this,
+                                _this._(this).attr('this-filter'));
+                    });
+                    var content = elem.outerHtml(),
+                            variables = internal.parseBrackets
+                            .call(this, '{{', '}}', content);
+                    content = internal.fillVariables.call(this, variables, object, content);
+                    content = internal.processExpressions
+                            .call(this, content, {
+                                key: key,
+                                value: object
+                            }, true);
+                    return elem.replaceWith(content);
+                },
+                /**
                  * Saves to cache or retrieves from cache
                  * @param string type collection or model
                  * @param string id The id of the collection or model
@@ -1217,7 +1258,8 @@
                  * @param {boolean} isModel Indicates whether loading a model or not
                  * @returns ThisApp
                  */
-                doLoad: function (container, data, content, variables, isModel, level) {
+                doLoad: function (container, data, content, variables, isModel, level)
+                {
                     if (isModel)
                         content = internal.processExpressions.call(this, content, data);
                     container = this._(container).hide();
@@ -1404,6 +1446,7 @@
                     internal.loadAssets.call(this, _layout);
                     var _this = this;
                     if (_layout && _layout.length) {
+                        // @todo: check need to remove
 //                        if (!this.container.find('layout[this-id="'
 //                                + _layout.attr('this-id')
 //                                + '"],[this-type="layout"][this-id="'
@@ -1511,8 +1554,9 @@
                  * @returns string
                  */
                 getDeepValue: function (variable, data) {
-                    var value = data, vars = __.isObject(variable, true) ? variable : variable.split('.');
-                    __.forEach(vars, function (i, v) {
+                    var value = data, vars = __.isObject(variable, true) ? variable :
+                            variable.split('.');
+                    this.__.forEach(vars, function (i, v) {
                         if (!value)
                             return false;
                         value = value[v];
@@ -1541,23 +1585,7 @@
                  * @returns {mixed}
                  */
                 getUIDValue: function (data, uid) {
-                    return this.tryCatch(function () {
-                        uid = uid || this.config.modelUID;
-                        var value;
-                        if (!data)
-                            return value;
-                        this.__.forEach(uid.split('.'), function (i, v) {
-                            if (!i) // first uid part. set value to data at v
-                                value = data[v];
-                            else if (value) // not first uid part. value should exist. 
-                                //set value to data at v of value
-                                value = value[v];
-                        });
-                        return value;
-                    },
-                            function () {
-                                return null;
-                            });
+                    return internal.getDeepValue.call(this, uid || this.config.modelUID, data);
                 },
                 /**
                  * Retrieves the value of the variable from the data and filters it if required
@@ -1566,18 +1594,19 @@
                  * @param {Boolean} raw Indicates whether to return value without surrounding span tag
                  * @returns {mixed}
                  */
-                getVariableValue: function (variable, data, raw) {
+                getVariableValue: function (variable, data) {
                     var _this = this,
                             vars = variable.replace(/{*}*/g, '')
                             .replace(/\\\|/g, '__fpipe__').split('|'),
-                            key = this.__.arrayRemoveIndex(vars, 0), value = this.__.contains(key, '.') ?
-                            internal.getDeepValue.call(null, key, data) : data[key];
+                            key = this.__.arrayRemoveIndex(vars, 0),
+                            value = this.__.contains(key, '.') ?
+                            internal.getDeepValue.call(this, key, data) : data[key];
                     if (value || value == 0)
                         this.__.forEach(vars, function (i, v) {
                             v = v.replace(/__fpipe__/g, '|');
                             var exp = v.split(':'), filter = _this.__.arrayRemoveIndex(exp, 0);
                             if (Filters[filter])
-                                value = Filters[filter](value, exp.join(':'));
+                                value = Filters[filter](value, exp.join(':'), this);
                             if (!value) /* stop filtering if no value exists anymore */
                                 return false;
                         });
@@ -2355,7 +2384,8 @@
                  *  after loading model
                  * @returns void
                  */
-                loadModel: function (target, data, replaceState, chain, looping) {
+                loadModel: function (target, data, replaceState, chain, looping)
+                {
                     var __this = this._(target),
                             content = __this.hide().outerHtml(),
                             _this = this,
@@ -2558,9 +2588,11 @@
                  * @param {_}|HTLElement elem
                  * @param {string} filter
                  * @param {string} content
+                 * @param {function} func Called on each elem created.Parameters are elem, key
+                 * and value while the value is also the `this` of the function
                  * @returns {_}
                  */
-                loop: function (data, elem, filter, content) {
+                loop: function (data, elem, filter, content, func) {
                     if (!data)
                         return;
                     elem = this._(elem);
@@ -2590,7 +2622,8 @@
                         if (!_content)
                             return;
                         _content = internal.processExpressions.call(_this, _content, __data);
-                        var _variables = internal.parseBrackets.call(_this, '{{', '}}', _content),
+                        var _variables = internal.parseBrackets.call(_this, '{{', '}}',
+                                _content),
                                 _content = _this._(internal.fillVariables
                                         .call(_this, _variables, __data, _content)
                                         .replace(/{{key}}/g, key));
@@ -2598,7 +2631,8 @@
                             _content = _content.children();
                             level--;
                         }
-                        elem.append(_content.show());
+                        elem.append(_content.show().removeAttr('this-cache'));
+                        _this.__.callable(func).call(value, _content, key, value);
                     });
                 },
                 /**
@@ -2808,7 +2842,8 @@
                  * @param boolean isModel Indicates whether parsing data for a model or not
                  * @returns ThisApp
                  */
-                parseData: function (data, content, variables, forCollection, isModel) {
+                parseData: function (data, content, variables, forCollection, isModel)
+                {
                     if (!variables)
                         variables = internal.parseBrackets.call(this, '{{', '}}', content);
                     var _temp, _this = this, custom = false;
@@ -2899,7 +2934,8 @@
                  * @param {object} current Object available to expressions
                  * @returns {mixed}
                  */
-                processExpressions: function (content, current, removeUnresolved) {
+                processExpressions: function (content, current, removeUnresolved)
+                {
                     var _this = this,
                             exps = internal.getExpressions.call(this, content);
                     this.__.forEach(exps, function (i, v) {
@@ -3127,7 +3163,8 @@
                                                     toReload = _this.templates.children(internal.selector
                                                             .call(_this, reload)),
                                                     // target to reload
-                                                    _reload = _this.container.find(internal.selector
+                                                    _reload = _this.container
+                                                    .find(internal.selector
                                                             .call(_this, reload, '[this-loaded]'));
                                             if (!toReload.length) {
                                                 _this.error('Reload target not found');
@@ -3167,7 +3204,8 @@
                                  * Optionally, target should also have attributes `this-model` and `this-mid`.
                                  * The are required if target isn't in a model container.
                                  */
-                                .on('click', '[this-goto][this-read]', function (e) {
+                                .on('click', '[this-goto][this-read]', function (e)
+                                {
                                     var __this = _this._(this),
                                             _model = __this.closest('model,[this-type="model"]'),
                                             model_id = __this.attr('this-model-id') ||
@@ -3200,7 +3238,8 @@
                                  * and `this-mid`.
                                  * If model is a part of a collection, target must also have attribute.
                                  */
-                                .on('click', '[this-goto][this-update]', function () {
+                                .on('click', '[this-goto][this-update]', function ()
+                                {
                                     var __this = _this._(this),
                                             model = __this.closest('model,[this-type="model"]'),
                                             model_id = __this.attr('this-model-id') ||
@@ -3234,7 +3273,8 @@
                                  * `this-model` must be provided unless the target
                                  * form already has the required attributes.
                                  */
-                                .on('click', '[this-goto][this-create]', function () {
+                                .on('click', '[this-goto][this-create]', function ()
+                                {
                                     var __this = _this._(this),
                                             url = __this.attr('this-create') || '#';
                                     var goto = internal.pageIDFromLink.call(this,
@@ -3277,8 +3317,15 @@
                                                 "this-binding": ""
                                             })
                                             .show()
-                                            .find('input:not([type="radio"]):not([type="checkbox"])')
-                                            .val('');
+                                            .find('input:not([type="radio"])'
+                                                    + ':not([type="checkbox"])'
+                                                    + ':not([this-cache])')
+                                            .each(function () {
+                                                if (_this._(this).closest('[this-cache]')
+                                                        .length)
+                                                    return;
+                                                this.value = '';
+                                            });
                                 })
                                 /*
                                  * DELETE event - Show Page
@@ -3621,7 +3668,8 @@
                                  * Search Event
                                  * Form submissiom 
                                  */
-                                .on('submit', 'form[this-do="search"]', function (e) {
+                                .on('submit', 'form[this-do="search"]', function (e)
+                                {
                                     e.preventDefault();
                                     var _form = _this._(this),
                                             _search = _form.find('[this-search]');
@@ -3684,53 +3732,196 @@
                                 /**
                                  * Autocomplete
                                  */
-                                .on('keyup', '[this-autocomplete][this-list]', function () {
-                                    clearTimeout(autocomplete_timeout);
+                                .on('keyup', '[this-autocomplete][this-list]', function ()
+                                {
                                     var __this = _this._(this),
                                             min_chars = __this.attr('this-min-chars') || 3,
                                             url = __this.attr('this-autocomplete')
-                                            || __this.attr('this-url'),
-                                            _list = _this.container.find('[this-type="list"][this-id="'
-                                                    + __this.attr('this-list') + '"],list[this-id="'
-                                                    + __this.attr('this-list') + '"]');
-                                    // do nothing if chars are less than required
-                                    if (__this.val().length < min_chars)
+                                            || __this.attr('this-url');
+                                    // block searching for same thing multiple times
+                                    if (__this.val() === __this.attr('this-last-query'))
                                         return;
+                                    // do nothing if chars are less than required
+                                    clearTimeout(autocomplete_timeout);
+                                    if (__this.val().length < min_chars) {
+                                        var _list = _this.container
+                                                .find('[this-type="list"][this-id="'
+                                                        + __this.attr('this-list')
+                                                        + '"],list[this-id="'
+                                                        + __this.attr('this-list')
+                                                        + '"]');
+                                        if (_list.children().length > 1) {
+                                            _list.children(':not([this-cache])').remove();
+                                        }
+                                        _this.store('autocompleting', null);
+                                        return;
+                                    }
                                     url += (url.indexOf('?') === -1) ? '?' : '&';
-                                    url += 'q=' + __this.val();
-                                    autocomplete_timeout = setTimeout(function () {
+                                    url += (__this.attr('this-query-key') || 'q') + '='
+                                            + __this.val();
+                                    autocomplete_timeout = setTimeout(function ()
+                                    {
+                                        __this.attr('this-last-query', __this.val());
                                         _this.request(url, function (data) {
-                                            internal.loop.call(_this, _this.config.dataKey ?
-                                                    data[_this.config.dataKey] : data, _list,
-                                                    __this.attr('this-filter'));
+                                            data = _this.config.dataKey ?
+                                                    data[_this.config.dataKey] : data;
+                                            if (!data)
+                                                return;
+                                            _this.store('autocompleting', data);
+                                            var _list = _this.container
+                                                    .find('[this-type="list"][this-id="'
+                                                            + __this.attr('this-list')
+                                                            + '"],list[this-id="'
+                                                            + __this.attr('this-list')
+                                                            + '"]'),
+                                                    _tplList = _this.templates
+                                                    .find('[this-type="list"][this-id="'
+                                                            + __this.attr('this-list')
+                                                            + '"],list[this-id="'
+                                                            + __this.attr('this-list')
+                                                            + '"]');
+                                            if (!_tplList.length) {
+                                                _this.templates.append(_list.clone());
+                                            }
+                                            else {
+                                                _list.html(_tplList.html());
+                                            }
+                                            if (!_list.length) {
+                                                _this.error('List #' + __this.attr('this-list')
+                                                        + ' not found');
+                                                return;
+                                            }
+                                            if (!__this.attr('this-id'))
+                                                __this.attr('this-id', _this.__.randomString());
+                                            _list.attr('this-autocompleting',
+                                                    __this.attr('this-id'))
+                                                    .children().attr('this-cache', '')
+                                                    .hide();
+                                            internal.loop.call(_this, data, _list,
+                                                    __this.attr('this-filter'), null,
+                                                    function (elem, key) {
+                                                        // avoid showing elem if already
+                                                        // selected
+                                                        var selected = _list
+                                                                .attr('this-selected') || '';
+                                                        if (selected.indexOf(key + ',') !== -1)
+                                                        {
+                                                            elem.remove();
+                                                            return;
+                                                        }
+                                                        elem.attr('this-key', key);
+                                                    });
                                         });
                                     }, __this.attr('this-delay') || 300);
-                                });
+                                })
+                                .on('click', '[this-autocompleting]>[this-key]', function ()
+                                {
+                                    var __this = _this._(this),
+                                            _selectedList = _this.container
+                                            .find('[this-type="list"][this-id="'
+                                                    + __this.parent().attr('this-selected-list')
+                                                    + '"],list[this-id="'
+                                                    + __this.parent().attr('this-selected-list')
+                                                    + '"]'),
+                                            elem = _selectedList.children('[this-cache]')
+                                            .clone(),
+                                            list = _this.store('autocompleting'),
+                                            key = __this.attr('this-key'),
+                                            _dropDownList = __this.parent(),
+                                            _input = _this.container
+                                            .find('[this-autocomplete][this-id="'
+                                                    + _dropDownList
+                                                    .attr('this-autocompleting') +
+                                                    '"]');
+                                    elem = internal.bindToObject
+                                            .call(_this, elem, list[key], key)
+                                            .removeAttr('this-cache')
+                                            .attr('this-key', key)
+                                            .show();
+                                    _dropDownList.attr('this-selected',
+                                            (_dropDownList.attr('this-selected') || '')
+                                            + key + ',');
+                                    _selectedList.append(elem);
+                                    if (!_input.hasAttr('this-multiple')) {
+                                        _input.hide();
+                                        _dropDownList.hide();
+                                    }
+                                    else
+                                        __this.remove();
+                                })
+                                .on('click', 'list[this-parent-list] [this-remove],'
+                                        + '[this-type="list"][this-parent-list] [this-remove]',
+                                        function () {
+                                            var __this = _this._(this).closest('[this-key]'),
+                                                    _dropDownList = _this.container
+                                                    .find('[this-type="list"][this-id="'
+                                                            + __this.parent()
+                                                            .attr('this-parent-list')
+                                                            + '"],list[this-id="'
+                                                            + __this.parent()
+                                                            .attr('this-parent-list')
+                                                            + '"]');
+                                            _dropDownList.attr('this-selected',
+                                                    _dropDownList.attr('this-selected')
+                                                    .replace(__this.attr('this-key')
+                                                            + ',', '')).show();
+                                            var _input = _this.container
+                                                    .find('[this-autocomplete][this-id="'
+                                                            + _dropDownList
+                                                            .attr('this-autocompleting') +
+                                                            '"]').show();
+                                            __this.remove();
+                                            if (_input.hasAttr('this-multiple')) {
+                                                _input.attr('this-last-query', '')
+                                                        .trigger('keyup');
+                                            }
+                                        });
                         this.when('page.loaded', 'page', function () {
-                            _this.container.find('[this-autocomplete][this-list]')
+                            _this.container.find('[this-list],list')
                                     .each(function () {
-                                        var __this = _this._(this),
-                                                _list = _this.container.find('[this-type="list"][this-id="'
-                                                        + __this.attr('this-list') + '"],list[this-id="'
-                                                        + __this.attr('this-list') + '"]');
-                                        if (_list.length > 1)
-                                            _list.innerWrap('<div />');
-                                        _list.children().hide();
+                                        var _list = _this._(this);
+                                        if (!_list.children('[this-cache]').length)
+                                        {
+                                            if (_list.children().length > 1)
+                                                _list.innerWrap('<div />');
+                                            _list.children()
+                                                    .attr('this-cache', '').hide();
+                                        }
+                                        if (_list.hasAttr('this-selected-list'))
+                                            _this.container
+                                                    .find('[this-type="list"][this-id="'
+                                                            + _list.attr('this-selected-list')
+                                                            + '"],list[this-id="'
+                                                            + _list.attr('this-selected-list')
+                                                            + '"]')
+                                                    .attr('')
+                                                    .attr('this-parent-list',
+                                                            _list.attr('this-id'));
                                     });
                         })
-                                .when('component.loaded', 'component', function () {
-                                    var component = _this._(this);
-                                    _this.container.find('[this-autocomplete][this-list]')
+                                .when('component.loaded', 'component', function ()
+                                {
+                                    _this._(this).find('[this-type="list"],list')
                                             .each(function () {
-                                                var __this = _this._(this),
-                                                        _list = component
-                                                        .find('[this-type="list"][this-id="'
-                                                                + __this.attr('this-list')
-                                                                + '"],list[this-id="'
-                                                                + __this.attr('this-list') + '"]');
-                                                if (_list.length > 1)
-                                                    _list.innerWrap('<div />');
-                                                _list.children().hide();
+                                                var _list = _this._(this);
+                                                if (!_list.children('[this-cache]').length)
+                                                {
+                                                    if (_list.children().length > 1)
+                                                        _list.innerWrap('<div />');
+                                                    _list.children()
+                                                            .attr('this-cache', '').hide();
+                                                }
+                                                if (_list.hasAttr('this-selected-list'))
+                                                    _this.container
+                                                            .find('[this-type="list"][this-id="'
+                                                                    + _list.
+                                                                    attr('this-selected-list')
+                                                                    + '"],list[this-id="'
+                                                                    + _list
+                                                                    .attr('this-selected-list')
+                                                                    + '"]')
+                                                            .attr('this-parent-list',
+                                                                    _list.attr('this-id'));
                                             });
                                 });
                         /*
@@ -4146,16 +4337,17 @@
                  * to check. Indexes may be chained with dots (.) if children are objects.
                  * @returns string|object|null
                  */
-                contains: function (val, options) {
+                contains: function (val, options, thisApp) {
                     if (__.isObject(val, true)) {
                         options = options.split(',');
                         return this.filter(val, function (v) {
                             var search = options[0];
                             if (options.length > 1) {
-                                v = internal.getDeepValue.call(null, options[0], v);
+                                v = internal.getDeepValue.call(thisApp, options[0], v);
                                 search = options[1];
                             }
-                            return v && (__.isString(v) || __.isArray(v)) && __.contains(v, search);
+                            return v && (__.isString(v) || __.isArray(v)) &&
+                                    __.contains(v, search);
                         });
                     }
                     else if (__.isString(val)) {

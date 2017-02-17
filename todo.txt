@@ -1,8 +1,5 @@
 collection pagination
-stash away templates from dom, probably in the localStorage
 Use FormData on form submission
-Check CORS
-
 
 Further minimize JS
 Write documentation
