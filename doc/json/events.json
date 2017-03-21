@@ -330,8 +330,8 @@
             "description": "Indicates that a collection or model has be updated. Event details will contain event and response",
             "on": "collections, models"
         },
-        "variables.binded": {
-            "id": "variables.binded",
+        "model.binded": {
+            "id": "model.binded",
             "description": "Triggered when a model has been binded to an element",
             "on": "models",
             "links": [

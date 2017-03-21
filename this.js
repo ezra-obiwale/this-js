@@ -93,6 +93,7 @@
     },
             __ = Object.create({
                 debug: true,
+                index: 0,
                 items: [],
                 /**
                  * Adds the given class to matched elements
@@ -171,10 +172,12 @@
                     if (!content)
                         return this;
                     var _content = content;
-                    if (!(content instanceof _))
+                    if (this.isString(content)) {
+                        _content = this.createElement(null, 'span');
+                        _content.items[0].innerHTML = content;
+                    }
+                    else
                         _content = _(content, this.debug);
-                    if (!_content.length && this.isString(content))
-                        _content = this.createElement(null, 'span').items[0].innerHTML = content;
                     if (!_content.length)
                         return this;
                     return this.each(function () {
@@ -321,7 +324,7 @@
                                     query += ',';
                                 query += '#' + _this.id + '>' + sel;
                             });
-                            result = result.concat(Array.from(document.querySelectorAll(query)));
+                            result = result.concat(Array.from(this.querySelectorAll(query)));
                             if (id)
                                 this.removeAttribute('id');
                             return;
@@ -422,7 +425,7 @@
                  * @returns {mixed}
                  */
                 data: function (key, value) {
-                    if (value) {
+                    if (value || value == 0) {
                         this.each(function () {
                             if (this.dataset)
                                 this.dataset[key] = value;
@@ -569,15 +572,15 @@
                  * @returns boolean
                  */
                 hasClass: function (className) {
-                    var has = true,
-                            _this = this;
-                    this.each(function () {
-                        if (!this.classList.length ||
-                                !_this.contains(Array.from(this.classList), className)) {
-                            has = false;
-                            return false;
-                        }
-                    });
+                    var has = false;
+                    if (this.length) {
+                        this.forEach(Array.from(this.items[0].classList), function (i, v) {
+                            if (v === className) {
+                                has = true;
+                                return false;
+                            }
+                        });
+                    }
                     return has;
                 },
                 /**
@@ -705,6 +708,20 @@
                     return object.hasOwnProperty(key);
                 },
                 /**
+                 * Returns the next item
+                 * @returns {_}
+                 */
+                next: function () {
+                    return _(this.items[this.index++], this.debug);
+                },
+                /**
+                 * Returns the prev item
+                 * @returns {_}
+                 */
+                previous: function () {
+                    return _(this.items[--this.index], this.debug);
+                },
+                /**
                  * Adds an event listener
                  * @param string event
                  * @param function callback
@@ -816,6 +833,16 @@
                             removed.push(this.parentElement.removeChild(this));
                     });
                     return _(removed, this.debug);
+                },
+                /**
+                 * Removes a data key
+                 * @param {string} key
+                 * @returns {ThisApp}
+                 */
+                removeData: function (key) {
+                    return this.each(function () {
+                        delete this.dataset[key];
+                    });
                 },
                 /**
                  * Removes the given attr(s) from elements
@@ -1025,7 +1052,7 @@
                         }
                         val = this.value;
                     });
-                    return value ? this : val;
+                    return value !== undefined ? this : val;
                 },
                 /**
                  * 
@@ -1090,7 +1117,8 @@
                  * @returns ThisApp
                  */
                 bindToModel: function (_target, _model, ignoreCache) {
-                    var model_name = _model.is('model') || _model.attr('this-type') === 'model'
+                    var model_name = _model.is('model') ||
+                            _model.attr('this-type') === 'model'
                             ? _model.attr('this-id') : _model.attr('this-model'),
                             model;
                     if (!_model.attr('this-mid')) {
@@ -1100,8 +1128,9 @@
                     if (!ignoreCache)
                         model = this.collection(model_name).model(_model.attr('this-mid'));
                     if (model) {
+                        model.url = _target.attr('this-url');
                         model.bind(_target);
-                        _target.trigger('variables.binded', {
+                        _target.trigger('model.binded', {
                             data: model
                         });
                     }
@@ -1116,7 +1145,7 @@
                                 url: _model.attr('this-url')
                             });
                             model.bind(_target);
-                            _target.trigger('variables.binded', {
+                            _target.trigger('model.binded', {
                                 data: data
                             });
                         });
@@ -1234,8 +1263,9 @@
                         _temp.attr('this-mid', id)
                                 .attr('this-uid', uid)
                                 .attr('this-type', 'model')
-                                .attr('this-in-collection', '')
-                                .attr('this-url', container.attr('this-url') + id);
+                                .attr('this-in-collection', '');
+                        if (!_temp.attr('this-url'))
+                            _temp.attr('this-url', container.attr('this-url') + id);
                         if (container.attr('this-model'))
                             _temp.attr('this-id', container.attr('this-model'));
                         container.append(_temp.show())
@@ -1631,54 +1661,67 @@
                                 var __this = _this._(this);
                                 if (__this.attr('this-if') && !__this.hasAttr('this-ignore'))
                                 {
-                                    level++;
-                                    if (eval(__this.attr('this-if').trim())) {
-                                        __this.removeAttr('this-if');
-                                        matched[level] = true;
+                                    try {
+                                        level++;
+                                        if (eval(__this.attr('this-if').trim())) {
+                                            __this.removeAttr('this-if');
+                                            matched[level] = true;
+                                        }
+                                        else {
+                                            matched[level] = false;
+                                            __this.remove();
+                                        }
+                                        if (__this.hasAttr('this-end-if')) {
+                                            __this.removeAttr('this-end-if');
+                                            delete matched[level];
+                                            level--;
+                                        }
                                     }
-                                    else {
-                                        matched[level] = false;
-                                        __this.remove();
-                                    }
-                                    if (__this.hasAttr('this-end-if')) {
-                                        __this.removeAttr('this-end-if');
-                                        delete matched[level];
-                                        level--;
+                                    catch (e) {
                                     }
                                 }
                                 else if (__this.attr('this-else-if') && !__this.hasAttr('this-ignore'))
                                 {
-                                    if (!__.isBoolean(matched[level])) {
-                                        _this.error('Branching error: Else-if without If!');
-                                        return;
-                                    }
-                                    if (matched[level] || !eval(__this.attr('this-else-if').trim()))
-                                        __this.remove();
-                                    else {
-                                        __this.removeAttr('this-else-if');
-                                        matched[level] = true;
-                                    }
+                                    try {
+                                        if (!__.isBoolean(matched[level])) {
+                                            _this.error('Branching error: Else-if without If!');
+                                            return;
+                                        }
+                                        if (matched[level] || !eval(__this.attr('this-else-if').trim()))
+                                            __this.remove();
+                                        else {
+                                            __this.removeAttr('this-else-if');
+                                            matched[level] = true;
+                                        }
 
-                                    if (__this.hasAttr('this-end-if')) {
-                                        __this.removeAttr('this-end-if');
-                                        delete matched[level];
-                                        level--;
+                                        if (__this.hasAttr('this-end-if')) {
+                                            __this.removeAttr('this-end-if');
+                                            delete matched[level];
+                                            level--;
+                                        }
+                                    }
+                                    catch (e) {
                                     }
                                 }
                                 else if (__this.hasAttr('this-else') && !__this.hasAttr('this-ignore'))
                                 {
-                                    if (!__.isBoolean(matched[level])) {
-                                        _this.error('Branching error: Else without If!');
-                                        return;
+                                    try {
+                                        if (!__.isBoolean(matched[level])) {
+                                            _this.error('Branching error: Else without If!');
+                                            return;
+                                        }
+                                        if (matched[level])
+                                            __this.remove();
+                                        else
+                                            __this.removeAttr('this-else');
+                                        if (__this.hasAttr('this-end-if'))
+                                            __this.removeAttr('this-end-if');
+                                        delete matched[level];
+                                        level--;
+
                                     }
-                                    if (matched[level])
-                                        __this.remove();
-                                    else
-                                        __this.removeAttr('this-else');
-                                    if (__this.hasAttr('this-end-if'))
-                                        __this.removeAttr('this-end-if');
-                                    delete matched[level];
-                                    level--;
+                                    catch (e) {
+                                    }
                                 }
                             });
                     content.find('[this-ignore]').removeAttr('this-ignore');
@@ -1760,6 +1803,7 @@
                             _this.__.callable(callback).call(_this);
                         };
                         script.attr('src', url);
+
                         // append script to body
                         this._('body').append(script);
                         return internal;
@@ -1853,7 +1897,8 @@
                     if (__this.children().length > 1)
                         __this.innerWrap('<div/>');
                     // cache collection if not exist in dom as unloaded
-                    if (!this.templates.children('collection[this-id="' + __this.attr('this-id') +
+                    if (!this.templates.children('collection[this-id="'
+                            + __this.attr('this-id') +
                             '"],[this-type="collection"][this-id="'
                             + __this.attr('this-id') + '"]').length) {
                         var cache = __this.removeAttr('this-loaded')
@@ -1883,9 +1928,12 @@
                         requestData['keys'] = __this.attr('this-search');
 
                     // callbacks for request
-                    success = function (data, uid) {
+                    success = function (data, uid, handled) {
                         if (uid)
                             __this.attr('this-model-uid', uid);
+                        if (handled)
+                            return;
+
                         internal.loadData
                                 .call(_this, __this, data, content, false, save);
                         __this.attr('this-loaded', '')
@@ -2033,7 +2081,8 @@
                     // get variables in content
                     var variables = internal.parseBrackets.call(this, '{{', '}}', content),
                             // model_name for containers, model id for models
-                            save_as = container.attr('this-model') || container.attr('this-id'),
+                            save_as = container.attr('this-model')
+                            || container.attr('this-id'),
                             // default data structure
                             _data = {
                                 data: {},
@@ -2355,12 +2404,15 @@
                  *  after loading model
                  * @returns void
                  */
-                loadModel: function (target, data, replaceState, chain, looping) {
+                loadModel: function (target, data, replaceState, chain, looping)
+                {
                     var __this = this._(target),
                             content = __this.hide().outerHtml(),
                             _this = this,
                             common_selector = '',
-                            type = __this.attr('this-type') || __this.get(0).tagName.toLowerCase();
+                            type = __this.attr('this-type')
+                            || __this.get(0).tagName.toLowerCase(),
+                            not_withs = [];
                     if (__this.attr('this-id'))
                         common_selector += '[this-id="' + __this.attr('this-id') + '"]';
                     if (__this.attr('this-model'))
@@ -2373,8 +2425,8 @@
                         return;
                     }
 
-                    if (this.templates.children(type + common_selector + ',[this-type="' + type + '"]'
-                            + common_selector).length) {
+                    if (this.templates.children(type + common_selector + ',[this-type="'
+                            + type + '"]' + common_selector).length) {
                         // necessary in case of binding and target has already been used
                         content = this.templates.children(type + common_selector
                                 + ',[this-type="' + type + '"]' + common_selector)
@@ -2386,10 +2438,38 @@
                                 .replace(/\}\)/g, '__cbrace2__'));
                         this.templates.append(cache.hide());
                     }
-                    __this.replaceWith(content);
+                    if (__this.hasAttr('this-binding')) {
+                        var oUrl = __this.attr('this-url');
+                        __this.replaceWith(content);
+                        __this.attr('this-url', oUrl);
+                    }
 
-                    var success = function (data) {
-                        internal.loadData.call(_this, __this, data, content, true, true);
+                    // hold not withs
+                    var _not_with = __this.find('[this-not-with="' + __this.attr('this-id') + '"]');
+                    while (_not_with.length) {
+                        not_withs.push(_not_with.get(0));
+                        this._(_not_with.get(0)).replaceWith('<div this-with="'
+                                + __this.attr('this-id') + (not_withs.length - 1)
+                                + '" />');
+                        _not_with = __this.find('[this-not-with="'
+                                + __this.attr('this-id') + '"]');
+                    }
+                    if (not_withs.length) {
+                        content = __this.outerHtml();
+                    }
+
+                    var success = function (data, uid, handled) {
+                        if (!handled)
+                            internal.loadData.call(_this, __this, data, content, true, true);
+                        var i = 0;
+                        // restore not withs
+                        while (not_withs.length) {
+                            __this.find('[this-with="' + __this.attr('this-id') + i + '"]')
+                                    .replaceWith(not_withs.pop());
+                            i++;
+                        }
+                        if (handled)
+                            return;
                         __this.attr('this-loaded', '').trigger('model.loaded');
                         _this.__proto__.models--;
                         if (chain && !this.models)
@@ -2509,6 +2589,7 @@
                         // loads the data
                         internal.loadData.call(this, config.elem, config.data, config.content,
                                 !isCollection, false);
+                        config.success.call(this, config.data, null, true);
                         // mark as loaded and trigger event
                         config.elem.attr('this-loaded', '');
                         if (fromCache) {
@@ -2552,6 +2633,37 @@
                         }
                     }
                 },
+                doLoop: function (key, value, elem, content, filter) {
+                    var _this = this,
+                            __data = {
+                                key: key,
+                                value: value
+                            },
+                            _content = internal.inLoop.call(this, __data, filter, content);
+                    if (!_content)
+                        return;
+                    _content = internal.processExpressions.call(this, _content, __data);
+                    var _variables = internal.parseBrackets.call(this, '{{', '}}', _content),
+                            _content = this._(internal.fillVariables
+                                    .call(this, _variables, __data, _content)
+                                    .replace(/{{key}}/g, key));
+                    while (level) {
+                        _content = _content.children();
+                        level--;
+                    }
+                    // check for loops withing current loop and execute
+                    if (this.__.isObject(value, true)) {
+                        this.__.forEach(value, function (i) {
+                            if (!_this.__.isObject(value[i], true))
+                                return;
+                            var _subLoops = _content.find('[this-each="value.' + i + '"]');
+                            if (_subLoops.length) {
+
+                            }
+                        });
+                    }
+                    elem.append(_content.show());
+                },
                 /**
                  * Loops elem through the given data
                  * @param {type} data
@@ -2582,11 +2694,12 @@
                         }
                     }
                     this.__.forEach(data, function (key, value) {
+//                        internal.doLoop.call(_this, key, value, elem, content, filter);
                         var __data = {
                             key: key,
                             value: value
                         },
-                        _content = internal.inLoop.call(_this, __data, filter, content);
+                                _content = internal.inLoop.call(_this, __data, filter, content);
                         if (!_content)
                             return;
                         _content = internal.processExpressions.call(_this, _content, __data);
@@ -2597,6 +2710,28 @@
                         while (level) {
                             _content = _content.children();
                             level--;
+                        }
+                        // check for loops withing current loop and execute
+                        if (_this.__.isObject(value, true)) {
+                            _this.__.forEach(value, function (i, v) {
+                                if (!_this.__.isObject(v, true))
+                                    return;
+                                _content.find('[this-each="value.' + i + '"]')
+                                        .each(function () {
+                                            var __this = _this._(this),
+                                                    __content = __this.removeAttr('this-muted')
+                                                    .html()
+                                                    .replace(/__obrace__/g, '{{')
+                                                    .replace(/__cbrace__/g, '}}')
+                                                    .replace(/__obrace2__/g, '({')
+                                                    .replace(/__cbrace2__/g, '})'),
+                                                    __filter = __this.attr('this-filter');
+                                            __this.html('');
+                                            internal.loop.call(_this, v, this, __filter,
+                                                    __content);
+                                            __this.removeAttr('this-each').removeAttr('this-filter');
+                                        });
+                            });
                         }
                         elem.append(_content.show());
                     });
@@ -2808,7 +2943,8 @@
                  * @param boolean isModel Indicates whether parsing data for a model or not
                  * @returns ThisApp
                  */
-                parseData: function (data, content, variables, forCollection, isModel) {
+                parseData: function (data, content, variables, forCollection, isModel)
+                {
                     if (!variables)
                         variables = internal.parseBrackets.call(this, '{{', '}}', content);
                     var _temp, _this = this, custom = false;
@@ -2820,10 +2956,11 @@
                     else {
                         _temp = content;
                     }
-                    _temp.find('[this-each]').each(function () {
-                        var __this = _this._(this),
+                    var _each = _temp.find('[this-each]');
+                    while (_each.length) {
+                        var __this = _each.next(),
                                 each = __this.attr('this-each').trim(),
-                                _data = data[each],
+                                _data = internal.getVariableValue.call(_this, each, data, false),
                                 filter = __this.attr('this-filter'),
                                 content = __this.removeAttr('this-muted')
                                 .html()
@@ -2848,9 +2985,10 @@
                             return;
                         internal.loop.call(_this, _data, __this, filter, content);
                         __this.removeAttr('this-each');
-                    });
+                        _each = _temp.find('[this-each]');
+                    }
                     if (isModel) {
-                        _temp.find('collection[this-data],[this-type="collection"][this-data]')
+                        _temp.find('collection,[this-type="collection"]')
                                 .each(function () {
                                     _this._(this).html(this.innerHTML
                                             .replace(/{{/g, '__obrace__')
@@ -2876,7 +3014,7 @@
                     content = internal.fillVariables.call(this, variables, data, content);
                     _temp.replaceWith(content);
                     if (isModel) {
-                        _temp.find('collection[this-data],[this-type="collection"][this-data]')
+                        _temp.find('collection,[this-type="collection"]')
                                 .each(function () {
                                     var __this = _this._(this).html(this.innerHTML
                                             .replace(/__obrace__/g, '{{')
@@ -2891,6 +3029,7 @@
                     }
                     if (custom)
                         _temp = _temp.children();
+                    _temp.find('[this-muted]').removeAttr('this-muted');
                     return _temp.show();
                 },
                 /**
@@ -2899,7 +3038,8 @@
                  * @param {object} current Object available to expressions
                  * @returns {mixed}
                  */
-                processExpressions: function (content, current, removeUnresolved) {
+                processExpressions: function (content, current, removeUnresolved)
+                {
                     var _this = this,
                             exps = internal.getExpressions.call(this, content);
                     this.__.forEach(exps, function (i, v) {
@@ -3169,10 +3309,12 @@
                                  */
                                 .on('click', '[this-goto][this-read]', function (e) {
                                     var __this = _this._(this),
-                                            _model = __this.closest('model,[this-type="model"]'),
+                                            _model = __this
+                                            .closest('model,[this-type="model"]'),
                                             model_id = __this.attr('this-model-id') ||
                                             _model.attr('this-mid'),
-                                            url = __this.attr('this-read') || _model.attr('this-url')
+                                            url = __this.attr('this-read')
+                                            || _model.attr('this-url')
                                             || '#',
                                             goto = internal.pageIDFromLink.call(this,
                                                     __this.attr('this-goto'));
@@ -3431,7 +3573,8 @@
                                     e.preventDefault();
                                     var __this = _this._(this),
                                             bind = __this.attr('this-bind'),
-                                            _model = __this.closest('model,[this-type="model"],'
+                                            _model = __this.closest('model,'
+                                                    + '[this-type="model"],'
                                                     + '[this-model]');
                                     if (!bind || !_model.length)
                                         return;
@@ -3440,15 +3583,34 @@
                                     if (!_target.length)
                                         return;
                                     _target.attr('this-model', (_model.attr('this-model')
-                                            || _model.attr('this-id'))).attr('this-binding', '');
-                                    if (__this.hasAttr('this-read'))
+                                            || _model.attr('this-id')))
+                                            .attr('this-binding', '')
+                                            .attr('this-url', _model.attr('this-url'));
+                                    if (__this.hasAttr('this-read')) {
                                         _this.container.find('[this-model="'
-                                                + (_model.attr('this-model') || _model.attr('this-id'))
+                                                + (_model.attr('this-model')
+                                                        || _model.attr('this-id'))
                                                 + '"][this-binding]').hide();
-                                    else if (__this.hasAttr('this-update'))
+                                        if (__this.attr('this-read'))
+                                            _target.attr('this-url',
+                                                    __this.attr('this-read'));
+                                    }
+                                    else if (__this.hasAttr('this-update')) {
                                         _target.attr('this-tar', 'do:update');
-                                    else if (__this.hasAttr('this-create'))
+                                        if (__this.attr('this-update'))
+                                            _target.attr('this-url',
+                                                    __this.attr('this-update'));
+                                    }
+                                    else if (__this.hasAttr('this-create')) {
                                         _target.attr('this-tar', 'do:create');
+                                        if (__this.attr('this-create'))
+                                            _target.attr('this-url',
+                                                    __this.attr('this-create'));
+                                    }
+                                    else if (__this.attr('this-delete')) {
+                                        _target.attr('this-url',
+                                                __this.attr('this-delete'));
+                                    }
                                     internal.bindToModel.call(_this, _target, _model);
                                 })
                                 /*
@@ -3465,32 +3627,47 @@
                                  */
                                 .on('click', '[this-hide]', function (e) {
                                     e.preventDefault();
-                                    _this.container.find(internal.selector.call(_this,
-                                            _this._(this).attr('this-hide'))).hide();
+                                    _this.__.forEach(_this._(this)
+                                            .attr('this-hide').split(','), function (i, v) {
+                                        _this.container.find(internal.selector.call(_this,
+                                                v.trim())).hide();
+                                    });
                                 })
                                 /*
                                  * Shows target elements
                                  */
                                 .on('click', '[this-show]', function (e) {
                                     e.preventDefault();
-                                    var __this = _this._(this),
-                                            _target = _this.container.find(internal.selector.call(_this,
-                                                    __this.attr('this-show')));
-                                    if (__this.attr('this-create')) {
-                                        _this.container.find('[this-binding]').hide();
-                                        var form = _target.is('form[this-model="'
-                                                + __this.attr('this-model') + '"]') ? _target :
-                                                _target.find('form[this-model="'
-                                                        + __this.attr('this-model') + '"]');
-                                        form.attr('this-do', 'create').attr('this-url',
-                                                __this.attr('this-create')).attr('this-binding', '');
-                                        if (__this.attr('this-model-uid'))
-                                            form.attr('this-model-uid', __this.attr('this-model-uid'));
-                                        form.removeAttr('this-mid');
-                                        if (form.length)
-                                            form.get(0).reset();
-                                    }
-                                    _target.show();
+                                    var __this = _this._(this);
+                                    _this.__.forEach(__this.attr('this-show').split(','),
+                                            function (i, v) {
+                                                var _target = _this.container
+                                                        .find(internal.selector.call(_this,
+                                                                v.trim()));
+                                                if (__this.attr('this-create')) {
+                                                    var form = _target.is('form[this-model="'
+                                                            + __this.attr('this-model')
+                                                            + '"]') ? _target :
+                                                            _target.find('form[this-model="'
+                                                                    + __this
+                                                                    .attr('this-model')
+                                                                    + '"]');
+                                                    if (form.length) {
+                                                        form.attr('this-do', 'create')
+                                                                .attr('this-url',
+                                                                        __this
+                                                                        .attr('this-create'))
+                                                                .attr('this-binding', '');
+                                                        if (__this.attr('this-model-uid'))
+                                                            form.attr('this-model-uid',
+                                                                    __this
+                                                                    .attr('this-model-uid'));
+                                                        form.removeAttr('this-mid');
+                                                        form.get(0).reset();
+                                                    }
+                                                }
+                                                _target.show();
+                                            });
                                 })
                                 /*
                                  * CREATE and UPDATE events
@@ -3503,8 +3680,10 @@
                                             e.preventDefault();
                                             var data = {},
                                                     __this = _this._(this),
-                                                    creating = __this.attr('this-do') === 'create',
-                                                    method = creating ? 'post' : 'put';
+                                                    creating = __this.attr('this-do')
+                                                    === 'create',
+                                                    method = __this.attr('this-method')
+                                                    || creating ? 'post' : 'put';
                                             if (!this.reportValidity()) {
                                                 __this.trigger('form.invalid.submission');
                                                 return;
@@ -3717,6 +3896,9 @@
                                             _list.innerWrap('<div />');
                                         _list.children().hide();
                                     });
+                            // hide all elements that should be hidden by default
+                            _this.container.find('[this-hidden]')
+                                    .removeAttr('this-hidden').hide();
                         })
                                 .when('component.loaded', 'component', function () {
                                     var component = _this._(this);
@@ -3835,62 +4017,64 @@
                                                     // or updated before
                                                     || (__model.hasAttr('this-updated')
                                                             // but has newer update
-                                                            && parseInt(__model.attr('this-updated'))
-                                                            < v.timestamp)));
-                                }).each(function () {
-                                    var __model = _this._(this),
-                                            _clone;
-                                    if (__model.hasAttr('this-in-collection')) {
-                                        in_collection = true;
-                                        var _collection = __model.parent();
-                                        _clone = _this.templates.children('collection[this-model="'
-                                                + _collection.attr('this-model')
-                                                + '"],[this-type="collection"][this-model="'
-                                                + _collection.attr('this-model') + '"]').children()
-                                                .clone();
-                                    }
-                                    else {
-                                        _clone = _this.templates.children('model[this-id="'
-                                                + __model.attr('this-id')
-                                                + '"],[this-type="collection"][this-id="'
-                                                + __model.attr('this-id') + '"]')
-                                                .clone();
-                                    }
-                                    var data = v.data,
-                                            __data = internal.canContinue
-                                            .call(_this, in_collection ?
-                                                    'collection.model.render'
-                                                    : 'model.render', [data]);
-                                    if (!__data) {
-                                        if (in_collection)
-                                            _model.parent().trigger('collection.model.render.canceled');
-                                        else
-                                            _model.trigger('model.render.canceled');
-                                        return;
-                                    }
-                                    else if (_this.__.isObject(__data))
-                                        data = __data;
-                                    // replace clone model's collections with existing
-                                    // model collections
-                                    _clone.find('collection,[this-type="collection"]')
-                                            .each(function () {
-                                                var _cl_col = _this._(this),
-                                                        // loaded collection
-                                                        selector = 'collection[this-id="'
-                                                        + _cl_col.attr('this-id') + '"],'
-                                                        + '[this-type="collection"][this-id="'
-                                                        + _cl_col.attr('this-id') + '"]',
-                                                        _rl_col = _model.find(selector);
-                                                if (_rl_col.length)
-                                                    _cl_col.replaceWith(_rl_col.clone());
+                                                            && parseInt(__model.attr('this-updated')) < v.timestamp)));
+                                })
+                                        .each(function () {
+                                            var __model = _this._(this),
+                                                    _clone;
+                                            if (__model.hasAttr('this-in-collection'))
+                                            {
+                                                in_collection = true;
+                                                var _collection = __model.parent();
+                                                _clone = _this.templates.children('collection[this-model="'
+                                                        + _collection.attr('this-model')
+                                                        + '"],[this-type="collection"][this-model="'
+                                                        + _collection.attr('this-model') + '"]').children()
+                                                        .clone();
+                                            }
+                                            else {
+                                                _clone = _this.templates.children('model[this-id="'
+                                                        + __model.attr('this-id')
+                                                        + '"],[this-type="collection"][this-id="'
+                                                        + __model.attr('this-id') + '"]')
+                                                        .clone();
+                                            }
+                                            var data = v.data,
+                                                    __data = internal.canContinue
+                                                    .call(_this, in_collection ?
+                                                            'collection.model.render'
+                                                            : 'model.render', [data]);
+                                            if (!__data) {
+                                                if (in_collection)
+                                                    _model.parent().trigger('collection.model.render.canceled');
                                                 else
-                                                    _cl_col.remove();
-                                            });
-                                    var tmpl = internal.parseData.call(_this, data,
-                                            _clone.outerHtml(), null, false, true);
-                                    __model.html(tmpl.html()).show()
-                                            .attr('this-updated', v.timestamp);
-                                });
+                                                    _model.trigger('model.render.canceled');
+                                                return;
+                                            }
+                                            else if (_this.__.isObject(__data))
+                                                data = __data;
+                                            // replace clone model's collections with existing
+                                            // model collections
+                                            _clone.find('collection,[this-type="collection"]')
+                                                    .each(function () {
+                                                        var _cl_col = _this._(this),
+                                                                // loaded collection
+                                                                selector = 'collection[this-id="'
+                                                                + _cl_col.attr('this-id') + '"],'
+                                                                + '[this-type="collection"][this-id="'
+                                                                + _cl_col.attr('this-id') + '"]',
+                                                                _rl_col = _model.find(selector);
+                                                        if (_rl_col.length)
+                                                            _cl_col.replaceWith(_rl_col.clone());
+                                                        else
+                                                            _cl_col.remove();
+                                                    });
+                                            var tmpl = internal.parseData.call(_this, data,
+                                                    _clone.outerHtml(), null, false, true);
+                                            __model.html(tmpl.html()).show()
+                                                    .attr('this-updated', v.timestamp)
+                                                    .attr('this-url', tmpl.attr('this-url'));
+                                        });
                             });
                             if (in_collection)
                                 delete updated[model_name];
@@ -4453,13 +4637,15 @@
                     bind: function (elem) {
                         elem = this.app._(elem);
                         elem.attr('this-mid', this.id)
-                                .attr('this-uid', this.uid)
-                                .attr('this-url', this.url);
-                        elem = internal.loadModel.call(this.app, elem, this.attributes, false);
+                                .attr('this-uid', this.uid);
+                        if (this.url)
+                            elem.attr('this-url', this.url);
+                        elem = internal.loadModel.call(this.app, elem,
+                                this.attributes, false);
                         elem.show();
                         if (!elem.is('form')) {
                             elem.find('form[this-loaded]').remove();
-                            elem = elem.find('form');
+                            elem = elem.find('form').attr('this-url', elem.attr('this-url'));
                             if (!elem.length)
                                 return this;
                         }
@@ -4772,7 +4958,7 @@
                                     name: _this.name,
                                     app: _this.app,
                                     uid: _this.uid,
-                                    url: _this.url + model_id,
+                                    url: _this.url + model_id + '&1',
                                     collection: this
                                 }) : null;
                     },
@@ -5078,7 +5264,7 @@
          * @param boolean debug
          * @returns _          */
         _: function (selector, debug) {
-            return _(selector, debug || this.config.debug);
+            return _(selector, debug || this.config ? this.config.debug : true);
         },
         /**
          * Sends an AJAX request
@@ -5718,7 +5904,8 @@
                                 default:
                                     var exp = v.split('#');
                                     if (exp.length > 1 && exp[0]) {
-                                        selector += '[this-type="' + exp[0] + '"][this-id="' + exp[1] + '"]';
+                                        selector += '[this-type="' + exp[0] + '"][this-id="'
+                                                + exp[1] + '"]';
                                     }
                                     else {
                                         selector += '[this-id="' + v + '"]';
