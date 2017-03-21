@@ -15,16 +15,7 @@ before
     page.load (DomElement):Boolean
     collection.render (Object, DomElement):Object|Boolean
     collection.model.render (Object, DomElement):Object|Boolean
-    model.delete (Model, DomElement):Boolean
-    model.create (Model):Boolean
-    model.update (Model):Boolean
+    create.form.submission (Object, FormElement):Boolean
+    model.delete (DomElement):Boolean
     model.render (Object, DomElement):Object|Boolean
-
-Events (element => event name)
-    page => page.load.canceled
-    collection => collection.render.canceled
-    collection => collection.model.render.canceled
-    form => model.create.canceled
-    form => model.update.canceled
-    model => model.delete.canceled
-    model => model.render.canceled
+    update.form.submission (Object, FormElement):Boolean

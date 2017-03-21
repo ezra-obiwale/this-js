@@ -1247,8 +1247,10 @@
                  * @returns ThisApp
                  */
                 doLoad: function (container, data, content, variables, isModel, level) {
-                    if (isModel)
+                    if (isModel) {
+                        content = internal.inLoop.call(this, data, null, content);
                         content = internal.processExpressions.call(this, content, data);
+                    }
                     container = this._(container).hide();
                     var _temp = internal.parseData
                             .call(this, data, content, variables, false, isModel),
@@ -1659,16 +1661,18 @@
                     content.find('[this-if],[this-else-if],[this-else]')
                             .each(function () {
                                 var __this = _this._(this);
-                                if (__this.attr('this-if') && !__this.hasAttr('this-ignore'))
+                                if (__this.hasAttr('this-ignore'))
+                                    return;
+                                else if (__this.attr('this-if'))
                                 {
                                     try {
                                         level++;
+                                        matched[level] = false;
                                         if (eval(__this.attr('this-if').trim())) {
                                             __this.removeAttr('this-if');
                                             matched[level] = true;
                                         }
                                         else {
-                                            matched[level] = false;
                                             __this.remove();
                                         }
                                         if (__this.hasAttr('this-end-if')) {
@@ -1680,7 +1684,7 @@
                                     catch (e) {
                                     }
                                 }
-                                else if (__this.attr('this-else-if') && !__this.hasAttr('this-ignore'))
+                                else if (__this.attr('this-else-if'))
                                 {
                                     try {
                                         if (!__.isBoolean(matched[level])) {
@@ -1703,7 +1707,7 @@
                                     catch (e) {
                                     }
                                 }
-                                else if (__this.hasAttr('this-else') && !__this.hasAttr('this-ignore'))
+                                else if (__this.hasAttr('this-else'))
                                 {
                                     try {
                                         if (!__.isBoolean(matched[level])) {
@@ -2411,8 +2415,7 @@
                             _this = this,
                             common_selector = '',
                             type = __this.attr('this-type')
-                            || __this.get(0).tagName.toLowerCase(),
-                            not_withs = [];
+                            || __this.get(0).tagName.toLowerCase();
                     if (__this.attr('this-id'))
                         common_selector += '[this-id="' + __this.attr('this-id') + '"]';
                     if (__this.attr('this-model'))
@@ -2444,30 +2447,26 @@
                         __this.attr('this-url', oUrl);
                     }
 
+                    this.notWiths = {};
                     // hold not withs
-                    var _not_with = __this.find('[this-not-with="' + __this.attr('this-id') + '"]');
+                    var _not_with = __this.find('[this-not-with="' + __this.attr('this-id') + '"]'),
+                            cnt = 0;
                     while (_not_with.length) {
-                        not_withs.push(_not_with.get(0));
+                        var name = __this.attr('this-id') + cnt;
+                        this.notWiths[name] = _not_with.get(0);
                         this._(_not_with.get(0)).replaceWith('<div this-with="'
-                                + __this.attr('this-id') + (not_withs.length - 1)
-                                + '" />');
+                                + name + '" />');
                         _not_with = __this.find('[this-not-with="'
                                 + __this.attr('this-id') + '"]');
+                        cnt++;
                     }
-                    if (not_withs.length) {
+                    if (cnt) {
                         content = __this.outerHtml();
                     }
 
                     var success = function (data, uid, handled) {
                         if (!handled)
                             internal.loadData.call(_this, __this, data, content, true, true);
-                        var i = 0;
-                        // restore not withs
-                        while (not_withs.length) {
-                            __this.find('[this-with="' + __this.attr('this-id') + i + '"]')
-                                    .replaceWith(not_withs.pop());
-                            i++;
-                        }
                         if (handled)
                             return;
                         __this.attr('this-loaded', '').trigger('model.loaded');
@@ -2633,37 +2632,6 @@
                         }
                     }
                 },
-                doLoop: function (key, value, elem, content, filter) {
-                    var _this = this,
-                            __data = {
-                                key: key,
-                                value: value
-                            },
-                            _content = internal.inLoop.call(this, __data, filter, content);
-                    if (!_content)
-                        return;
-                    _content = internal.processExpressions.call(this, _content, __data);
-                    var _variables = internal.parseBrackets.call(this, '{{', '}}', _content),
-                            _content = this._(internal.fillVariables
-                                    .call(this, _variables, __data, _content)
-                                    .replace(/{{key}}/g, key));
-                    while (level) {
-                        _content = _content.children();
-                        level--;
-                    }
-                    // check for loops withing current loop and execute
-                    if (this.__.isObject(value, true)) {
-                        this.__.forEach(value, function (i) {
-                            if (!_this.__.isObject(value[i], true))
-                                return;
-                            var _subLoops = _content.find('[this-each="value.' + i + '"]');
-                            if (_subLoops.length) {
-
-                            }
-                        });
-                    }
-                    elem.append(_content.show());
-                },
                 /**
                  * Loops elem through the given data
                  * @param {type} data
@@ -2694,7 +2662,6 @@
                         }
                     }
                     this.__.forEach(data, function (key, value) {
-//                        internal.doLoop.call(_this, key, value, elem, content, filter);
                         var __data = {
                             key: key,
                             value: value
@@ -2727,8 +2694,7 @@
                                                     .replace(/__cbrace2__/g, '})'),
                                                     __filter = __this.attr('this-filter');
                                             __this.html('');
-                                            internal.loop.call(_this, v, this, __filter,
-                                                    __content);
+                                            internal.loop.call(_this, v, this, __filter, __content);
                                             __this.removeAttr('this-each').removeAttr('this-filter');
                                         });
                             });
@@ -2875,6 +2841,13 @@
                         this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
                                 + '"]:not([this-dead]), [this-type="page"][this-id="'
                                 + this.page.attr('this-id') + '"]:not([this-dead])');
+                        if (this.notWiths) {
+                            this.__.forEach(this.notWiths, function (i, v) {
+                                _this.page.find('[this-with="' + i + '"]')
+                                        .replaceWith(v);
+                            });
+                            delete this.notWiths;
+                        }
                         internal.resolveTargetOnPage.call(this);
                         internal.saveState.call(this, replaceState);
                     }

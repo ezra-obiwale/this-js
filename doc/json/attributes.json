@@ -207,7 +207,8 @@
             "description": [
                 "Continues branching. Expression will only be executed if the `this-if` and previous `this-else-if` expressions fail",
                 "If expression passes, the element stays in the DOM otherwise, it is removed.",
-                "If this ends the branching, that is, no `this-else` is given, add attribute `this-end-if`"
+                "If this ends the branching, that is, no `this-else` is given, add attribute `this-end-if`",
+                "Note: The expression should not be surrounded by ({...}). This is known to cause issues."
             ],
             "on": "branching",
             "links": [
@@ -339,7 +340,8 @@
             "description": [
                 "Starts branching. The value should be the logical expression to check",
                 "This can be used with `this-else-if` and/or `this-else`. If neither is required, this must also have `this-end-if`",
-                "If the expression passes, then the element stays and `this-else-if` and `this-else` elements are removed."
+                "If the expression passes, then the element stays and `this-else-if` and `this-else` elements are removed.",
+                "Note: The expression should not be surrounded by ({...}). This is known to cause issues."
             ],
             "on": "branching",
             "links": [
@@ -490,8 +492,9 @@
             "id": "this-not-with",
             "value": "string",
             "description": [
-                "This indicates the container's content should not be loaded with the containers parent model",
-                "The value is the id of the model"
+                "This indicates the container's content should not be loaded with the specified model",
+                "The value is the id of the model",
+                "In case where there are descendant models, the value may be a comma-separated list of model ids"
             ],
             "links": ["this-type"]
         },
