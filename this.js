@@ -1297,7 +1297,7 @@
                                         _temp.attr('this-url', container.attr('this-url') + id);
                                     if (container.attr('this-model'))
                                         _temp.attr('this-id', container.attr('this-model'));
-                                    container.append(_temp.show())
+                                    container[container.hasAttr('this-prepend') ? 'prepend' : 'append'](_temp.show())
                                             .removeAttr('this-loading');
                                 }
                                 else {
@@ -1478,23 +1478,6 @@
                     internal.loadAssets.call(this, this.page, function () {
                         internal.loadComponents.call(this, function () {
                             this.page = internal.doTar.call(this, this.page);
-                            var transit = this.__.callable(this.config.transition, true), wait;
-                            if (transit)
-                                wait = transit.call(null, _this.oldPage.removeAttr('this-current'),
-                                        this.page, this.config.transitionOptions);
-                            else if (this.__.isString(this.config.transition)) {
-                                if (!Transitions[this.config.transition])
-                                    this.config.transition = 'switch';
-                                wait = Transitions[this.config.transition](_this.oldPage
-                                        .removeAttr('this-current'),
-                                        this.page, this.config.transitionOptions);
-                            }
-                            setTimeout(function () {
-                                _this.oldPage.remove();
-                                delete _this.oldPage;
-                            }, wait);
-                            if (this.config.titleContainer)
-                                this.config.titleContainer.html(this.page.attr('this-title'));
                             if (this.page.attr('this-url') && !this.page.attr('this-model')) {
                                 this.request(this.page.attr('this-url'), function (data) {
                                     _this.page.html(data);
@@ -1506,11 +1489,11 @@
                             else if (this.page.attr('this-url') && this.page.attr('this-model')) {
                                 // continue loading other models once page has been loaded as a model
                                 internal.loadModel.call(this, this.page, null, function () {
-                                    internal.loadModels.call(this, replaceInState, true);
+                                    internal.showPage.call(this, replaceInState);
                                 });
                             }
                             else {
-                                internal.loadModels.call(this, replaceInState, true);
+                                internal.showPage.call(this, replaceInState);
                             }
                         }.bind(this));
                     });
@@ -2212,7 +2195,8 @@
                                 if (!uid)
                                     uid = _this.config.modelUID;
                                 var uid_parts = uid.split('.').reverse(),
-                                        _id = {}, top_uid = uid_parts.pop();
+                                        _id = {},
+                                        top_uid = uid_parts.pop();
                                 // uid must exist in model
                                 if (!model[top_uid]) {
                                     $.each(uid_parts, function (i, v) {
@@ -2778,7 +2762,7 @@
                                         });
                             });
                         }
-                        elem.append(_content.show());
+                        elem[elem.hasAttr('this-prepend') ? 'prepend' : 'append'](_content.show());
                     });
                 },
                 /**
@@ -4036,6 +4020,33 @@
                     return this;
                 },
                 /**
+                 * Shows the target page and hides the current
+                 * @param {boolean} replaceInState Indicates whether to replace
+                 * the current page in history or create a new layer
+                 * @return {void}
+                 */
+                showPage: function (replaceInState) {
+                    var transit = this.__.callable(this.config.transition, true), wait;
+                    if (transit)
+                        wait = transit.call(null, this.oldPage.removeAttr('this-current'),
+                                this.page, this.config.transitionOptions);
+                    else if (this.__.isString(this.config.transition)) {
+                        if (!Transitions[this.config.transition])
+                            this.config.transition = 'switch';
+                        wait = Transitions[this.config.transition](this.oldPage
+                                .removeAttr('this-current'),
+                                this.page, this.config.transitionOptions);
+                    }
+                    setTimeout(function () {
+                        this.oldPage.remove();
+                        delete this.oldPage;
+                    }.bind(this), wait);
+                    if (this.config.titleContainer)
+                        this.config.titleContainer.html(this.page.attr('this-title'));
+                    // load models
+                    internal.loadModels.call(this, replaceInState, true);
+                },
+                /**
                  * Updates a retrieved saved page
                  * @returns ThisApp
                  */
@@ -5031,6 +5042,25 @@
                         return false;
                     },
                     /**
+                     * Binds the collection to the given element
+                     * @param {string}|{HTMLElement}|{_} elem
+                     * @returns {Model}
+                     */
+                    bind: function (elem) {
+                        if (!this.name) {
+                            this.app.error('Collection must have a name');
+                            return;
+                        }
+                        elem = this.app._(elem);
+                        elem.attr('this-model', this.name);
+                        if (this.uid)
+                            elem.attr('this-model-uid', this.uid);
+                        if (this.url)
+                            elem.attr('this-url', this.url);
+                        internal.loadCollection.call(this.app, elem);
+                        return this;
+                    },
+                    /**
                      * Clears the collection data from app cache
                      */
                     clearCache: function () {
@@ -5491,7 +5521,14 @@
                         var data = config.data;
                         if (!data) {
                             var collection = internal.cache.call(this, 'model', model_name);
-                            data = (collection && collection.data) ? collection.data : [];
+                            data = [];
+                            if (collection) {
+                                data = collection.data;
+                                if (!config.url)
+                                    config.url = collection.url;
+                                if (!config.uid)
+                                    config.uid = collection.uid;
+                            }
                         }
                         else if (data) {
                             if (this.config.dataKey && !data[this.config.dataKey]) {
@@ -5502,7 +5539,8 @@
                             internal.cache.call(this, 'model', model_name, data);
                         }
                         if (data && (this.__.isObject(data) ||
-                                (this.__.isArray(data) && (data.length || (!data.length && !config.url))))) {
+                                (this.__.isArray(data) &&
+                                        (data.length || (!data.length && !config.url))))) {
                             this.__.callable(config.success).call(this,
                                     new Collection(data, {
                                         name: model_name,
@@ -5532,9 +5570,8 @@
                                                 new Collection(data, {
                                                     name: model_name,
                                                     app: _this,
-                                                    uid: _collection.attr('this-model-uid') || uid,
-                                                    url: _collection.attr('this-url'),
-                                                    length: Object.keys(data).length || 0
+                                                    uid: config.uid || _collection.attr('this-model-uid') || uid,
+                                                    url: config.url || _collection.attr('this-url')
                                                 }));
                                     }, config.error);
                         }

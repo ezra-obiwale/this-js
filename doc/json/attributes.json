@@ -496,7 +496,9 @@
                 "The value is the id of the model",
                 "In case where there are descendant models, the value may be a comma-separated list of model ids"
             ],
-            "links": ["this-type"]
+            "links": [
+                "this-type"
+            ]
         },
         "this-page-title": {
             "id": "this-page-title",
@@ -510,6 +512,15 @@
                 "this-title"
             ],
             "on": "link elements"
+        },
+        "this-prepend": {
+            "id": "this-prepend",
+            "description": "Indicates that each element in the collection/loop should be prepended to the container",
+            "on": "collections,loops",
+            "links": [
+                "this-each",
+                "this-list"
+            ]
         },
         "this-prepend-new": {
             "id": "this-prepend-new",
