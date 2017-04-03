@@ -44,15 +44,11 @@
                 }
             ]
         },
-        "delete.canceled": {
-            "id": "delete.canceled",
-            "description": "Triggered when a delete action is canceled, that is, when the beforeDelete() method return `FALSE`",
-            "on": "models",
-            "links": [
-                {
-                    "label": "models",
-                    "goto": "models"
-                }
+        "create.form.cleared": {
+            "id": "create.form.cleared",
+            "description": [
+                "Triggered when a link with `this-create` and `this-form` attributes is clicked.",
+                "It clears the form of previous values and unused variables"
             ]
         },
         "delete.complete": {
@@ -292,17 +288,6 @@
                 }
             ]
         },
-        "page.load.canceled": {
-            "id": "page.load.canceled",
-            "description": "Triggered when the requested page is canceled, that is beforePage() method returns `FALSE`",
-            "on": "pages",
-            "links": [
-                {
-                    "label": "pages",
-                    "goto": "pages"
-                }
-            ]
-        },
         "page.load.failed": {
             "id": "page.load.failed",
             "description": "Triggered when the requested page is found but cannot be loaded",
@@ -330,8 +315,8 @@
             "description": "Indicates that a collection or model has be updated. Event details will contain event and response",
             "on": "collections, models"
         },
-        "variables.binded": {
-            "id": "variables.binded",
+        "model.binded": {
+            "id": "model.binded",
             "description": "Triggered when a model has been binded to an element",
             "on": "models",
             "links": [

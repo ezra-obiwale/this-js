@@ -20,6 +20,12 @@
             ],
             "on": "link elements"
         },
+        "this-autocomplete": {
+            "id": "this-autocomplete",
+            "description": "Indicates that the input field should be autocompleted from the given url",
+            "on": "input",
+            "links": ["this-delay", "this-list", "this-min-chars", "this-multiple", "this-selection-list", "this-query-key"]
+        },
         "this-bind": {
             "id": "this-bind",
             "value": "string",
@@ -105,6 +111,13 @@
             ],
             "on": "pages"
         },
+        "this-delay": {
+            "id": "this-delay",
+            "value": "integer",
+            "description": "This is the amount of time to wait after the user stops typing before trying to autocompleting entry. This is in milliseconds",
+            "on": "input",
+            "links": ["this-autocomplete", "this-min-chars"]
+        },
         "this-delete": {
             "id": "this-delete",
             "value": ["URL", "-"],
@@ -158,7 +171,8 @@
             "description": [
                 "Continues branching. Expression will only be executed if the `this-if` and previous `this-else-if` expressions fail",
                 "If expression passes, the element stays in the DOM otherwise, it is removed.",
-                "If this ends the branching, that is, no `this-else` is given, add attribute `this-end-if`"
+                "If this ends the branching, that is, no `this-else` is given, add attribute `this-end-if`",
+                "Note: The expression should not be surrounded by ({...}). This is known to cause issues."
             ],
             "on": "branching",
             "links": ["this-if", "this-else", "this-end-if"]
@@ -225,13 +239,32 @@
             "value": "string",
             "description": "When clicked, loads the target page. The value is ID of the page",
             "on": "link elements",
-            "links": ["this-create", "this-read", "this-update", "this-delete"]
+            "links": [
+                "this-create",
+                "this-read",
+                "this-update",
+                "this-delete"
+            ]
+        },
+        "this-hidden": {
+            "id": "this-hidden",
+            "description": "Makes the element hidden by default",
+            "links": [
+                "this-show",
+                "this-hide"
+            ]
         },
         "this-hide": {
             "id": "this-hide",
             "value": "string",
-            "description": "When clicked, hides the target element. The value is the ID of the element.",
-            "links": ["this-show", "this-toggle"],
+            "description": [
+                "When clicked, hides the target element. The value is the ID of the element.",
+                "Multiple elements can also be targeted by separating their IDs with comma"
+            ],
+            "links": [
+                "this-show",
+                "this-toggle"
+            ],
             "on": "link elements"
         },
         "this-id": {
@@ -246,7 +279,8 @@
             "description": [
                 "Starts branching. The value should be the logical expression to check",
                 "This can be used with `this-else-if` and/or `this-else`. If neither is required, this must also have `this-end-if`",
-                "If the expression passes, then the element stays and `this-else-if` and `this-else` elements are removed."
+                "If the expression passes, then the element stays and `this-else-if` and `this-else` elements are removed.",
+                "Note: The expression should not be surrounded by ({...}). This is known to cause issues."
             ],
             "on": "branching",
             "links": ["this-else-if", "this-else", "this-end-if"]
@@ -297,12 +331,28 @@
             "this-links": ["this-model"],
             "on": "forms, input, select, textarea, button"
         },
+        "this-key": {
+            "id": "this-key",
+            "value": "string, integer",
+            "description": [
+                "This holds the unique key that identifies each suggested item when autcompleting. This is usually the index of the object applied to the suggestion item from the array list gotten from the server",
+                "When loading a selection list with previously selected items, the item parent element should bear this attribute with the corresponding unique identifier as the value. This would make sure they are watched to avoid duplications"
+            ],
+            "links": ["this-autocomplete", "this-selection-list"]
+        },
         "this-layout": {
             "id": "this-layout",
             "value": "string",
             "description": "The layout a page should use. If none is specified, the general app layout is used if specified. And if that isn't specified either, the page is loaded without a layout.",
             "on": "pages",
             "links": ["this-type"]
+        },
+        "this-list": {
+            "id": "this-list",
+            "value": "string",
+            "description": "This is the target list element to hold the list of found suggestions",
+            "on": "input",
+            "links": ["this-autocomplete", "this-type"]
         },
         "this-load-css": {
             "id": "this-load-css",
@@ -339,6 +389,13 @@
             "links": ["this-model"],
             "on": "models"
         },
+        "this-min-chars": {
+            "id": "this-min-chars",
+            "value": "integer",
+            "description": "This is the minimum number of characters the user must have entered before trying to autocomplete entry",
+            "on": "input",
+            "links": ["this-autocomplete", "this-delay"]
+        },
         "this-model": {
             "id": "this-model",
             "value": "string",
@@ -354,6 +411,24 @@
             ],
             "links": ["this-uid", "this-model"]
         },
+        "this-multiple": {
+            "id": "this-multiple",
+            "description": "This indicates that multiple suggestions can be selected instead of the default one",
+            "on": "input",
+            "links": ["this-autocomplete"]
+        },
+        "this-not-with": {
+            "id": "this-not-with",
+            "value": "string",
+            "description": [
+                "This indicates the container's content should not be loaded with the specified model",
+                "The value is the id of the model",
+                "In case where there are descendant models, the value may be a comma-separated list of model ids"
+            ],
+            "links": [
+                "this-type"
+            ]
+        },
         "this-page-title": {
             "id": "this-page-title",
             "value": "string",
@@ -363,6 +438,15 @@
             ],
             "links": ["this-goto", "this-title"],
             "on": "link elements"
+        },
+        "this-prepend": {
+            "id": "this-prepend",
+            "description": "Indicates that each element in the collection/loop should be prepended to the container",
+            "on": "collections,loops",
+            "links": [
+                "this-each",
+                "this-list"
+            ]
         },
         "this-prepend-new": {
             "id": "this-prepend-new",
@@ -374,7 +458,15 @@
             "value": "string",
             "description": "Holds the string being searched for when a search is performed",
             "links": ["this-do", "this-search"],
+            "internal": true,
             "on": "pages"
+        },
+        "this-query-key": {
+            "id": "this-query-key",
+            "value": "string",
+            "description": "This is the GET parameter key on which to send the user entry when autocompleting. Defaults to `q` if not provided.",
+            "on": "input",
+            "links": ["this-autcomplete"]
         },
         "this-read": {
             "id": "this-read",
@@ -421,11 +513,24 @@
             "links": ["this-do", "this-query"],
             "on": "forms, input"
         },
+        "this-selection-list": {
+            "id": "this-selection-list",
+            "value": "string",
+            "description": "Holds the id of the list element that would hold selected suggestions",
+            "on": "lists",
+            "links": ["this-autocomplete", "this-type"]
+        },
         "this-show": {
             "id": "this-show",
             "value": "string",
-            "description": "Shows the target element. The value is the ID of the element.",
-            "links": ["this-hide", "this-toggle"],
+            "description": [
+                "Shows the target element. The value is the ID of the element.",
+                "Multiple elements can also be targeted by separating their IDs with comma"
+            ],
+            "links": [
+                "this-hide",
+                "this-toggle"
+            ],
             "on": "link elements"
         },
         "this-tar": {
@@ -450,9 +555,9 @@
         },
         "this-type": {
             "id": "this-type",
-            "value": ["page", "model", "collection", "component", "layout", "..."],
+            "value": ["page", "model", "collection", "component", "layout", "list", "..."],
             "description": "Indicates the type of container an element is",
-            "on": "pages, models, collections, components, layouts"
+            "on": "pages, models, collections, components, layouts, lists"
         },
         "this-update": {
             "id": "this-update",
