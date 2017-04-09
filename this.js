@@ -2445,7 +2445,6 @@
                             data = __data;
                         // saving is allowed
                         if (save !== false) {
-                            save_as = container.attr('this-id');
                             var id = internal.getUIDValue
                                     .call(this, data, container.attr('this-uid'));
                             // store data under its uid
@@ -2718,7 +2717,9 @@
                     var success = function (data, uid, handled) {
                         if (handled)
                             return;
-                        internal.loadData.call(_this, __this, data, content, true, true,
+                        internal.loadData.call(_this, __this, data, content, true,
+                                // only save the data if not loading page
+                                type !== 'page',
                                 function (elem) {
                                     if (elem)
                                         elem.attr('this-loaded', '')
