@@ -56,28 +56,36 @@
         }
         return object;
     };
+    FormData.prototype.toQuery = function () {
+        var str = '';
+        for (var [key, value] of this) {
+            if (str !== '')
+                str += '&';
+            str += key + '=' + encodeURIComponent(value);
+        }
+        return str;
+    };
     /**
      * Creates an AJAX connection
      * @param object config
      * @returns ajax object
      */
-    var Ajax = function (config, __) {
-        var __this = __ || this;
+    var Ajax = function (config, app) {
         function parseData(data) {
-            if (!__this.isObject(data))
+            if (!__.isObject(data))
                 return data;
             var str = '';
-            __this.forEach(data, function (i, v) {
+            __.forEach(data, function (i, v) {
                 if (str)
                     str += '&';
-                if (__this.isObject(v, true)) {
-                    var isArray = __this.isArray(v);
-                    __this.forEach(v, function (j, w) {
+                if (__.isObject(v, true)) {
+                    var isArray = __.isArray(v);
+                    __.forEach(v, function (j, w) {
                         if (j)
                             str += '&';
                         if (isArray)
                             j = null;
-                        if (__this.isObject(w, true))
+                        if (__.isObject(w, true))
                             str += i + '[' + j + ']=' + parseData(w);
                         else
                             str += i + '[' + j + ']=' + encodeURIComponent(w);
@@ -88,11 +96,12 @@
             });
             return str;
         }
-        config = __this.extend({
+        config = __.extend({
             type: 'get',
             url: location.href,
             data: null,
             dataType: 'json',
+            headers: {},
             success: function () {
             },
             error: function () {
@@ -106,44 +115,78 @@
             clearCache: false
         }, config);
         var httpRequest = new XMLHttpRequest();
+        if (app && config.api) {
+            var records = internal.record.call(app),
+                    key = internal.generateRequestKey.call(app),
+                    headers = {},
+                    data = {};
+            if (false === __.callable(records.secureAPI).call(app, key, headers, data)) {
+                return __.callable(config.error).call(httpRequest);
+            }
+            __.forEach(headers, function (i, v) {
+                config.headers[i] = v;
+            });
+            __.forEach(data, function (i, v) {
+                config.data[i] = v;
+            });
+        }
         httpRequest.onreadystatechange = function () {
             if (httpRequest.readyState === XMLHttpRequest.DONE) {
                 if (httpRequest.status >= 200 && httpRequest.status < 400) {
-                    __this.callable(config.success).call(httpRequest, httpRequest.response);
+                    __.callable(config.success).call(httpRequest, httpRequest.response);
                 }
                 else {
-                    __this.callable(config.error).call(httpRequest);
+                    __.callable(config.error).call(httpRequest);
                 }
-                __this.callable(config.complete).call(httpRequest);
+                __.callable(config.complete).call(httpRequest);
             }
         };
+        if (config.type.toLowerCase() === 'get' && config.data) {
+            if (__.isObject(config.data)) {
+                if (config.data instanceof FormData)
+                    config.data = config.data.toQuery();
+                else if (Object.keys(config.data).length)
+                    config.data = parseData(config.data);
+            }
+            if (__.isString(config.data)) {
+                if (config.data.startsWith('&') || config.data.startsWith('?'))
+                    config.data = config.data.substr(1);
+                config.url += ((/\?/).test(config.url) ? "&" : "?") + config.data;
+                config.data = null;
+            }
+        }
         if (config.clearCache) {
             config.url += ((/\?/).test(config.url) ? "&" : "?") + (new Date()).getTime();
-        }
-        if (config.type.toLowerCase() === 'get' && config.data
-                && __this.isObject(config.data) && Object.keys(config.data).length) {
-            config.url += ((/\?/).test(config.url) ? "&" : "?") + parseData(config.data);
-            config.data = null;
         }
         httpRequest.open(config.type.toUpperCase(), config.url, config.async);
         httpRequest.responseType = config.dataType;
         httpRequest.withCredentials = config.crossDomain;
         httpRequest.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         httpRequest.setRequestHeader('Requested-With', 'XMLHttpRequest');
-        var contentTypeSet = false;
         if (__.isObject(config.headers)) {
             __.forEach(config.headers, function (key, value) {
-                if (!contentTypeSet && key.trim().toLowerCase() === 'content-type')
-                    contentTypeSet = true;
                 httpRequest.setRequestHeader(key, value);
             });
         }
-        if (!contentTypeSet && __.isString(config.data))
+        // convert data to query string if put or patch
+        if (config.type.toLowerCase() === 'put' || config.type.toLowerCase() === 'patch') {
+            if (config.data instanceof FormData) {
+                config.data = config.data.toQuery();
+            }
+            else if (__.isObject(config.data)) {
+                config.data = parseData(config.data);
+            }
+        }
+        if (__.isObject(config.data) && !(config.data instanceof FormData)) {
+            config.data = parseData(config.data);
+        }
+        if (__.isString(config.data)) {
             httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        __this.tryCatch(function () {
+        }
+        __.tryCatch(function () {
             httpRequest.upload.onprogress = function (e) {
                 if (e.lengthComputable) {
-                    __this.callable(config.progress).call(httpRequest, e, e.loaded, e.total);
+                    __.callable(config.progress).call(httpRequest, e, e.loaded, e.total);
                 }
             };
         });
@@ -221,7 +264,7 @@
                         complete: function () {
                         }
                     }, config);
-                    return Ajax(config, this);
+                    return Ajax(config);
                 },
                 /**
                  * Append content to the elements
@@ -394,8 +437,15 @@
                  * Generates random string 
                  * @returns {string}
                  */
-                randomString: function () {
-                    return 'rANd' + Math.ceil(Math.random() * 100);
+                randomString: function (len) {
+                    var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefjhijklmnopqrstuvwxyz',
+                            str = '';
+                    if (!len)
+                        len = 6;
+                    while (str.length < len) {
+                        str += alpha[Math.floor(Math.random() * 52)];
+                    }
+                    return str + '-' + Date.now();
                 },
                 /**
                  * Clones the first item
@@ -478,9 +528,10 @@
                         return this.items[0].style;
                     else if (!val && this.items.length)
                         return this.items[0].style[attr];
-                    return this.each(function () {
+                    this.each(function () {
                         this.style[attr] = val;
                     });
+                    return this;
                 },
                 /**
                  * Sets/Gets a value into/from the dataset
@@ -786,6 +837,14 @@
                     return typeof item === 'object' && (allowArray || !Array.isArray(item));
                 },
                 /**
+                 * Checks if the given item is a number
+                 * @param mixed item
+                 * @returns {Boolean}
+                 */
+                isNumber: function (item) {
+                    return !isNaN(item);
+                },
+                /**
                  * Checks if the given item is a string
                  * @param mixed item
                  * @returns boolean
@@ -915,7 +974,7 @@
                  */
                 prop: function (prop, value) {
                     return this.tryCatch(function () {
-                        if (value) {
+                        if (value !== undefined) {
                             this.each(function (i, v) {
                                 v[prop] = value;
                             });
@@ -1220,6 +1279,7 @@
              * Internal (hidden) methods
              */
             internal = Object.create({
+                records: {},
                 /**
                  * Binds the target to the model
                  * @param _ _target
@@ -1241,9 +1301,6 @@
                                 if (model) {
                                     model.url = _target.attr('this-url');
                                     model.bind(_target);
-                                    _target.trigger('model.binded', {
-                                        data: model
-                                    });
                                 }
                                 else {
                                     _this.request({
@@ -1257,9 +1314,6 @@
                                                 url: _model.attr('this-url')
                                             });
                                             model.bind(_target);
-                                            _target.trigger('model.binded', {
-                                                data: model
-                                            });
                                         }
                                     });
                                 }
@@ -1383,15 +1437,6 @@
                     }
                 },
                 /**
-                 * Fetches the debug level
-                 * @returns {Number}
-                 */
-                debugLevel: function () {
-                    if (this.__.isBoolean(this.config.debug))
-                        return this.config.debug ? 3 : 0;
-                    return this.config.debug;
-                },
-                /**
                  * Does the loading
                  * @param {HTMLElement}|{_} container
                  * @param object data
@@ -1409,7 +1454,9 @@
                     var uid = container.attr('this-model-uid') ||
                             container.attr('this-uid') || '',
                             id = internal.getUIDValue.call(this, data, uid),
-                            url = container.attr('this-url');
+                            url = container.attr('this-url'),
+                            url_parts = url.split('?');
+                    url = url_parts[0];
                     if (url && !url.endsWith('/'))
                         url += '/';
                     var _callback = function (_temp) {
@@ -1501,7 +1548,7 @@
                     // layout doesn't exist in container
                     if (!_layout.length)
                         // get from templates
-                        _layout = this.templates.children('[this-type="layouts"] layout[this-id="'
+                        _layout = this.getTemplate('[this-type="layouts"] layout[this-id="'
                                 + __layout.attr('this-extends') + '"],'
                                 + '[this-type="layouts"] [this-type="layout"][this-id="'
                                 + __layout.attr('this-extends') + '"]').clone();
@@ -1602,26 +1649,20 @@
                                     + this.page.attr('this-id')
                                     + '"]:not([this-dead])')
                             .attr('this-current', '')
-                            .removeAttr('this-layout');
+                            .removeAttr('this-layout').hide();
                     this.container.find('[this-type]:not([this-type="page"]):not(page)'
                             + ':not(layout):not([this-type="layout"])'
                             + ':not(component):not([this-type="component"])').hide();
-                    internal.loadAssets.call(this, this.page, function () {
+                    // callback for when page assets have been loaded
+                    var loadedAssets = function () {
                         internal.loadComponents.call(this, function () {
-                            this.page = internal.doTar.call(this, this.page);
-                            if (this.page.attr('this-url') && !this.page.attr('this-model')) {
-                                this.request({
-                                    url: this.page.attr('this-url'),
-                                    success: function (data) {
-                                        _this.page.html(data);
-                                        internal.loadModels.call(_this, replaceInState, true);
-                                    },
-                                    error: function () {
-                                    },
-                                    dataType: 'text'
-                                });
-                            }
-                            else if (this.page.attr('this-url') && this.page.attr('this-model')) {
+                            this.page = internal.doTar.call(this, this.page).hide();
+                            this.page.find('collection:not([this-model]),[this-type="collection"]:not([this-model])')
+                                    .each(function () {
+                                        _this._(this).attr('this-model', _this._(this).attr('this-id'));
+                                    });
+                            // load page as model if attached to a model
+                            if (this.page.attr('this-url') && this.page.attr('this-model')) {
                                 // continue loading other models once page has been loaded as a model
                                 internal.loadModel.call(this, this.page, null, function () {
                                     internal.showPage.call(this, replaceInState);
@@ -1631,46 +1672,75 @@
                                 internal.showPage.call(this, replaceInState);
                             }
                         }.bind(this));
-                    });
+                    }.bind(this);
+                    // load page content from elsewhere
+                    if (this.page.attr('this-path')) {
+                        this.request({
+                            url: this.page.attr('this-path'),
+                            success: function (data) {
+                                _this.page.html(data).show()
+                                        .find('[this-type]'
+                                                + ':not(component):not([this-type="component"])')
+                                        .hide();
+                                internal.loadAssets.call(_this, _this.page, loadedAssets);
+                            },
+                            error: function () {
+                            },
+                            dataType: 'text'
+                        });
+                    }
+                    // just load the page assets
+                    else {
+                        internal.loadAssets.call(this, this.page, loadedAssets);
+                    }
                 },
                 /**
                  * Loads a type fully from URL
                  * @param {string} type page || layout || component
-                 * @param {string} id
+                 * @param {string} idOrPath
                  * @param {boolean} replaceInState
                  * @returns {void}
                  */
-                fullyFromURL: function (type, id, success, error) {
+                fullyFromURL: function (type, idOrPath, success, error) {
                     if (!this.config.paths) {
                         this.__.callable(error).call(this);
                         return;
                     }
                     var _this = this,
-                            pathConfig = this.config.paths[type + 's'],
-                            url = pathConfig.dir + id + pathConfig.ext;
+                            pathConfig = this.config.paths[type + 's'];
+                    if (!this.__.isObject(pathConfig)) {
+                        this.__callable(error).call(this);
+                        return;
+                    }
+                    var url = pathConfig.dir + idOrPath + pathConfig.ext;
                     this.request({
                         url: url,
                         success: function (data) {
                             var elem = _this.__.createElement(data);
-                            if (type !== 'component') {
-                                if (!elem.length || elem.length > 1 ||
-                                        (!elem.is(type) && elem.attr('this-type') !== type))
-                                {
-                                    elem = _this._('<div this-type="' + type + '" this-id="'
-                                            + id + '" />')
-                                            .html(data);
-                                }
-                                elem.attr('this-id', id);
-                                _this.templates.append(elem);
-                            }
-                            else {
+                            // components
+                            if (type === 'component') {
                                 if (elem.length > 1)
                                     elem = _this._('<div/>').html(elem);
                                 if (!elem.attr('this-url'))
-                                    elem.attr('this-url', id);
-                                _this.templates.append(_this._('<div this-type="component"'
-                                        + ' this-url="' + id + '" />')
+                                    elem.attr('this-url', idOrPath);
+                                _this.addTemplate(_this._('<div this-type="component"'
+                                        + ' this-url="' + idOrPath + '" />')
                                         .html(elem.clone().removeAttr('this-url')));
+                            }
+                            // pages and layouts
+                            else {
+                                if (!elem.length || elem.length > 1 ||
+                                        (!elem.is(type) && elem.attr('this-type') !== type))
+                                {
+                                    elem = _this._('<div this-type="' + type + '" />')
+                                            .html(data);
+                                }
+                                // overwrite id from idOrPath
+                                elem.attr('this-id', idOrPath.replace(/\/\\/g, '-'));
+                                if (type === 'page' && idOrPath.indexOf('/') !== -1) {
+                                    elem.attr('this-path', idOrPath);
+                                }
+                                _this.addTemplate(elem);
                             }
                             _this.__.callable(success).call(this, elem.clone());
                         },
@@ -1679,6 +1749,16 @@
                         },
                         dataType: 'text'
                     });
+                },
+                /**
+                 * Generates a key for the request
+                 */
+                generateRequestKey: function () {
+                    if (!internal.isRunning.call(this))
+                        return;
+                    var key = this.__.randomString(12);
+                    internal.record.call(this, 'requestKey', key);
+                    return key;
                 },
                 /**
                  * Fetches the value of the variable on a deep level
@@ -1708,6 +1788,16 @@
                         exps.push('({' + v.split('})')[0] + '})');
                     });
                     return exps;
+                },
+                /**
+                 * Fetches and clears the generated request key
+                 */
+                getRequestKey: function () {
+                    if (!internal.isRunning.call(this))
+                        return null;
+                    var key = internal.record.call(this, 'requestKey');
+                    delete internal.records[this.container.attr('this-id')].requestKey;
+                    return key || null;
                 },
                 /**
                  * Fetches the value of the uid of the given data
@@ -1853,6 +1943,15 @@
                     return this._(container).attr('this-type') === type || this._(container).is(type);
                 },
                 /**
+                 * Check if an app is running
+                 */
+                isRunning: function () {
+                    var record;
+                    if (this.container)
+                        record = internal.record.call(this);
+                    return record && record.running;
+                },
+                /**
                  * Loads the given type of asset on the given elementF
                  * @param {string} type js|css
                  * @param {string} name Asset filename, or full path to file if remote
@@ -1876,7 +1975,7 @@
                         if (!url.endsWith('.css'))
                             url += '.css';
                         // request new version if debugging
-                        if (this.config.debug)
+                        if (internal.record.call(this, 'debug'))
                             url += '?' + Math.round(Math.random() * 99999);
                         // create link
                         var link = this.__.createElement(null, 'link')
@@ -1904,7 +2003,7 @@
                         if (!url.endsWith('.js'))
                             url += '.js';
                         // request new version if debugging
-                        if (this.config.debug)
+                        if (internal.record.call(this, 'debug'))
                             url += '?' + Math.round(Math.random() * 99999);
                         // create script
                         var script = this.__.createElement(null, 'script')
@@ -2000,7 +2099,7 @@
                     // collection must have an id
                     if (!__this.attr('this-id')) {
                         __this.removeAttr('this-loading');
-                        if (looping)
+                        if (looping && this.__proto__.collections)
                             this.__proto__.collections--;
                         if (chain && !this.collections)
                             internal.loadForms.call(this, null, null, replaceState, chain);
@@ -2012,15 +2111,15 @@
                         __this.innerWrap('<div/>');
                     var _content;
                     // cache collection if not exist in dom as unloaded
-                    if (!this.templates.children('collection[this-id="'
+                    if (!this.getTemplate('collection[this-id="'
                             + __this.attr('this-id') +
                             '"],[this-type="collection"][this-id="'
                             + __this.attr('this-id') + '"]').length) {
-                        this.templates.append(__this.clone().removeAttr('this-loaded')
+                        this.addTemplate(__this.clone().removeAttr('this-loaded')
                                 .removeAttr('this-loading').hide().outerHtml());
                     }
                     else {
-                        _content = this.templates.children('collection[this-id="'
+                        _content = this.getTemplate('collection[this-id="'
                                 + __this.attr('this-id') +
                                 '"],[this-type="collection"][this-id="'
                                 + __this.attr('this-id') + '"]')
@@ -2055,12 +2154,13 @@
                         internal.loadData
                                 .call(_this, __this, data, content, false, save,
                                         function (elem) {
-                                            elem.attr('this-loaded', '')
-                                                    .removeAttr('this-loading')
-                                                    .trigger('collection.loaded');
+                                            if (elem)
+                                                elem.attr('this-loaded', '')
+                                                        .removeAttr('this-loading')
+                                                        .trigger('collection.loaded');
                                             this.__.callable(callback).call(this, data);
                                         }.bind(_this));
-                        if (looping)
+                        if (looping && _this.__proto__.collections)
                             _this.__proto__.collections--;
                         if (chain && !_this.collections)
                             internal.loadForms.call(_this, null, null, replaceState, chain);
@@ -2068,7 +2168,7 @@
                             error = function () {
                                 __this.removeAttr('this-loading');
                                 _this.__.callable(callback).call(_this);
-                                if (looping)
+                                if (looping && _this.__proto__.collections)
                                     _this.__proto__.collections--;
                                 if (chain && !_this.collections)
                                     internal.loadForms.call(_this, null, null, replaceState, chain);
@@ -2097,7 +2197,7 @@
                             + ':not([this-data]):not([this-loading]),'
                             + '[this-type="collection"]:not([this-loaded])'
                             + ':not([this-data]):not([this-loading])');
-                    this.__proto__.collections += collections.length;
+                    this.__proto__.collections = collections.length;
                     if (chain && !collections.length)
                         internal.loadForms.call(this, null, null, replaceState, chain);
                     collections.each(function () {
@@ -2138,13 +2238,13 @@
                             }
                         }
                         else {
-                            component = this.templates.children('component[this-id="'
+                            component = this.getTemplate('component[this-id="'
                                     + __this.attr('this-component') + '"],'
                                     + '[this-type="component"][this-id="'
                                     + __this.attr('this-component')
                                     + '"]').clone();
                             if (!component.length) {
-                                if (this.__proto__.components)
+                                if (this.__proto__.components && this.__proto__.components)
                                     this.__proto__.components--;
                                 if (!this.__proto__.components)
                                     this.__.callable(callback).call(this);
@@ -2159,7 +2259,7 @@
                         component.removeAttr('this-url');
                     // load component
                     __this.replaceWith(component.show()).trigger('component.loaded');
-                    if (this.__proto__.components)
+                    if (this.__proto__.components && this.__proto__.components)
                         this.__proto__.components--;
                     this.__.callable(callback).call(this);
                 },
@@ -2172,7 +2272,7 @@
                     var _this = this,
                             components = this.container.find('[this-component]'),
                             loaded = 0;
-                    this.__proto__.components += components.length;
+                    this.__proto__.components = components.length;
                     if (!components.length) {
                         this.__.callable(callback).call(this);
                     }
@@ -2199,19 +2299,15 @@
                     // trigger invalid.response trigger if no data
                     if (!data) {
                         container.trigger('invalid.response');
+                        this.__.callable(callback).call(this);
                         return;
                     }
-                    // get variables in content
-                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
-                            // model_name for containers, model id for models
-                            save_as = container.attr('this-model')
-                            || container.attr('this-id'),
-                            // default data structure
-                            _data = {
-                                data: {},
-                                // set expiration timestamp to 24 hours
-                                expires: new Date().setMilliseconds(1000 * 3600 * 24)
-                            };
+                    // default data structure
+                    var _data = {
+                        data: {},
+                        // set expiration timestamp to 24 hours
+                        expires: new Date().setMilliseconds(1000 * 3600 * 24)
+                    };
                     // get expiration if set and data from dataKey if specified
                     if (this.config.dataKey) {
                         // set data expiration timestamp too.
@@ -2221,11 +2317,21 @@
                             _data.expires = new Date(data.expires).getTime();
                         data = data[this.config.dataKey];
                     }
-
-                    var _callback = function () {
-                        container.removeAttr('this-filter').show();
-                        this.__.callable(callback).apply(this, Array.from(arguments));
-                    }.bind(this);
+                    // trigger empty.response trigger if no data
+                    if (!data) {
+                        container.trigger('empty.response');
+                        this.__.callable(callback).call(this);
+                        return;
+                    }
+                    // get variables in content
+                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
+                            // model_name for containers, model id for models
+                            save_as = container.attr('this-model')
+                            || container.attr('this-id'),
+                            _callback = function () {
+                                container.removeAttr('this-filter').show();
+                                this.__.callable(callback).apply(this, Array.from(arguments));
+                            }.bind(this);
                     // loading a collection
                     if (this.__.isArray(data) || isModel === false) {
                         // check if can continue with rendering
@@ -2467,7 +2573,7 @@
                         // layout does not exist in container
                         if (!_layout.length) {
                             // get layout template
-                            _layout = this.templates.children('layout[this-id="'
+                            _layout = this.getTemplate('layout[this-id="'
                                     + layout + '"],'
                                     + '[this-type="layout"][this-id="'
                                     + layout + '"]').clone().attr('this-loaded', '');
@@ -2561,7 +2667,8 @@
                         common_selector += '[this-model="' + __this.attr('this-model') + '"]';
                     __this = internal.doTar.call(this, __this, true);
                     if (!data && !__this.attr('this-url')) {
-                        this.__proto__.models--;
+                        if (this.__proto__.models)
+                            this.__proto__.models--;
                         if (chain && !this.models) {
                             internal.loadCollections.call(this, replaceState, chain);
                         }
@@ -2569,10 +2676,10 @@
                     }
 
                     if (type !== 'page') {
-                        if (this.templates.children(type + common_selector + ',[this-type="'
+                        if (this.getTemplate(type + common_selector + ',[this-type="'
                                 + type + '"]' + common_selector).length) {
                             // necessary in case of binding and target has already been used
-                            content = __this.html(this.templates.children(type + common_selector
+                            content = __this.html(this.getTemplate(type + common_selector
                                     + ',[this-type="' + type + '"]' + common_selector)
                                     .hide().html()).outerHtml();
                         }
@@ -2580,7 +2687,7 @@
                             var cache = _this._(content
                                     .replace(/\(\{/g, '__obrace2__')
                                     .replace(/\}\)/g, '__cbrace2__'));
-                            this.templates.append(cache.hide());
+                            this.addTemplate(cache.hide());
                         }
                     }
 
@@ -2613,19 +2720,22 @@
                             return;
                         internal.loadData.call(_this, __this, data, content, true, true,
                                 function (elem) {
-                                    elem.attr('this-loaded', '')
-                                            .removeAttr('this-loading')
-                                            .trigger('model.loaded')
-                                            .show();
+                                    if (elem)
+                                        elem.attr('this-loaded', '')
+                                                .removeAttr('this-loading')
+                                                .trigger('model.loaded')
+                                                .show();
                                     this.__.callable(callback).call(this, data);
                                 }.bind(_this));
-                        _this.__proto__.models--;
+                        if (_this.__proto__.models)
+                            _this.__proto__.models--;
                         if (chain && !this.models)
                             internal.loadCollections.call(_this, replaceState, chain);
                     },
                             error = function () {
                                 __this.removeAttr('this-loading');
-                                _this.__proto__.models--;
+                                if (_this.__proto__.models)
+                                    _this.__proto__.models--;
                                 if (chain && !this.models)
                                     internal.loadCollections.call(_this, replaceState, chain);
                                 _this.__.callable(callback).call(_this);
@@ -2742,7 +2852,7 @@
                         // loads the data
                         internal.loadData.call(this, config.elem, config.data, config.content,
                                 !isCollection, false, function (elem) {
-                                    if (fromCache) {
+                                    if (elem && fromCache) {
                                         // trigger expired.cache.loaded event
                                         if (cache_expired) {
                                             elem.trigger('expired.' + type + '.cache.loaded');
@@ -2774,6 +2884,7 @@
                     // use default request method
                     else if (config.elem.attr('this-url')) {
                         _this.request({
+                            type: _this.config.crud.methods.read,
                             url: config.elem.attr('this-url'),
                             success: config.success,
                             error: config.error,
@@ -2784,6 +2895,17 @@
                     else {
                         this.__.callable(config.error).call(this);
                     }
+                },
+                /**
+                 * The function called when logging a message
+                 * @param {string} method
+                 * @param {string}|{array} param
+                 * @returns {ThisApp}
+                 */
+                log: function (method, param) {
+                    if (internal.record.call(this, 'debug'))
+                        console[method].apply(null, this.__.isArray(param) ? param : [param]);
+                    return this;
                 },
                 /**
                  * Loops elem through the given data
@@ -2904,7 +3026,7 @@
                         pageId: page
                     });
                     if (this.__.isString(this.notFound)) {
-                        page = this.templates.children(internal.selector.call(this, this.notFound
+                        page = this.getTemplate(internal.selector.call(this, this.notFound
                                 .startsWith('page#') ? this.notFound : 'page#' + this.notFound));
                         if (!page.length) {
                             return this.error('Page [' + this.notFound + '] also not found');
@@ -2925,18 +3047,18 @@
                 pageFound: function (page, replaceInState) {
                     if (internal.is.call(this, 'page', page)) {
                         if (!internal.canContinue
-                                .call(this, 'page.load', [page.items[0]]))
-                        {
+                                .call(this, 'page.load', [page.items[0]])) {
                             return this;
                         }
                         if (this.page) {
-                            this.oldPage = this.page.attr('this-dead', '');
+                            this.oldPage = this.page.attr('this-dead', '')
+                                    .trigger('page.leave');
                             if (this.oldPage.attr('this-id') === page.attr('this-id'))
                                 replaceInState = true;
                         }
                         if (this.store('last_page') === page.attr('this-id'))
                             replaceInState = true;
-                        this.page = page.clone().hide();
+                        this.page = page.clone().show();
                         this.params = this._params;
                         delete this._params;
                         internal.loadLayouts.call(this, replaceInState);
@@ -3028,7 +3150,7 @@
                     // page was restored from history
                     else {
                         this.page.attr('this-restored', '');
-                        internal.updatePage.call(this);
+                        internal.updatePage.call(this, true);
                     }
                     if (this.firstPage) {
                         if (restored)
@@ -3133,7 +3255,8 @@
                         _each = _temp.find('[this-each]');
                     }
                     if (isModel) {
-                        _temp.find('collection,[this-type="collection"]')
+                        _temp.find('collection:not([this-loaded]),'
+                                + '[this-type="collection"]:not([this-loaded])')
                                 .each(function () {
                                     _this._(this).html(this.innerHTML
                                             .replace(/{{/g, '__obrace__')
@@ -3159,7 +3282,8 @@
                     content = internal.fillVariables.call(this, variables, data, content);
                     _temp.replaceWith(content);
                     if (isModel) {
-                        var collections = _temp.find('collection,[this-type="collection"]');
+                        var collections = _temp.find('collection:not([this-loaded]),'
+                                + '[this-type="collection"]:not([this-loaded])');
                         if (collections.length) {
                             this.__proto__.modelCollections = collections.length;
                             collections.each(function () {
@@ -3203,12 +3327,27 @@
                         _this.tryCatch(function () {
                             content = content.replace(v, eval(v.trim().substr(2, v.trim().length - 4)));
                         }, function (e) {
-                            _this.console('error', e.message);
+                            internal.log.call(_this, 'error', e.message);
                             if (removeUnresolved)
                                 content = content.replace(v, '');
                         });
                     });
                     return content;
+                },
+                /**
+                 * Fetch current app records
+                 * @param {string} key
+                 * @praram mixed value
+                 * @returns mixed
+                 */
+                record: function (key, value) {
+                    // set a record
+                    if (key && value !== undefined && this.container) {
+                        internal.records[this.container.attr('this-id')][key] = value;
+                        return this;
+                    }
+                    var records = this.container ? internal.records[this.container.attr('this-id')] : null;
+                    return records && key ? records[key] : records;
                 },
                 /**
                  * Escapes a regex string
@@ -3234,19 +3373,36 @@
                 },
                 /**
                  * Resets a form wisely without removing values from buttons
+                 * and hidden input elements
                  */
                 resetForm: function (form) {
                     var _this = this;
-                    this._(form).find('[type="button"],[type="submit"],[type="reset"]')
+                    this._(form)
+                            .find('input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="hidden"])'
+                                    + ',textarea,select,[this-resettable]')
                             .each(function () {
-                                _this._(this).data('oldValue', this.value);
+                                var __this = _this._(this);
+                                if (__this.attr('this-resettable')) {
+                                    _this.__.forEach(__this.attr('this-resettable').split(';'), function (i, v) {
+                                        var part = v.split(':');
+                                        __this.attr(part[0], part[1]);
+                                    });
+                                }
+                                if (this.type === 'radio' || this.type === 'checkbox') {
+                                    _this._(this).prop('checked', false)
+                                            .removeAttr('checked');
+                                }
+                                this.value = '';
+                                if (this.tagName.toLowerCase() === 'select') {
+                                    _this._(this).children(':nth-child(1)')
+                                            .prop('selected', true)
+                                            .attr('selected', 'selected')
+                                            .siblings('[selected="selected"]').
+                                            prop('selected', false)
+                                            .removeAttr('selected');
+                                }
                             });
-                    form.reset();
-                    this._(form).find('[type="button"],[type="submit"],[type="reset"]')
-                            .each(function () {
-                                this.value = _this._(this).data('oldValue');
-                                _this._(this).removeData('oldValue');
-                            });
+                    return this;
                 },
                 /**
                  * Restores a saved state
@@ -3255,16 +3411,13 @@
                  */
                 restoreState: function (state) {
                     var _this = this;
-                    if (this.page) {
-                        this.page.trigger('page.leave');
-                    }
                     this.container.html(state.content);
                     this.page = this.container.find('page[this-id="' + state.id
-                            + '"]:not([this-dead]),[this-type="page"][this-id="'
-                            + state.id + '"]:not([this-dead])');
+                            + '"],[this-type="page"][this-id="'
+                            + state.id + '"]').removeAttr('this-dead');
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(state.title);
-                    this.store('last_page', state.id);
+                    this.store('last_page', state.url);
                     this.__proto__.components = 0;
                     this.__proto__.collections = 0;
                     this.__proto__.models = 0;
@@ -3279,7 +3432,7 @@
                             .removeAttr('this-with-first-js')
                             .removeAttr('this-with-js'), function () {
                         internal.pageLoaded.call(this, null, true);
-                    });
+                    }.bind(this));
                 },
                 /**
                  * Saves the app state
@@ -3290,15 +3443,30 @@
                     var action = 'pushState';
                     if (replace || this.firstPage)
                         action = 'replaceState';
-                    var url = '#/' + this.page.attr('this-id');
+                    var url = '#/' + (this.page.attr('this-path') || this.page.attr('this-id'));
                     if (this.params.length)
                         url += '/#/' + this.params.join('/');
                     history[action]({
                         id: this.page.attr('this-id'),
                         title: this.page.attr('this-title'),
-                        content: this.container.html()
+                        content: this.container.html(),
+                        url: url
                     }, this.page.attr('this-title'), url);
                     this.store('last_page', url);
+                    return this;
+                },
+                /**
+                 * Provide function to ensure api requests are secured by providing either
+                 * headers or request body data, or both.
+                 * @param {Function} func The function to be called when making api
+                 * requests. The function would receive 3 parameters: (string) key, 
+                 * (object) header, (object) body
+                 * @returns {ThisApp}
+                 */
+                secureAPI: function (func) {
+                    if (internal.isRunning.call(this))
+                        return;
+                    this.secap = func;
                     return this;
                 },
                 /**
@@ -3333,8 +3501,6 @@
                         this._(window).on('beforeunload', function () {
                             internal.saveState.call(_this, true);
                         });
-                        // update debug mode
-                        this.__.__proto__.debug = this.config.debug;
                         // ensure paths end with /
                         if (this.config.paths) {
                             this.__.forEach(this.config.paths, function (i, v) {
@@ -3355,7 +3521,7 @@
                                         _this.loadPage(last_page);
                                     }
                                     else if (_this.config.startWith) {
-                                        if (this.templates.children('page[this-id="'
+                                        if (this.getTemplate('page[this-id="'
                                                 + _this.config.startWith
                                                 + '"]').length)
                                             _this.loadPage(_this.config.startWith);
@@ -3375,7 +3541,17 @@
                         if (!this.container.length)
                             this.container = this._('body');
                         else if (!this.container.attr('this-id'))
-                            this.container.attr('this-id', Math.ceil(Math.random() * 9999));
+                            this.container.attr('this-id', __.randomString());
+                        // setup record for this app
+                        internal.records[this.container.attr('this-id')] = {
+                            running: true,
+                            secureAPI: this.secap || function () {},
+                            uploader: this.setup || null
+                        };
+                        delete this.secap;
+                        delete this.setup;
+                        // set debug mode
+                        internal.record.call(this, 'debug', this.config.debug || false);
                         // mark all loaded element's children as loaded too
                         this.container.find('[this-loaded] [this-type], [this-loaded] page,'
                                 + '[this-loaded] layout, [this-loaded] component,'
@@ -3402,7 +3578,7 @@
                                         .hide());
                         if (this.config.titleContainer)
                             this.config.titleContainer = this._(this.config.titleContainer,
-                                    this.config.debug);
+                                    internal.record.call(this, 'debug'));
                         var autocomplete_timeout;
                         this.container
                                 /* reload current page or loaded collection|model */
@@ -3429,7 +3605,7 @@
                                             // reload value: collection| 
                                             var reload = __this.attr('this-reload'),
                                                     // template to reload
-                                                    toReload = _this.templates.children(internal.selector
+                                                    toReload = _this.getTemplate(internal.selector
                                                             .call(_this, reload)),
                                                     // target to reload
                                                     _reload = _this.container.find(internal.selector
@@ -3483,14 +3659,16 @@
                                             || _model.attr('this-url')
                                             || '#',
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
+                                                    __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
                                     // keep attributes for page
-                                    _this.tar['page#' + goto] = {
+                                    _this.tar['page#' + pageId] = {
                                         reading: '',
                                         url: url,
                                         model: model_name
                                     };
-                                    _this.tar['page#' + goto]['mid'] = model_id;
+                                    _this.tar['page#' + pageId]['mid'] = model_id;
                                     __this.attr('this-goto', goto + '/#/' + model_name + '/' + url);
                                 })
                                 /*
@@ -3514,18 +3692,20 @@
                                             url = __this.attr('this-update')
                                             || model.attr('this-url') || '#',
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
+                                                    __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    _this.tar['page#' + pageId] = {
                                         "do": "update",
                                         mid: model_id,
                                         action: url,
                                         model: model_name
                                     };
                                     if (__this.attr('this-model-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] =
+                                        _this.tar['page#' + pageId]['model-uid'] =
                                                 __this.attr('this-model-uid');
                                     else if (model.attr('this-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = model
+                                        _this.tar['page#' + pageId]['model-uid'] = model
                                                 .attr('this-uid');
                                 })
                                 /*
@@ -3542,16 +3722,18 @@
                                     var __this = _this._(this),
                                             url = __this.attr('this-create') || '#';
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
+                                            __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    _this.tar['page#' + pageId] = {
                                         "do": "create",
                                         action: url
                                     };
                                     if (__this.attr('this-model'))
-                                        _this.tar['page#' + goto]['model'] = __this
+                                        _this.tar['page#' + pageId]['model'] = __this
                                                 .attr('this-model');
                                     if (__this.attr('this-model-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = __this
+                                        _this.tar['page#' + pageId]['model-uid'] = __this
                                                 .attr('this-model-uid');
                                 })
                                 /*
@@ -3579,12 +3761,13 @@
                                         common_selector += '[this-id="' + _target.attr('this-id') + '"]';
                                     else if (_target.attr('this-model'))
                                         common_selector += '[this-model="' + _target.attr('this-model') + '"]';
-                                    if (!_this.templates.children(type + common_selector + ',[this-type="'
-                                            + type + '"]' + common_selector).length) {
+                                    var _temp = _this.getTemplate(type + common_selector + ',[this-type="'
+                                            + type + '"]' + common_selector);
+                                    if (!_temp.length) {
                                         var cache = _this._(_target.outerHtml()
                                                 .replace(/\(\{/g, '__obrace2__')
                                                 .replace(/\}\)/g, '__cbrace2__'));
-                                        _this.templates.append(cache.hide());
+                                        _this.addTemplate(cache.hide());
                                     }
                                     var content = internal.processExpressions
                                             .call(_this, _target.html(), null, true),
@@ -3621,14 +3804,16 @@
                                             || _model.attr('this-id'),
                                             uid = _model.attr('this-uid'),
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
+                                                    __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    _this.tar['page#' + pageId] = {
                                         "do": "delete",
                                         action: url,
                                         uid: uid
                                     };
                                     if (_model) {
-                                        _this.tar['page#' + goto]['model'] = model_name;
+                                        _this.tar['page#' + pageId]['model'] = model_name;
                                         __this.attr('this-goto', goto + '/#/' +
                                                 (_model.attr('this-mid') || __this.attr('this-model-id')));
                                     }
@@ -3645,16 +3830,17 @@
                                     var __this = _this._(this);
                                     if (!__this.attr('this-goto'))
                                         return;
-                                    _this.page.trigger('page.leave');
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto'));
-                                    if (!_this.tar['page#' + goto])
-                                        _this.tar['page#' + goto] = {};
+                                            __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    if (!_this.tar['page#' + pageId])
+                                        _this.tar['page#' + pageId] = {};
                                     if (__this.attr('this-page-title'))
-                                        _this.tar['page#' + goto]['title'] =
+                                        _this.tar['page#' + pageId]['title'] =
                                                 __this.attr('this-page-title');
                                     if (__this.attr('this-ignore-cache'))
-                                        _this.tar['page#' + goto]['ignore-cache'] =
+                                        _this.tar['page#' + pageId]['ignore-cache'] =
                                                 __this.attr('this-ignore-cache');
                                     _this.loadPage(__this.attr('this-goto'));
                                     e.stop = true;
@@ -3699,7 +3885,14 @@
                                     var __this = _this._(this),
                                             _model = __this.closest('model,[this-type="model"],'
                                                     + '[this-model]'),
-                                            _do = __this.closest('[this-do="delete"]');
+                                            _do = __this.closest('[this-do="delete"]'),
+                                            model_url = __this.attr('this-delete') ||
+                                            _model.attr('this-url') ||
+                                            _do.attr('this-action'),
+                                            model_id = _model.attr('this-mid') ||
+                                            _do.attr('this-mid'),
+                                            // remove model_id to get collection_url
+                                            collection_url = model_url.replace(model_id, '');
                                     if (!internal.canContinue
                                             .call(_this, 'model.delete',
                                                     [_model.get(0)])) {
@@ -3711,16 +3904,13 @@
                                             _do.attr('this-model'), {
                                         uid: _model.attr('this-uid') ||
                                                 _do.attr('this-uid'),
-                                        url: __this.attr('this-delete') ||
-                                                _model.attr('this-url') ||
-                                                _do.attr('this-action'),
+                                        url: collection_url,
                                         success: function (collection) {
-                                            var __model = collection.model(_model.attr('this-mid') ||
-                                                    _do.attr('this-mid'));
+                                            var __model = collection.model(model_id);
                                             if (__model) {
                                                 __model.remove({
                                                     success: function (data) {
-                                                        var crudStatus = _this.config.crudStatus;
+                                                        var crudStatus = _this.config.crud.status;
                                                         if ((crudStatus &&
                                                                 data[crudStatus.key] === crudStatus.successValue)
                                                                 || !crudStatus) {
@@ -3891,15 +4081,6 @@
                                             var id = null;
                                             if (__this.attr('this-mid'))
                                                 id = __this.attr('this-mid');
-                                            // @todo remove?
-//                                            else if (_this.page.attr('this-mid'))
-//                                                id = _this.page.attr('this-mid');
-                                            var data = internal.canContinue
-                                                    .call(_this, creating ? 'create.form.submission'
-                                                            : 'update.form.submission', [this]);
-                                            if (!data) {
-                                                return;
-                                            }
                                             // @todo Use collection.model()
                                             var _model = new Model(id, null, {
                                                 app: _this,
@@ -3916,12 +4097,11 @@
                                             });
                                             _model.save({
                                                 form: this,
-                                                data: data,
                                                 method: method,
                                                 success: function (data) {
                                                     var model = _this.config.dataKey ?
                                                             data[_this.config.dataKey] : data;
-                                                    var crudStatus = _this.config.crudStatus;
+                                                    var crudStatus = _this.config.crud.status;
                                                     if (((crudStatus &&
                                                             data[crudStatus.key] ===
                                                             crudStatus.successValue)
@@ -4018,20 +4198,22 @@
                                     }
                                     // load a page and the collection in it
                                     else {
-                                        goto = internal.pageIDFromLink.call(this, goto);
-                                        var _page = _this.templates.children('page[this-id="'
-                                                + goto + '"],[this-type="page"][this-id="'
-                                                + goto + '"]'),
+                                        var _goto = internal.pageIDFromLink.call(this, goto),
+                                                // necessary in case _goto is a url and not an id
+                                                pageId = _goto.replace(/\/\\/g, '-'),
+                                                _page = _this.getTemplate('page[this-id="'
+                                                        + _goto + '"],[this-type="page"][this-id="'
+                                                        + _goto + '"]'),
                                                 _component = _page.find('[this-component="'
                                                         + exp[0] + '"]');
                                         _component.attr('this-filter', 'collection#' + exp[0] + ':'
                                                 + filter).attr('this-search', 'collection#'
                                                 + exp[0] + ':' + keys.join(','));
-                                        _this.tar['page#' + goto] = {
+                                        _this.tar['page#' + pageId] = {
                                             query: _search.val().trim()
                                         };
                                         if (_search.attr('this-ignore-cache'))
-                                            _this.tar['page#' + goto]['ignore-cache'] =
+                                            _this.tar['page#' + pageId]['ignore-cache'] =
                                                     _search.attr('this-ignore-cache');
                                         _collection = _page.find(selector);
                                         _collection.attr('this-filter', filter).attr('this-search',
@@ -4091,7 +4273,7 @@
                                                                 + __this.attr('this-list')
                                                                 + '"]');
                                                 if (!_tplList.length) {
-                                                    _this.templates.append(_list.clone());
+                                                    _this.addTemplate(_list.clone());
                                                 }
                                                 else {
                                                     _list.html(_tplList.html());
@@ -4188,6 +4370,8 @@
                                             }
                                         });
                         this.when('page.loaded', 'page', function () {
+                            if (!_this.page.hasAttr('this-restored'))
+                                document.scrollingElement.scrollTop = 0;
                             // prepare autocomplete list elements
                             _this.container.find('[this-list],list')
                                     .each(function () {
@@ -4240,9 +4424,17 @@
                          * State resuscitation
                          */
                         this._(window).on('popstate', function (e) {
-                            if (e.state)
-                                internal.restoreState.call(_this, e.state);
-                        });
+                            if (e.state) {
+                                if (this.page) {
+                                    this.page.trigger('page.leave');
+                                }
+                                location.replace(e.state.url);
+                                internal.pageIDFromLink.call(this, e.state.url);
+                                this.params = this._params;
+                                delete this._params;
+                                internal.restoreState.call(this, e.state);
+                            }
+                        }.bind(this));
                         /*
                          * Container events activation
                          */
@@ -4251,7 +4443,17 @@
                         });
                         delete this.__proto__.events;
                     });
-                    this.__proto__.running = true;
+                    return this;
+                },
+                /**
+                 * Sets the funtion to call when there are files to be upload in a form
+                 * @param {Function} func
+                 * @returns {ThisApp}
+                 */
+                setUploader: function (func) {
+                    if (internal.isRunning.call(this))
+                        return;
+                    this.setup = func;
                     return this;
                 },
                 /**
@@ -4275,7 +4477,7 @@
                     setTimeout(function () {
                         this.oldPage.remove();
                         delete this.oldPage;
-                    }.bind(this), wait);
+                    }.bind(this), this.__.isNumber(wait) ? wait : 0);
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(this.page.attr('this-title'));
                     // load models
@@ -4313,10 +4515,10 @@
                             var __collection = collection[model_name],
                                     uid = __collection.uid || '';
                             _this.__.forEach(arr, function (i, v) {
-                                var tmpl = _this.templates.children('collection[this-model="'
-                                        + model_name
-                                        + '"],[this-type="collection"][this-model="'
-                                        + model_name + '"]').children().clone(),
+                                var tmpl = _this.getTemplate('collection[this-id="'
+                                        + _collection.attr('this-id')
+                                        + '"],[this-type="collection"][this-id="'
+                                        + _collection.attr('this-id') + '"]').children(),
                                         action = _collection.attr('this-prepend-new') ?
                                         'prepend' : 'append',
                                         data = __collection.data[v],
@@ -4376,18 +4578,16 @@
                                             if (__model.hasAttr('this-in-collection')) {
                                                 in_collection = true;
                                                 var _collection = __model.parent();
-                                                _clone = _this.templates.children('collection[this-model="'
-                                                        + _collection.attr('this-model')
-                                                        + '"],[this-type="collection"][this-model="'
-                                                        + _collection.attr('this-model') + '"]').children()
-                                                        .clone();
+                                                _clone = _this.getTemplate('collection[this-id="'
+                                                        + _collection.attr('this-id')
+                                                        + '"],[this-type="collection"][this-id="'
+                                                        + _collection.attr('this-id') + '"]').children();
                                             }
                                             else {
-                                                _clone = _this.templates.children('model[this-id="'
+                                                _clone = _this.getTemplate('model[this-id="'
                                                         + __model.attr('this-id')
                                                         + '"],[this-type="collection"][this-id="'
-                                                        + __model.attr('this-id') + '"]')
-                                                        .clone();
+                                                        + __model.attr('this-id') + '"]');
                                             }
                                             var data = v.data,
                                                     __data = internal.canContinue
@@ -4415,6 +4615,8 @@
                                                         else
                                                             _cl_col.remove();
                                                     });
+                                            // put back current model's url
+                                            _clone.attr('this-url', __model.attr('this-url'));
                                             internal.parseData.call(_this, data,
                                                     _clone.outerHtml(), null, false, true, function (tmpl) {
                                                 __model.html(tmpl.html()).show()
@@ -4949,6 +5151,106 @@
              * @returns {Model}
              */
             Model = function (id, attributes, props) {
+                function finalizeSave(config, data) {
+                    var _this = this,
+                            method = this.id
+                            ? this.app.config.crud.methods.update
+                            : this.app.config.crud.methods.create,
+                            formData = new FormData(config.form).fromObject(data);
+
+                    if (this.method)
+                        method = this.method;
+                    if (this.id && config.cacheOnly)
+                        /* save model to collection */
+                        internal.modelToStore.call(this.app, this.name, this.id,
+                                formData.toObject(), this.uid);
+                    else if (_this.url || config.url) {
+                        var _success = function (data, id) {
+                            if (data) {
+                                var model = _this.app.config.dataKey ?
+                                        data[_this.app.config.dataKey] : data,
+                                        crudStatus = _this.app.config.crud.status;
+                                if (((crudStatus &&
+                                        data[crudStatus.key] === crudStatus.successValue)
+                                        || !crudStatus) && model) {
+                                    _this.attributes = model;
+                                    id = id || internal.getUIDValue
+                                            .call(_this.app, model, _this.uid);
+                                    // Don't cache for update if watching for updates already
+                                    if (!_this.app.watchCallback) {
+                                        // save model to collection and set whole data as model
+                                        model = internal.modelToStore
+                                                .call(_this.app, _this.name, id, model,
+                                                        _this.uid);
+                                        var _action = _this.id ? 'updated' : 'created',
+                                                action = _this.app.store(_action) || {};
+                                        // saved existing model for dom update
+                                        if (_this.id) {
+                                            if (!action[_this.name])
+                                                action[_this.name] = {};
+                                            action[_this.name][_this.id] = {
+                                                data: model,
+                                                timestamp: Date.now()
+                                            };
+                                        }
+                                        // saved new model for dom update
+                                        else {
+                                            _this.id = id;
+                                            // update the url
+                                            _this.url += _this.id;
+                                            if (!action[_this.name])
+                                                action[_this.name] = [];
+                                            // Remove model uid if exists to avoid duplicates
+                                            action[_this.name] = _this.app.__
+                                                    .arrayRemoveValue(action[_this.name],
+                                                            _this.id, true);
+                                            action[_this.name].push(_this.id);
+                                        }
+                                        _this.app.store(_action, action);
+                                        // update current page 
+                                        internal.updatePage.call(_this.app);
+                                    }
+                                    // update model's collection
+                                    if (_this.collection) {
+                                        _this.collection.models[id] = model;
+                                        _this.collection.length++;
+                                    }
+                                }
+                                _this.app.__.callable(config.success).call(this, data);
+                            }
+                            else {
+                                _this.app.__.callable(config.fail).call(this);
+                            }
+                            _this.app.__.callable(config.complete).call(this);
+                        },
+                                _error = function (e) {
+                                    _this.app.__.callable(config.error).call(this, e);
+                                    _this.app.__.callable(config.complete).call(this, e);
+                                };
+                        if (this.app.dataTransport)
+                            this.app.__.callable(this.app.dataTransport)
+                                    .call(this.app, {
+                                        url: config.url || this.url,
+                                        id: this.id,
+                                        data: formData,
+                                        action: this.id ? 'update' : 'create',
+                                        success: _success,
+                                        error: _error
+                                    });
+                        else {
+                            this.app.request({
+                                type: config.method || method,
+                                url: config.url || _this.url,
+                                data: formData,
+                                success: _success,
+                                error: _error
+                            });
+                        }
+                    }
+                    else {
+                        _this.app.error('Cannot save model to server: No URL supplied.');
+                    }
+                }
                 var _Model = Object.create({
                     app: props && props.app ? props.app : null,
                     attributes: __.isObject(attributes) ? attributes : {},
@@ -4980,6 +5282,9 @@
                                             return this;
                                     }
                                     internal.loadForms.call(this.app, elem, this.attributes);
+                                    elem.trigger('model.binded', {
+                                        data: this
+                                    });
                                 }.bind(this))
                                 .show();
                         return this;
@@ -5024,7 +5329,7 @@
                             internal.removeModelFromStore.call(this.app, this.name, this.id);
                         else if (this.url || config.url) {
                             var _success = function (data) {
-                                var crudStatus = _this.app.config.crudStatus;
+                                var crudStatus = _this.app.config.crud.status;
                                 if ((crudStatus &&
                                         data[crudStatus.key] === crudStatus.successValue)
                                         || !crudStatus) {
@@ -5065,7 +5370,7 @@
                                         });
                             else
                                 this.app.request({
-                                    type: config.method || 'delete',
+                                    type: config.method || this.app.config.crud.methods.delete,
                                     url: config.url || _this.url,
                                     success: _success,
                                     error: _error
@@ -5095,109 +5400,55 @@
 
                         config = this.app.__.extend({}, config);
                         data = config.data || this.attributes;
+                        var _data = internal.canContinue
+                                .call(_this, this.id ? 'model.update' : 'model.create',
+                                        [config.form, data]);
+                        if (false === _data) {
+                            return;
+                        }
+                        else if (this.app.__.isObject(_data)) {
+                            data = _data;
+                        }
+                        // no data
                         if ((!data || (this.app.__.isObject(data) && !Object.keys(data).length))
+                                // and no form
                                 && !config.form) {
                             this.app.error('No data or form to save');
                             return false;
                         }
 
-                        var _this = this,
-                                method = this.id ? 'PUT' : 'POST',
-                                formData = new FormData(config.form).fromObject(data);
-                        if (this.method)
-                            method = this.method;
-                        if (this.id && config.cacheOnly)
-                            /* save model to collection */
-                            internal.modelToStore.call(this.app, this.name, this.id,
-                                    formData.toObject(), this.uid);
-                        else if (_this.url || config.url) {
-                            var _success = function (data, id) {
-                                if (data) {
-                                    var model = _this.app.config.dataKey ?
-                                            data[_this.app.config.dataKey] : data,
-                                            crudStatus = _this.app.config.crudStatus;
-                                    if (((crudStatus &&
-                                            data[crudStatus.key] === crudStatus.successValue)
-                                            || !crudStatus) && model) {
-                                        _this.attributes = model;
-                                        id = id || internal.getUIDValue
-                                                .call(_this.app, model, _this.uid);
-                                        // Don't cache for update if watching for updates already
-                                        if (!_this.app.watchCallback) {
-                                            // save model to collection and set whole data as model
-                                            model = internal.modelToStore
-                                                    .call(_this.app, _this.name, id, model,
-                                                            _this.uid);
-                                            var _action = _this.id ? 'updated' : 'created',
-                                                    action = _this.app.store(_action) || {};
-                                            // saved existing model for dom update
-                                            if (_this.id) {
-                                                if (!action[_this.name])
-                                                    action[_this.name] = {};
-                                                action[_this.name][_this.id] = {
-                                                    data: model,
-                                                    timestamp: Date.now()
-                                                };
-                                            }
-                                            // saved new model for dom update
-                                            else {
-                                                _this.id = id;
-                                                // update the url
-                                                _this.url += _this.id;
-                                                if (!action[_this.name])
-                                                    action[_this.name] = [];
-                                                // Remove model uid if exists to avoid duplicates
-                                                action[_this.name] = _this.app.__
-                                                        .arrayRemoveValue(action[_this.name],
-                                                                _this.id, true);
-                                                action[_this.name].push(_this.id);
-                                            }
-                                            _this.app.store(_action, action);
-                                            // update current page 
-                                            internal.updatePage.call(_this.app);
-                                        }
-                                        // update model's collection
-                                        if (_this.collection) {
-                                            _this.collection.models[id] = model;
-                                            _this.collection.length++;
-                                        }
-                                    }
-                                    _this.app.__.callable(config.success).call(this, data);
-                                }
-                                else {
-                                    _this.app.__.callable(config.fail).call(this);
-                                }
-                                _this.app.__.callable(config.complete).call(this);
-                            },
-                                    _error = function (e) {
-                                        _this.app.__.callable(config.error).call(this, e);
-                                        _this.app.__.callable(config.complete).call(this, e);
-                                    };
-                            if (this.app.dataTransport)
-                                this.app.__.callable(this.app.dataTransport)
-                                        .call(this.app, {
-                                            url: config.url || this.url,
+                        // saving form while there's an uploader for the app
+                        if (config.form && internal.record.call(this.app, 'uploader')) {
+                            // get files
+                            var files = this.app._(config.form).find('input[type="file"]');
+                            if (files.length) {
+                                var _this = this;
+                                // send them to uploader
+                                this.app.__.callable(internal.record.call(this.app, 'uploader'))
+                                        .call(config.form, {
+                                            modelName: this.name,
+                                            files: files.items,
+                                            data: this.app.__.extend(data),
                                             id: this.id,
-                                            data: formData,
-                                            action: this.id ? 'update' : 'create',
-                                            success: _success,
-                                            error: _error
+                                            url: this.url,
+                                            done: function (_data) {
+                                                if (!_data) {
+                                                    this.app.__.callable(config.error).call(this.app);
+                                                    return;
+                                                }
+                                                this.app.__.forEach(_data, function (i, v) {
+                                                    data[i] = v;
+                                                });
+                                                finalizeSave.call(this, config, data);
+                                            }.bind(this)
                                         });
-                            else {
-                                this.app.request({
-                                    type: config.method || method,
-                                    url: config.url || _this.url,
-                                    data: formData,
-                                    success: _success,
-                                    error: _error
-                                });
+                                // remove them from form
+                                files.remove();
+                                return this;
                             }
-                            return true;
                         }
-                        else {
-                            _this.app.error('Cannot save model to server: No URL supplied.');
-                        }
-                        return false;
+                        finalizeSave.call(this, config, data);
+                        return this;
                     }
                 });
                 if (__.isObject(attributes)) {
@@ -5419,7 +5670,7 @@
                             else
                                 this.app.request({
                                     url: this.url,
-                                    type: config.method || 'delete',
+                                    type: config.method || this.app.config.crud.methods.delete,
                                     success: _success,
                                     error: _error
                                 });
@@ -5448,7 +5699,6 @@
         this.version = '1.0';
         if (config && __.isObject(config))
             this.config = this.__.extend(this.config, config, true);
-        this.debug(this.config.debug);
     };
     /**
      * Transitions affect how old pages are exited and new pages are entered
@@ -5584,11 +5834,25 @@
              */
             baseURL: location.origin + location.pathname,
             /**
-             * Indicates the status info for crud operations
+             * CRUD settings
              */
-            crudStatus: {
-                key: 'status', // the key that holds the operation status
-                successValue: true // the key value that indicates success
+            crud: {
+                /*
+                 * Indicates the status info for crud operations
+                 */
+                status: {
+                    key: 'status', // the key that holds the operation status
+                    successValue: true // the key value that indicates success
+                },
+                /*
+                 * CRUD methods
+                 */
+                methods: {
+                    create: 'POST',
+                    read: 'GET',
+                    update: 'PUT',
+                    delete: 'DELETE'
+                }
             },
             /**
              * The key in each ajax response which holds the actual object or array of objects
@@ -5669,7 +5933,21 @@
          * @param boolean debug
          * @returns _          */
         _: function (selector, debug) {
-            return _(selector, debug || this.config ? this.config.debug : true);
+            return _(selector, debug || this.config ? internal.record.call(this, 'debug') : true);
+        },
+        /**
+         * Adds an element to the template collection
+         * @param {_}|{HTMLElement} elem
+         * @returns {ThisApp}
+         */
+        addTemplate: function (elem) {
+            elem = this._(elem).clone();
+            var _this = this;
+            elem.find('style').each(function () {
+                _this._(this).replaceWith('<div this-type="style">' + this.innerText + '</div>');
+            });
+            this.templates.append(elem);
+            return this;
         },
         /**
          * Takes the app back one step in history
@@ -5779,23 +6057,12 @@
             return this;
         },
         /**
-         * The function called when logging a message
-         * @param {string} msg
-         * @returns {ThisApp}
-         */
-        console: function (method, param) {
-            if (this.config.debug)
-                console[method].apply(null, this.__.isArray(param) ? param : [param]);
-            return this;
-        },
-        /**
          * Sets the app debug mode
          * @param boolean debug Default is TRUE
          * @returns ThisApp
          */
         debug: function (debug) {
             this.config.debug = debug || false;
-            this.__.__proto__.debug = this.config.debug;
             return this;
         },
         /**
@@ -5804,7 +6071,7 @@
          * @returns ThisApp
          */
         error: function (msg) {
-            this.console('warn', msg);
+            internal.log.call(this, 'warn', msg);
             return this;
         },
         /**
@@ -5829,6 +6096,39 @@
          */
         getAvailableTransitions: function () {
             return Object.keys(Transitions);
+        },
+        /**
+         * Fetches the unique key generated for the last request
+         */
+        getRequestKey: function () {
+            return internal.getRequestKey.call(this);
+        },
+        /**
+         * Fetches the required elements from the template collection
+         * @param {string}|{_} selector
+         * @returns {_}
+         */
+        getTemplate: function (selector, childOnly) {
+            var _this = this,
+                    elem = this._();
+            if (!childOnly && this.page) {
+                var selectr = '';
+                this.__.forEach(selector.split(','), function (i, v) {
+                    if (selectr)
+                        selectr += ',';
+                    selectr += 'page[this-id="'
+                            + _this.page.attr('this-id') + '"] ' + v
+                            + ',[this-type="page"][this-id="'
+                            + _this.page.attr('this-id') + '"] ' + v;
+                });
+                elem = this.templates.find(selectr).clone();
+            }
+            if (!elem.length)
+                elem = this.templates.children(selector).clone();
+            elem.find('[this-type="style"]').each(function () {
+                _this._(this).replaceWith('<style>' + this.innerText + '</style>');
+            });
+            return elem;
         },
         /**
          * Returns the app to the home page
@@ -5860,19 +6160,22 @@
         },
         /**
          * Loads the given page
-         * @param {string} pageID ID of the page
+         * @param {string} pageIDorPath ID of the page or the path to the content of the page
          * @param {boolean} replaceInState Indicates whether to replace the current page's state with
          * the new page state instead of creating a different state for it.
          * @returns {ThisApp}
          */
-        loadPage: function (pageID, replaceInState) {
-            if (!pageID)
+        loadPage: function (pageIDorPath, replaceInState) {
+            var last_page = this.store('last_page');
+            if (!pageIDorPath || ((last_page === pageIDorPath || last_page === '#/' + pageIDorPath)
+                    && !this.firstPage))
                 return;
             this.oldPage = _();
-            pageID = internal.pageIDFromLink.call(this, pageID);
-            var newPage = this.templates.children('page[this-id="'
-                    + pageID + '"],'
-                    + '[this-type="page"][this-id="' + pageID + '"]');
+            pageIDorPath = internal.pageIDFromLink.call(this, pageIDorPath);
+            var newPage = this.getTemplate('page[this-id="' + pageIDorPath + '"],'
+                    + 'page[this-path="' + pageIDorPath + '"],'
+                    + '[this-type="page"][this-path="' + pageIDorPath + '"],'
+                    + '[this-type="page"][this-id="' + pageIDorPath + '"]');
             if (newPage.length > 1) {
                 this.error('Target page matches multiple pages!');
                 return this;
@@ -5880,16 +6183,16 @@
             else if (!newPage.length) {
                 if (this.config.paths && this.config.paths.pages) {
                     var _this = this;
-                    internal.fullyFromURL.call(this, 'page', pageID,
+                    internal.fullyFromURL.call(this, 'page', pageIDorPath,
                             function (elem) {
                                 internal.pageFound.call(_this, elem, replaceInState);
                             },
                             function () {
-                                internal.notAPage.call(_this, pageID);
+                                internal.notAPage.call(_this, pageIDorPath);
                             });
                     return this;
                 }
-                internal.notAPage.call(this, pageID);
+                internal.notAPage.call(this, pageIDorPath);
                 return this;
             }
             this.__proto__.components = 0;
@@ -5907,7 +6210,7 @@
          * @returns ThisApp
          */
         on: function (event, selector, callback) {
-            if (this.running)
+            if (internal.isRunning.call(this))
                 this.container.on(event, selector, callback);
             else
                 this.events.push({
@@ -5969,30 +6272,43 @@
          */
         request: function (config) {
             if (!this.__.isObject(config)) {
-                this.console('error', 'Method expects an object parameter. '
+                internal.log.call(this, 'error', 'Method expects an object parameter. '
                         + typeof config + ' given!');
                 return this;
             }
             var url = config.url;
+            config.api = false;
             if (!url) {
-                this.console('error', 'Method request() expects parameter 1 to be string. '
+                internal.log.call(this, 'error', 'Method request() expects parameter 1 to be string. '
                         + typeof url + ' given');
                 return this;
             }
             else if (this.__.isObject(url)) {
                 url = url.attr('this-url');
             }
-            if (!url.startsWith('./') && !url.startsWith('../') && url.indexOf('://') === -1)
+            if (!url.startsWith('./') && !url.startsWith('../') && url.indexOf('://') === -1) {
                 url = this.config.baseURL + url;
-            return this.__.ajax({
-                type: config.type || 'get',
-                url: url,
-                dataType: config.dataType || 'json',
-                data: config.data || {},
-                clearCache: this.config.debug,
-                success: config.success,
-                error: config.error
-            });
+                config.api = true;
+            }
+
+            config.type = config.type || 'get';
+            config.dataType = config.dataType || 'json';
+            config.clearCache = internal.record.call(this, 'debug');
+            config.url = url;
+
+            return Ajax(config, this);
+        },
+        /**
+         * Provide function to ensure api requests are secured by providing either
+         * headers or request body data, or both.
+         * @param {Function} func The function to be called when making api
+         * requests. The function would receive 3 parameters: (string) key, 
+         * (object) header, (object) body
+         * @returns {ThisApp}
+         */
+        secureAPI: function (func) {
+            internal.secureAPI.call(this, func);
+            return this;
         },
         /**
          * Set the base url for the app          * @param string url
@@ -6125,20 +6441,31 @@
             return this;
         },
         /**
+         * Sets the funtion to call when there are files to be upload in a form
+         * @param {Function} func
+         * @returns {ThisApp}
+         */
+        setUploader: function (func) {
+            this.setup = func;
+            internal.setUploader.call(this, func);
+            return this;
+        },
+        /**
          * Initializes the app
          * @param string page The ID of the page
-         * @param boolean fromState Indicates whether to load the start page from state if avaiable
-         * or regenerate it
+         * @param boolean freshCopy Indicates to ignore copy in histor and 
+         * generate a fresh one
          * @returns app
          */
-        start: function (page, fromState) {
-            if (this.running)
+        start: function (page, freshCopy) {
+            if (internal.isRunning.call(this))
                 return this;
             if (page)
                 this.config.startWith = page;
             this.firstPage = true;
             internal.setup.call(this);
-            var target_page = internal.pageIDFromLink.call(this, location.hash),
+            var hash = location.hash,
+                    target_page = internal.pageIDFromLink.call(this, hash),
                     params = this.__.extend(this._params);
             if (params.length) {
                 // keep attributes for page
@@ -6149,13 +6476,14 @@
                     url: params.join('/')
                 };
             }
-            if (fromState !== false && history.state &&
-                    location.hash === this.store('last_page')) {
+            if (!freshCopy && history.state &&
+                    hash === this.store('last_page')) {
                 internal.restoreState.call(this, history.state);
             }
             else {
-                this.loadPage(location.hash || this.config.startWith ||
-                        this.templates.children('page[this-default-page],'
+                this.loadPage((hash && hash !== '#' && hash !== '#/') ? hash :
+                        this.config.startWith ||
+                        this.getTemplate('page[this-default-page],'
                                 + '[this-type="pages"] [this-default-page]')
                         .attr('this-id'));
             }
@@ -6208,7 +6536,7 @@
                 else
                     selector = type + ',[this-type="' + type + '"]';
             }
-            return this.templates.children(selector);
+            return this.getTemplate(selector);
         },
         /**
          * Calls the given function in a try...catch block and outputs any errors to the console if 

@@ -1,0 +1,74 @@
+{
+    "data": {
+        "collection.model.render": {
+            "id": "collection.model.render",
+            "value": "function",
+            "description": [
+                "Called before each model in a collection is rendered",
+                "The function receives two (2) parameters - the object to be loaded into the collection and the HTMLElement of the collection",
+                "The expected return is either an object which becomes overrides the given object or a boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
+        "collection.render": {
+            "id": "collection.render",
+            "value": "function",
+            "description": [
+                "Called before collections are rendered",
+                "The function receives two (2) parameters - the object to be loaded as a collection and the HTMLElement of the collection",
+                "The expected return is either an object which becomes overrides the given object or a boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
+        "model.create": {
+            "id": "model.create",
+            "value": "function",
+            "description": [
+                "Called before models are created",
+                "The function receives two (2) parameters - the form which was submitted or passed into `save()` and the data object passed into `save()`",
+                "The expected return is boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
+        "model.delete": {
+            "id": "model.delete",
+            "value": "function",
+            "description": [
+                "Called before models are deleted",
+                "The function receives a parameter - the HTMLElement of the model being deleted",
+                "The expected return is a boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
+        "model.update": {
+            "id": "model.update",
+            "value": "function",
+            "description": [
+                "Called before models are updated",
+                "The function receives two (2) parameters - the form which was submitted or passed into `save()` and the data object passed into `save()`",
+                "The expected return is boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
+        "model.render": {
+            "id": "model.render",
+            "value": "function",
+            "description": [
+                "Called before models are rendered",
+                "The function receives two (2) parameters - the object to be loaded as the model and the HTMLElement of the model",
+                "The expected return is either an object which becomes overrides the given object or a boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
+        "page.load": {
+            "id": "page.load",
+            "value": "function",
+            "description": [
+                "Called before pages are loaded",
+                "The function receives a parameter - the HTMLElement of the page",
+                "The expected return is boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        }
+    }
+}

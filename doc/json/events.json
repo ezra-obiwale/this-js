@@ -107,6 +107,11 @@
                 "delete.complete"
             ]
         },
+        "empty.response": {
+            "id": "empty.response",
+            "description": "Triggered when the data returned by a request is empty or null",
+            "on":"models"
+        },
         "expired.collection.cache.loaded": {
             "id": "expired.collection.cache.loaded",
             "description": "Triggered when an expired collection cache was loaded because the device is offline and newer data could not be fetched",
@@ -224,25 +229,38 @@
             "id": "invalid.response",
             "description": "Triggered when the response from an AJAX request does not match the expected type",
             "on": "AJAX",
-            "links": ["load.content.success", "load.content.error", "load.content.complete"]
+            "links": [
+                "load.content.success",
+                "load.content.error",
+                "load.content.complete"
+            ]
         },
         "load.content.complete": {
             "id": "load.content.complete",
             "description": "Triggered when an AJAX response has been received. This is called whether the request is successful or fails",
             "on": "AJAX",
-            "links": ["load.content.success", "load.content.error"]
+            "links": [
+                "load.content.success",
+                "load.content.error"
+            ]
         },
         "load.content.error": {
             "id": "load.content.error",
             "description": "Triggered when an AJAX response status IS NOT greater or equal to 200 and and less than 400",
             "on": "AJAX",
-            "links": ["load.content.success", "load.content.complete"]
+            "links": [
+                "load.content.success",
+                "load.content.complete"
+            ]
         },
         "load.content.success": {
             "id": "load.content.success",
             "description": "Triggered when an AJAX response status IS greater or equal to 200 and and less than 400",
             "on": "AJAX",
-            "links": ["load.content.error", "load.content.complete"]
+            "links": [
+                "load.content.error",
+                "load.content.complete"
+            ]
         },
         "model.cache.loaded": {
             "id": "model.cache.loaded",
@@ -330,6 +348,5 @@
                 }
             ]
         }
-    },
-    "expires": 1800
+    }
 }
