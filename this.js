@@ -3845,26 +3845,6 @@
                                     _this.loadPage(__this.attr('this-goto'));
                                     e.stop = true;
                                 })
-                                /**
-                                 * DELETE event
-                                 * 
-                                 * Transfers the delete action to the bounded element's [this-delete]
-                                 * descendant.
-                                 */
-                                .on('click', '[this-bind][this-delete]', function (e) {
-                                    e.stop = true;
-                                    e.preventDefault();
-                                    var __this = _this._(this),
-                                            _model = __this.closest('model,[this-type="model"]');
-                                    _this.container.find('[this-id="' + __this.attr('this-bind') + '"]')
-                                            .attr({
-                                                'this-model': _model.attr('this-id'),
-                                                'this-mid': _model.attr('this-mid'),
-                                                'this-do': 'delete',
-                                                'this-uid': _model.attr('this-uid'),
-                                                'this-action': _model.attr('this-url')
-                                            }).show();
-                                })
                                 /*
                                  * DELETE event
                                  * 
