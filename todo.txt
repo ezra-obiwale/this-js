@@ -1,5 +1,3 @@
-collection pagination
-
 Further minimize JS
 Write documentation
     - Make header fixed

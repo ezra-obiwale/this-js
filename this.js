@@ -87,12 +87,12 @@
                             j = null;
                         if (__.isObject(w, true))
                             str += i + '[' + j + ']=' + parseData(w);
-                        else
-                            str += i + '[' + j + ']=' + encodeURIComponent(w);
+                        else if (('' + w).trim())
+                            str += i + '[' + j + ']=' + encodeURIComponent(('' + w).trim());
                     });
                 }
-                else
-                    str += i + '=' + encodeURIComponent(v);
+                else if (('' + v).trim())
+                    str += i + '=' + encodeURIComponent(('' + v).trim());
             });
             return str;
         }
@@ -288,44 +288,6 @@
                     });
                 },
                 /**
-                 * Removes the item at the given index from the given array
-                 * @param array array
-                 * @param integer index
-                 * @returns mixed The removed item
-                 */
-                arrayRemoveIndex: function (array, index) {
-                    return this.tryCatch(function () {
-                        return array.splice(index, 1)[0];
-                    });
-                },
-                /**
-                 * Removes the given item from the given array
-                 * @param array array
-                 * @param mixed item
-                 * @param boolean all Indicates whether to remove all occurrences
-                 * @returns array|index Index if removing just one
-                 */
-                arrayRemoveValue: function (array, item, all) {
-                    return this.tryCatch(function () {
-                        var index = array.indexOf(item);
-                        if (index < 0) {
-                            index = array.indexOf(parseInt(item));
-                        }
-                        if (!all) {
-                            return index > -1 ? [this.arrayRemoveIndex(array, index)] : [];
-                        }
-                        else {
-                            while (index > -1) {
-                                this.arrayRemoveIndex(array, index);
-                                index = array.indexOf(item);
-                                if (index < 0)
-                                    index = array.indexOf(parseInt(item));
-                            }
-                        }
-                        return array;
-                    });
-                },
-                /**
                  * Sets or gets the attr of the elements
                  * @param {string}|{object} attr
                  * @param {mixed} val
@@ -347,7 +309,7 @@
                             return this;
                         }
                         if (!this.items.length)
-                            return null;
+                            return;
                         return attr ? this.items[0].getAttribute(attr)
                                 : Array.from(this.items[0].attributes);
                     });
@@ -556,7 +518,7 @@
                         return this;
                     }
                     if (!this.items.length || !this.items[0].dataset)
-                        return null;
+                        return;
                     value = this.items[0].dataset[key];
                     return this.tryCatch(function () {
                         return eval(value);
@@ -1005,13 +967,41 @@
                     return _(removed, this.debug);
                 },
                 /**
-                 * Removes a data key
-                 * @param {string} key
-                 * @returns {ThisApp}
+                 * Removes the item at the given index from the given array
+                 * @param array array
+                 * @param integer index
+                 * @returns mixed The removed item
                  */
-                removeData: function (key) {
-                    return this.each(function () {
-                        delete this.dataset[key];
+                removeArrayIndex: function (array, index) {
+                    return this.tryCatch(function () {
+                        return array.splice(index, 1)[0];
+                    });
+                },
+                /**
+                 * Removes the given item from the given array
+                 * @param array array
+                 * @param mixed item
+                 * @param boolean all Indicates whether to remove all occurrences
+                 * @returns array|index Index if removing just one
+                 */
+                removeArrayValue: function (array, item, all) {
+                    return this.tryCatch(function () {
+                        var index = array.indexOf(item);
+                        if (index < 0) {
+                            index = array.indexOf(parseInt(item));
+                        }
+                        if (!all) {
+                            return index > -1 ? [this.removeArrayIndex(array, index)] : [];
+                        }
+                        else {
+                            while (index > -1) {
+                                this.removeArrayIndex(array, index);
+                                index = array.indexOf(item);
+                                if (index < 0)
+                                    index = array.indexOf(parseInt(item));
+                            }
+                        }
+                        return array;
                     });
                 },
                 /**
@@ -1049,6 +1039,16 @@
                         _this.forEach(className.split(' '), function (i, v) {
                             __this.classList.remove(v);
                         });
+                    });
+                },
+                /**
+                 * Removes a data key
+                 * @param {string} key
+                 * @returns {ThisApp}
+                 */
+                removeData: function (key) {
+                    return this.each(function () {
+                        delete this.dataset[key];
                     });
                 },
                 /**
@@ -1370,14 +1370,9 @@
 
                     // saving
                     // update if exists
-                    if (update) {
-                        // data at id exists already
-                        if (__data[id])
-                            // data at id has key data. extend new data on it
-                            if (__data[id].data)
-                                data.data = this.__.extend(__data[id].data, data.data, true);
+                    if (update && __data[id]) {
                         // save data to id
-                        __data[id] = data;
+                        __data[id] = this.__.extend(__data[id], data, true);
                     }
                     else // overwrite otherwise
                         __data[id] = data;
@@ -1475,8 +1470,9 @@
                                 _temp.attr('this-id', container.attr('this-model'));
                             container[container.hasAttr('this-prepend')
                                     ? 'prepend' : 'append'](_temp.show())
-                                    .removeAttr('this-loading');
-                            this.__.callable(callback).call(this, container);
+                                    .removeAttr('this-loading')
+                                    .attr('this-loaded');
+                            this.__.callable(callback).call(this, container.show());
                         }
                         else {
                             container.attr('this-uid', uid).attr('this-mid', id);
@@ -1791,13 +1787,14 @@
                 },
                 /**
                  * Fetches and clears the generated request key
+                 * @returns {string}
                  */
                 getRequestKey: function () {
                     if (!internal.isRunning.call(this))
-                        return null;
+                        return;
                     var key = internal.record.call(this, 'requestKey');
                     delete internal.records[this.container.attr('this-id')].requestKey;
-                    return key || null;
+                    return key;
                 },
                 /**
                  * Fetches the value of the uid of the given data
@@ -1821,13 +1818,13 @@
                     var _this = this,
                             vars = variable.replace(/{*}*/g, '')
                             .replace(/\\\|/g, '__fpipe__').split('|'),
-                            key = this.__.arrayRemoveIndex(vars, 0),
+                            key = this.__.removeArrayIndex(vars, 0),
                             value = this.__.contains(key, '.') ?
                             internal.getDeepValue.call(null, key, data) : data[key];
                     if (value || value == 0)
                         this.__.forEach(vars, function (i, v) {
                             v = v.replace(/__fpipe__/g, '|');
-                            var exp = v.split(':'), filter = _this.__.arrayRemoveIndex(exp, 0);
+                            var exp = v.split(':'), filter = _this.__.removeArrayIndex(exp, 0);
                             if (Filters[filter])
                                 value = Filters[filter](value, exp.join(':'));
                             if (!value) /* stop filtering if no value exists anymore */
@@ -2107,8 +2104,9 @@
                     if (!__this.attr('this-model'))
                         __this.attr('this-model', __this.attr('this-id'));
                     // ensure collection content is grouped together
-                    if (__this.children().length > 1)
+                    if (!__this.hasAttr('this-loaded') && __this.children().length > 1) {
                         __this.innerWrap('<div/>');
+                    }
                     var _content;
                     // cache collection if not exist in dom as unloaded
                     if (!this.getTemplate('collection[this-id="'
@@ -2132,7 +2130,10 @@
                             model_to_bind = this.container.find('model[this-id="' + model_name
                                     + '"],[this-type="model"][this-id="' + model_name
                                     + '"]');
-                    __this = internal.doTar.call(this, __this, true).html('');
+                    __this = internal.doTar.call(this, __this, true);
+                    if (!__this.hasAttr('this-paginate') || !__this.children(':first-child').attr('this-mid')) {
+                        __this.html('');
+                    }
                     if (model_name && model_to_bind.length)
                         model_to_bind.attr('this-bind', true);
                     var requestData = {}, save = true, success, error;
@@ -2143,6 +2144,25 @@
                     }
                     if (__this.attr('this-search'))
                         requestData['keys'] = __this.attr('this-search');
+                    // paginate collection
+                    if (__this.hasAttr('this-paginate')) {
+                        // update pagination
+                        if (!__this.attr('this-pagination-page')) {
+                            __this.attr('this-pagination-page', 0);
+                        }
+                        // add request data with pagination info
+                        if (__this.attr('this-pagination-page') !== undefined) {
+                            requestData['page'] = parseInt(__this.attr('this-pagination-page')) + 1;
+                            __this.attr('this-pagination-page', requestData['page']);
+                            // add limit
+                            if (__this.attr('this-paginate')) {
+                                requestData['limit'] = __this.attr('this-paginate');
+                            }
+                            else if (this.config.pagination && this.config.pagination.limit) {
+                                requestData['limit'] = this.config.pagination.limit;
+                            }
+                        }
+                    }
                     // callbacks for request
                     success = function (data, uid, handled) {
                         if (uid)
@@ -2166,6 +2186,10 @@
                             internal.loadForms.call(_this, null, null, replaceState, chain);
                     },
                             error = function () {
+                                // revert pagination page to former page count
+                                if (__this.attr('this-pagination-page') !== undefined) {
+                                    __this.attr('this-pagination-page', parseInt(__this.attr('this-pagination-page')) - 1);
+                                }
                                 __this.removeAttr('this-loading');
                                 _this.__.callable(callback).call(_this);
                                 if (looping && _this.__proto__.collections)
@@ -2368,16 +2392,78 @@
                                     break;
                             }
                         }
-                        this.collectionData = Object.keys(data).length;
+                        this.collectionData = Object.keys(this.cacheTargets || data).length;
+                        var done = function () {
+                            // was paginating
+                            if (container.hasAttr('this-paginate')) {
+                                // next button
+                                var selector = '[this-paginate-next="'
+                                        + container.attr('this-id')
+                                        + '"]',
+                                        selector2 = '[this-paginate-next=""]';
+                                // overwrite is on
+                                if ((container.hasAttr('this-pagination-overwrite')
+                                        && container.attr('this-pagination-overwrite') === 'true')
+                                        || (!container.hasAttr('this-pagination-overwrite')
+                                                && this.config.pagination
+                                                && this.config.pagination.overwrite)
+                                        // and current page is the first
+                                        && container.attr('this-pagination-page') === 1) {
+                                    // hide previous button too
+                                    selector += ',[this-paginate-previous="'
+                                            + container.attr('this-id') + '"]';
+                                    selector2 += ',[this-paginate-previous=""]';
+                                }
+                                // hide pagination button selector 
+                                this.container.find(selector).hide();
+                                // hide sibling buttons
+                                container.siblings(selector2).hide();
+
+                                // reset page index to previous
+                                container.attr('this-pagination-page', parseInt(container.attr('this-pagination-page')) - 1);
+                            }
+                        }.bind(this);
+                        // data is not empty
                         if (this.collectionData) {
-                            this.__.forEach(data, function (index, model) {
+                            // inline overwrite command exist
+                            if (container.hasAttr('this-pagination-overwrite')) {
+                                // empty collection element if true
+                                if (container.attr('this-pagination-overwrite') === 'true') {
+                                    container.html('');
+                                }
+                            }
+                            // inline command not exist. check config pagination command
+                            else if (this.config.pagination && this.config.pagination.overwrite) {
+                                container.html('');
+                            }
+                            // the indices of the all models in collection
+                            var indices = [];
+                            // needed for subsequent pagination attempts
+                            this.__.forEach(this.cacheTargets || data, function (_index, _model) {
+                                var index, model;
+                                if (_this.cacheTargets) {
+                                    index = _model;
+                                    model = data[index];
+                                }
+                                else {
+                                    model = _model;
+                                    index = _index;
+                                }
                                 // get id from model with uid
                                 var id = internal.getUIDValue.call(_this, model, uid);
+                                // keep index for later cached pagination
+                                indices.push(id || index);
                                 // if saving data is allowed
                                 if (save !== false) {
                                     // set model into data to save. use id if available,
                                     // or else index
-                                    _data.data[id || index] = model;
+                                    if (container.hasAttr('this-paginate')) {
+                                        _data.data[id || index] = _this.__.extend(model, {__page: container.attr('this-pagination-page')});
+                                    }
+                                    else {
+                                        _data.data[id || index] = model;
+                                    }
+
                                 }
                                 // process content as being in a loop
                                 var _content = internal.inLoop.call(_this, {
@@ -2385,7 +2471,7 @@
                                     model: model
                                 }, filter,
                                         content.replace(/{{_index}}/g, index));
-                                // if there's not content, go to the next model
+                                // if there's no content, go to the next model
                                 if (!_content)
                                     return;
                                 // process expressions in content
@@ -2418,17 +2504,68 @@
                                             }
                                         }.bind(_this));
                             });
+                            delete this.cacheTargets;
+
+                            var pageIndex = container.attr('this-pagination-page');
+                            if (pageIndex !== undefined) {
+                                // first page loaded
+                                if (pageIndex == 1) {
+                                    // hide previous button
+                                    this.container.find('[this-paginate-previous="'
+                                            + container.attr('this-id') + '"]').hide();
+                                    container.siblings('[this-paginate-previous=""]').hide();
+                                }
+                                // overwrite is one
+                                else if ((container.hasAttr('this-pagination-overwrite')
+                                        && container.attr('this-pagination-overwrite') === 'true')
+                                        || (!container.hasAttr('this-pagination-overwrite')
+                                                && this.config.pagination
+                                                && this.config.pagination.overwrite)) {
+                                    // show previous button
+                                    this.container.find('[this-paginate-previous="'
+                                            + container.attr('this-id') + '"]').show();
+                                    container.siblings('[this-paginate-previous=""]').show();
+                                }
+                                // show next button
+                                this.container.find('[this-paginate-next="'
+                                        + container.attr('this-id') + '"]').show();
+                                container.siblings('[this-paginate-next=""]').show();
+                            }
+                            // if saving data is allowed
+                            if (save !== false) {
+                                // save uid
+                                _data.uid = uid;
+                                // save url
+                                _data.url = url;
+                                if (container.hasAttr('this-paginate')) {
+                                    // save pagination index
+                                    _data.pagination = {};
+                                    _data.pagination[pageIndex] = indices;
+                                }
+                            }
+                            // mark pagination done if length of last result is not
+                            // equal to the expected limit
+                            if ((container.attr('this-paginate') && indices.length != container.attr('this-paginate'))
+                                    || (!container.attr('this-paginate') && this.config.pagination
+                                            && this.config.pagination.limit && indices.length != this.config.pagination.limit)) {
+                                done();
+                            }
                         }
+                        // data is empty
                         else {
+                            done();
+                            save = false;
                             delete this.collectionData;
                             this.__.callable(_callback).call(this, container);
                         }
-                        // if saving data is allowed
-                        if (save !== false) {
-                            // save uid
-                            _data.uid = uid;
-                            // save url
-                            _data.url = url;
+                        if (container.hasAttr('this-paginate')) {
+                            this.container.find('[this-paginate-next="'
+                                    + container.attr('this-id')
+                                    + '"],[this-paginate-previous="'
+                                    + container.attr('this-id') + '"]')
+                                    .removeAttr('disabled');
+                            container.siblings('[this-paginate-next=""],[this-paginate-previous=""]')
+                                    .removeAttr('disabled');
                         }
                     }
                     // loading a model
@@ -2453,7 +2590,7 @@
                             // split into array by /
                             var _url = container.attr('this-url').split('/');
                             // remove the last value
-                            this.__.arrayRemoveIndex(_url, _url.length - 1);
+                            this.__.removeArrayIndex(_url, _url.length - 1);
                             // save the url
                             _data.url = _url.join('/') + '/';
                         }
@@ -2799,6 +2936,21 @@
                     // get model cache
                     if (!isCollection && cache)
                         cache = cache[config.elem.attr('this-mid')];
+
+                    // check pagination page data exists in cached data for collection
+                    if (isCollection && config.elem.hasAttr('this-paginate') &&
+                            // cached data exists and no pagination exists already
+                            cached) {
+                        if ((!cached.pagination
+                                // or paginaion exists but the page meta doesn't exist yet
+                                || cached.pagination[config.elem.attr('this-pagination-page')] === undefined
+                                // or paginaion exists and page meta exists but limit has changed
+                                || cached.pagination[config.elem.attr('this-pagination-page')].length !== config.requestData.limit))
+                            cache = null;
+                        else
+                            this.cacheTargets = cached.pagination[config.elem.attr('this-pagination-page')];
+                    }
+
                     // if no data is provided and collection has url 
                     if (!config.data && config.elem.attr('this-url')
                             // and no cache or cache exists but is expired
@@ -2816,6 +2968,7 @@
                                     id: config.elem.attr('this-mid'),
                                     url: config.elem.attr('this-url'),
                                     isCollection: isCollection,
+                                    data: config.requestData,
                                     success: function () {
                                         _this.__.callable(config.success)
                                                 .apply(config.elem, Array.from(arguments));
@@ -2829,72 +2982,73 @@
                                         config.elem.trigger('load.content.complete');
                                     }
                                 });
-                        return this;
                     }
-                    // if no data and no explicit ignore-cache on collection config.element 
-                    // and cache exists
-                    else if (!config.data && cache) {
-                        if (config.looping)
-                            this.__proto__[type + 's']--;
-                        config.data = cache;
-                        config.uid = cache_uid;
-                        fromCache = true;
-                    }
-                    // if data exists/found
-                    if (config.data) {
-                        var _data = {};
-                        // use dataKey if available
-                        if (_this.config.dataKey) {
-                            _data[_this.config.dataKey] = config.data;
-                            config.data = _data;
-                        }
-                        // watch for updates
-                        internal.watch.call(this, config.elem);
-                        // loads the data
-                        internal.loadData.call(this, config.elem, config.data, config.content,
-                                !isCollection, false, function (elem) {
-                                    if (elem && fromCache) {
-                                        // trigger expired.cache.loaded event
-                                        if (cache_expired) {
-                                            elem.trigger('expired.' + type + '.cache.loaded');
-                                        }
-                                        // trigger cache.loaded event
-                                        else {
-                                            elem.trigger(type + '.cache.loaded');
-                                        }
-                                        setTimeout(function () {
-                                            config.success.call(this, config.data, null, true);
-                                        }.bind(this));
-                                        // mark as loaded and trigger event
-                                        elem.removeAttr('this-loading').attr('this-loaded', '');
-                                    }
-                                    this.__.callable(config.callback).call(this, _data);
-                                }.bind(this));
-                        // if chaining methods
-                        if (config.chain) {
-                            // if collection and done with all collections
-                            if (isCollection && !this.collections)
-                                internal.loadForms.call(this, null, null, config.replaceState,
-                                        config.chain);
-                            // if model and done with all models
-                            else if (!isCollection && !this.models)
-                                internal.loadCollections.call(this, config.replaceState,
-                                        config.chain);
-                        }
-                    }
-                    // use default request method
-                    else if (config.elem.attr('this-url')) {
-                        _this.request({
-                            type: _this.config.crud.methods.read,
-                            url: config.elem.attr('this-url'),
-                            success: config.success,
-                            error: config.error,
-                            data: config.requestData
-                        });
-                    }
-                    // Cannot load type. Move on.
                     else {
-                        this.__.callable(config.error).call(this);
+                        // if no data and no explicit ignore-cache on collection config.element 
+                        // and cache exists
+                        if (!config.data && cache) {
+                            if (config.looping)
+                                this.__proto__[type + 's']--;
+                            config.data = cache;
+                            config.uid = cache_uid;
+                            fromCache = true;
+                        }
+                        // if data exists/found
+                        if (config.data) {
+                            var _data = {};
+                            // use dataKey if available
+                            if (this.config.dataKey) {
+                                _data[this.config.dataKey] = config.data;
+                                config.data = _data;
+                            }
+                            // watch for updates
+                            internal.watch.call(this, config.elem);
+                            // loads the data
+                            internal.loadData.call(this, config.elem, config.data, config.content,
+                                    !isCollection, false, function (elem) {
+                                        if (elem && fromCache) {
+                                            // trigger expired.cache.loaded event
+                                            if (cache_expired) {
+                                                elem.trigger('expired.' + type + '.cache.loaded');
+                                            }
+                                            // trigger cache.loaded event
+                                            else {
+                                                elem.trigger(type + '.cache.loaded');
+                                            }
+                                            setTimeout(function () {
+                                                config.success.call(this, config.data, null, true);
+                                            }.bind(this));
+                                            // mark as loaded and trigger event
+                                            elem.removeAttr('this-loading').attr('this-loaded', '');
+                                        }
+                                        this.__.callable(config.callback).call(this, _data);
+                                    }.bind(this));
+                            // if chaining methods
+                            if (config.chain) {
+                                // if collection and done with all collections
+                                if (isCollection && !this.collections)
+                                    internal.loadForms.call(this, null, null, config.replaceState,
+                                            config.chain);
+                                // if model and done with all models
+                                else if (!isCollection && !this.models)
+                                    internal.loadCollections.call(this, config.replaceState,
+                                            config.chain);
+                            }
+                        }
+                        // use default request method
+                        else if (config.elem.attr('this-url')) {
+                            _this.request({
+                                type: _this.config.crud.methods.read,
+                                url: config.elem.attr('this-url'),
+                                success: config.success,
+                                error: config.error,
+                                data: config.requestData
+                            });
+                        }
+                        // Cannot load type. Move on.
+                        else {
+                            this.__.callable(config.error).call(this);
+                        }
                     }
                 },
                 /**
@@ -3482,7 +3636,7 @@
                         append = '';
                     var attrs = id[id.length - 1].split('[');
                     id[id.length - 1] = attrs[0];
-                    this.__.arrayRemoveIndex(attrs, 0);
+                    this.__.removeArrayIndex(attrs, 0);
                     if (attrs.length)
                         append += '[' + attrs.join('[');
                     return id.length > 1 ? '[this-type="' + id[0] + '"][this-id="' + id[1] + '"]' + append + ',' + id[0] + '[this-id="' + id[1] + '"]' + append : '[this-id="' + id[0] + '"]' + append;
@@ -3619,7 +3773,7 @@
                                                 _this.__.forEach(__this.attr('this-attributes').split(';'),
                                                         function (i, v) {
                                                             var attr = v.split(':'),
-                                                                    name = _this.__.arrayRemoveIndex(attr, 0);
+                                                                    name = _this.__.removeArrayIndex(attr, 0);
                                                             attr = attr.join(':');
                                                             toReload.attr(name, attr);
                                                         });
@@ -4349,7 +4503,58 @@
                                                 _input.attr('this-last-query', '')
                                                         .trigger('keyup');
                                             }
-                                        });
+                                        })
+                                /**
+                                 * Load next set of results on a paginated collection
+                                 */
+                                .on('click', '[this-paginate-next]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _collection;
+                                    // collection not specified. Target sibling collection
+                                    if (!__this.attr('this-paginate-next'))
+                                        _collection = __this.siblings('collection,[this-type="collection"]');
+                                    // collection is specified. get it
+                                    else
+                                        _collection = _this.container.find('collection[this-id="'
+                                                + __this.attr('this-paginate-next')
+                                                + '"],[this-type="collection"][this-id="'
+                                                + __this.attr('this-paginate-next') + '"]');
+                                    // collection must have attribute `this-paginate`
+                                    if (!_collection.hasAttr('this-paginate'))
+                                        return;
+                                    __this.attr('disabled', 'disabled');
+                                    // load target collection
+                                    // page is already set right
+                                    _this.load(_collection);
+                                })
+                                /**
+                                 * Load previous set of results on a paginated collection
+                                 */
+                                .on('click', '[this-paginate-previous]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _collection;
+                                    // collection not specified. Target sibling collection
+                                    if (!__this.attr('this-paginate-previous'))
+                                        _collection = __this.siblings('collection,[this-type="collection"]');
+                                    // collection is specified. get it
+                                    else
+                                        _collection = _this.container.find('collection[this-id="'
+                                                + __this.attr('this-paginate-previous')
+                                                + '"],[this-type="collection"][this-id="'
+                                                + __this.attr('this-paginate-previous') + '"]');
+                                    // if page is 0, can't before to previous anymore
+                                    if (_collection.attr('this-pagination-page') == 0
+                                            // collection must have attribute `this-paginate`
+                                            || !_collection.hasAttr('this-paginate'))
+                                        return;
+                                    __this.attr('disabled', 'disabled');
+                                    // reduce page by 2
+                                    _collection.attr('this-pagination-page', parseInt(_collection.attr('this-pagination-page')) - 2);
+                                    // load collection
+                                    _this.load(_collection);
+                                });
                         this.when('page.loaded', 'page', function () {
                             if (!_this.page.hasAttr('this-restored'))
                                 document.scrollingElement.scrollTop = 0;
@@ -4521,7 +4726,7 @@
                                                     .attr('this-id', model_name)
                                                     .attr('this-in-collection', '')
                                                     .outerHtml());
-                                            this.__.arrayRemoveIndex(arr, i);
+                                            this.__.removeArrayIndex(arr, i);
                                         }.bind(_this));
                             });
                             if (!created[model_name].length)
@@ -4657,7 +4862,7 @@
                     var del = false;
                     this.__.forEach(touched.deleted, function (mod, arr) {
                         _this.__.forEach(arr, function (i, v) {
-                            _this.__.arrayRemoveValue(deleted[mod], v);
+                            _this.__.removeArrayValue(deleted[mod], v);
                             del = true;
                         });
                         /* remove model from deleted if operated on all */
@@ -4707,7 +4912,7 @@
                                             action[model_name] = [];
                                         /* Remove model uid if exists to avoid duplicates */
                                         action[model_name] = this.__
-                                                .arrayRemoveValue(action[model_name], resp.id, true);
+                                                .removeArrayValue(action[model_name], resp.id, true);
                                         action[model_name].push(resp.id);
                                         break;
                                     case 'updated':
@@ -4739,7 +4944,7 @@
                                             action[model_name] = [];
                                         /* Indicate model as deleted */
                                         action[model_name] = this.__
-                                                .arrayRemoveValue(action[model_name], resp.id, true);
+                                                .removeArrayValue(action[model_name], resp.id, true);
                                         action[model_name].push(resp.id);
                                         break;
                                 }
@@ -5183,7 +5388,7 @@
                                                 action[_this.name] = [];
                                             // Remove model uid if exists to avoid duplicates
                                             action[_this.name] = _this.app.__
-                                                    .arrayRemoveValue(action[_this.name],
+                                                    .removeArrayValue(action[_this.name],
                                                             _this.id, true);
                                             action[_this.name].push(_this.id);
                                         }
@@ -5306,8 +5511,42 @@
                             return false;
                         }
 
-                        if (config.cacheOnly)
+                        var done = function () {
+                            // model is a part of a page pagination
+                            // sanitize!
+                            if (this.attributes.__page) {
+                                // get cache
+                                var collection = internal.cache.call(this.app, 'model', this.name);
+                                // pagination exists
+                                if (collection.pagination) {
+                                    var page = parseInt(this.attributes.__page),
+                                            removed = false;
+                                    // go through all pagination metas
+                                    while (collection.pagination[page]) {
+                                        if (!removed) {
+                                            // remove model id from pagination
+                                            this.app.__.removeArrayValue(collection.pagination[page], this.id);
+                                            removed = true;
+                                        }
+                                        else {
+                                            // shift first value into last page's pagination meta
+                                            collection.pagination[page - 1].push(collection.pagination[page].shift());
+                                            // delete pagination meta if empty
+                                            if (!collection.pagination[page].length)
+                                                delete collection.pagination[page];
+                                        }
+                                        page++;
+                                    }
+                                    // save collection back to cache
+                                    internal.cache.call(this.app, 'model', this.name, collection);
+                                }
+                            }
+                        }.bind(this);
+
+                        if (config.cacheOnly) {
                             internal.removeModelFromStore.call(this.app, this.name, this.id);
+                            done();
+                        }
                         else if (this.url || config.url) {
                             var _success = function (data) {
                                 var crudStatus = _this.app.config.crud.status;
@@ -5322,9 +5561,10 @@
                                             deleted[_this.name] = [];
                                         /* Indicate model as deleted */
                                         deleted[_this.name] = _this.app.__
-                                                .arrayRemoveValue(deleted[_this.name], _this.id, true);
+                                                .removeArrayValue(deleted[_this.name], _this.id, true);
                                         deleted[_this.name].push(_this.id);
                                         _this.app.store('deleted', deleted);
+                                        done();
                                         /* update current page */
                                         internal.updatePage.call(_this.app);
                                     }
@@ -5434,6 +5674,9 @@
                 });
                 if (__.isObject(attributes)) {
                     __.forEach(attributes, function (key) {
+                        // ignore internal keys
+                        if (key.startsWith('__'))
+                            return;
                         _Model.init(key);
                     });
                 }
@@ -5850,6 +6093,17 @@
              * Default uid for models and collections if not explicitly defined
              */
             modelUID: 'id',
+            /**
+             * Pagination settings
+             */
+            pagination: {
+                // The number of results to fetch when paginating. 
+                // FALSE means no limit should be sent. Useful for when the server
+                // takes care of its pagination limit
+                limit: 20,
+                // FALSE means new data would be appended
+                overwrite: false
+            },
             /**              * Paths to pages, layouts and components
              */
             paths: {
@@ -6554,7 +6808,8 @@
          * collection#users. This means the target is a collection of id `users`. Target all collection
          * by specifying only collection
          * Multiple elements may be targeted by separating their selectors by a comma.
-         * @param function callback          * @returns ThisApp
+         * @param function callback
+         * @returns ThisApp
          */
         when: function (event, target, callback) {
             var selector = "", targets = target.split(',');

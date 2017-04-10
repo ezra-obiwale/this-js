@@ -577,6 +577,62 @@
             ],
             "on": "link elements"
         },
+        "this-paginate": {
+            "id": "this-paginate",
+            "value": "integer",
+            "description": [
+                "Indicates that the collection should be paginated",
+                "Value is the number of results to show per page.",
+                "If no value is provided, the config limit apply."
+            ],
+            "on": "collections",
+            "links": [
+                "this-paginate-next",
+                "this-paginate-previous",
+                "this-pagination-overwrite"
+            ]
+        },
+        "this-paginate-next": {
+            "id": "this-paginate-next",
+            "value": "string",
+            "description": [
+                "Indicates that the element to show the next page on the target collection.",
+                "Value is the id of the target collection.",
+                "If no value is provided, the sibling collection is targeted."
+            ],
+            "links": [
+                "this-paginate",
+                "this-paginate-previous",
+                "this-pagination-overwrite"
+            ]
+        },
+        "this-paginate-previous": {
+            "id": "this-paginate-previous",
+            "value": "string",
+            "description": [
+                "Indicates that the element to show the previous page on the target collection.",
+                "Value is the id of the target collection.",
+                "If no value is provided, the sibling collection is targeted."
+            ],
+            "links": [
+                "this-paginate",
+                "this-paginate-next",
+                "this-pagination-overwrite"
+            ]
+        },
+        "this-pagination-overwrite": {
+            "id": "this-pagination-overwrite",
+            "value": "boolean",
+            "description": [
+                "Indicates that new page results should overwrite existing collection content"
+            ],
+            "on": "collections",
+            "links": [
+                "this-paginate",
+                "this-paginate-next",
+                "this-pagination-previous"
+            ]
+        },
         "this-path": {
             "id": "this-path",
             "value": "string",
@@ -676,7 +732,7 @@
         },
         "this-resettable": {
             "id": "this-resettable",
-            "value":"string",
+            "value": "string",
             "description": [
                 "Used on any element within a form and indicates that the element should be reset when other form elements are being reset.",
                 "Value can be a semi-colon separated string of attribute:value to be set when resetting the form.",
