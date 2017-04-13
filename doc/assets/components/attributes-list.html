@@ -1,0 +1,51 @@
+<ul class="media-list" this-id="attributes" this-type="collection"
+    this-url="attributes.json">
+    <li class="media ({current.model.internal ? 'internal hidden' : ''}) {{on|replace:/\,\s/g, |replace:link elements,links}}">
+        <div class="media-body">
+            <h3 class="media-heading">
+                <a tabindex="-1" name="{{_index}}" class="text-warning">{{_index}}</a>
+                <small this-if="app.__.isArray(current.model.value)">
+                    {{value|join: \|\| |replace:-,empty}}
+                </small>
+                <small this-else-if="current.model.value">
+                    <em>{{value}}</em>
+                </small>
+                <small this-else><em>empty</em></small>
+            </h3>
+            <hr/>
+            <div this-if="app.__.isString(current.model.description)">
+                {{description}}
+            </div>
+            <div this-else>
+                <div this-each="description">
+                    <p>{{value}}</p>
+                </div>
+            </div>
+            <div style="background-color:#eee;padding:10px;margin-top:10px;
+                 border-radius: 0 0 5px 5px;text-shadow:none" this-if="current.model.on || current.model.links">
+                <div this-if="current.model.on" this-end-if>
+                    <span class="text-warning">Applicable to:</span>
+                    <span style="color:#000000">
+                        {{on|replace:*,any element|lcase}}
+                    </span>
+                </div>
+                <div this-if="current.model.links">
+                    <span class="text-warning">Related:</span>
+                    <span this-each="links">
+                        <a this-if="app.__.isString(current.value)" class="badge"
+                           style="margin-right:5px" href="#{{value}}">
+                            {{value}}
+                        </a>
+                        <span this-else-if="app.__.isObject(current.value)" this-end-if>
+                            <a href="#({current.value.hash || ''})" class="badge" 
+                               style="margin-right:5px"
+                               this-goto="({current.value.goto ? '{{value.goto}}' : ''})">
+                                {{value.label}}
+                            </a>
+                        </span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </li>
+</ul>
