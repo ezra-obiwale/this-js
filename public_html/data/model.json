@@ -1,0 +1,14 @@
+{
+	"status": true,
+	"data": {
+		"name": "Ezra Obiwale",
+		"gender": "Male",
+		"hobbies": ["singing", "dancing"],
+		"socials": {
+			"Twitter": "http://twitter.com/ezraobiwale",
+			"LinkedIn": "http://linkedin.com/in/ezraobiwale",
+			"Facebook": "http://facebook.com/ezra.obiwale"
+		},
+		"id": 1
+	}
+}

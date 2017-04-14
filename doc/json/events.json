@@ -44,11 +44,15 @@
                 }
             ]
         },
-        "create.form.cleared": {
-            "id": "create.form.cleared",
-            "description": [
-                "Triggered when a link with `this-create` and `this-form` attributes is clicked.",
-                "It clears the form of previous values and unused variables"
+        "delete.canceled": {
+            "id": "delete.canceled",
+            "description": "Triggered when a delete action is canceled, that is, when the beforeDelete() method return `FALSE`",
+            "on": "models",
+            "links": [
+                {
+                    "label": "models",
+                    "goto": "models"
+                }
             ]
         },
         "delete.complete": {
@@ -224,38 +228,25 @@
             "id": "invalid.response",
             "description": "Triggered when the response from an AJAX request does not match the expected type",
             "on": "AJAX",
-            "links": [
-                "load.content.success",
-                "load.content.error",
-                "load.content.complete"
-            ]
+            "links": ["load.content.success", "load.content.error", "load.content.complete"]
         },
         "load.content.complete": {
             "id": "load.content.complete",
             "description": "Triggered when an AJAX response has been received. This is called whether the request is successful or fails",
             "on": "AJAX",
-            "links": [
-                "load.content.success",
-                "load.content.error"
-            ]
+            "links": ["load.content.success", "load.content.error"]
         },
         "load.content.error": {
             "id": "load.content.error",
             "description": "Triggered when an AJAX response status IS NOT greater or equal to 200 and and less than 400",
             "on": "AJAX",
-            "links": [
-                "load.content.success",
-                "load.content.complete"
-            ]
+            "links": ["load.content.success", "load.content.complete"]
         },
         "load.content.success": {
             "id": "load.content.success",
             "description": "Triggered when an AJAX response status IS greater or equal to 200 and and less than 400",
             "on": "AJAX",
-            "links": [
-                "load.content.error",
-                "load.content.complete"
-            ]
+            "links": ["load.content.error", "load.content.complete"]
         },
         "model.cache.loaded": {
             "id": "model.cache.loaded",
@@ -301,9 +292,9 @@
                 }
             ]
         },
-        "page.load.failed": {
-            "id": "page.load.failed",
-            "description": "Triggered when the requested page is found but cannot be loaded",
+        "page.load.canceled": {
+            "id": "page.load.canceled",
+            "description": "Triggered when the requested page is canceled, that is beforePage() method returns `FALSE`",
             "on": "pages",
             "links": [
                 {
@@ -312,9 +303,9 @@
                 }
             ]
         },
-        "page.loaded": {
-            "id": "page.loaded",
-            "description": "Triggered when a page has been fully loaded",
+        "page.load.failed": {
+            "id": "page.load.failed",
+            "description": "Triggered when the requested page is found but cannot be loaded",
             "on": "pages",
             "links": [
                 {
@@ -328,8 +319,8 @@
             "description": "Indicates that a collection or model has be updated. Event details will contain event and response",
             "on": "collections, models"
         },
-        "model.binded": {
-            "id": "model.binded",
+        "variables.binded": {
+            "id": "variables.binded",
             "description": "Triggered when a model has been binded to an element",
             "on": "models",
             "links": [

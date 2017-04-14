@@ -24,6 +24,19 @@
             ],
             "on": "link elements"
         },
+        "this-autocomplete": {
+            "id": "this-autocomplete",
+            "description": "Indicates that the input field should be autocompleted from the given url",
+            "on": "input",
+            "links": [
+                "this-delay",
+                "this-list",
+                "this-min-chars",
+                "this-multiple",
+                "this-selection-list",
+                "this-query-key"
+            ]
+        },
         "this-bind": {
             "id": "this-bind",
             "value": "string",
@@ -72,7 +85,8 @@
             "id": "this-component",
             "value": "string",
             "description": [
-                "Indicates a placeholder for a component. The value is the ID of the component to load"
+                "Indicates a placeholder for a component. The value is the ID of the component to load",
+                "If the component needs to be loaded from file, leave value has empty and add attribute `this-url` instead."
             ]
         },
         "this-content": {
@@ -131,6 +145,16 @@
                 "Having multiple pages with the attribute throws an error and no page is loaded"
             ],
             "on": "pages"
+        },
+        "this-delay": {
+            "id": "this-delay",
+            "value": "integer",
+            "description": "This is the amount of time to wait after the user stops typing before trying to autocompleting entry. This is in milliseconds",
+            "on": "input",
+            "links": [
+                "this-autocomplete",
+                "this-min-chars"
+            ]
         },
         "this-delete": {
             "id": "this-delete",
@@ -296,8 +320,9 @@
         "this-goto": {
             "id": "this-goto",
             "value": "string",
-            "description": "When clicked, loads the target page. The value is ID of the page",
-            "on": "link elements",
+            "description": [
+                "Holds the id of, or the path to, the page to load when the element is clicked"
+            ],
             "links": [
                 "this-create",
                 "this-read",
@@ -410,12 +435,34 @@
             ],
             "on": "forms, input, select, textarea, button"
         },
+        "this-key": {
+            "id": "this-key",
+            "value": "string, integer",
+            "description": [
+                "This holds the unique key that identifies each suggested item when autcompleting. This is usually the index of the object applied to the suggestion item from the array list gotten from the server",
+                "When loading a selection list with previously selected items, the item parent element should bear this attribute with the corresponding unique identifier as the value. This would make sure they are watched to avoid duplications"
+            ],
+            "links": [
+                "this-autocomplete",
+                "this-selection-list"
+            ]
+        },
         "this-layout": {
             "id": "this-layout",
             "value": "string",
             "description": "The layout a page should use. If none is specified, the general app layout is used if specified. And if that isn't specified either, the page is loaded without a layout.",
             "on": "pages",
             "links": [
+                "this-type"
+            ]
+        },
+        "this-list": {
+            "id": "this-list",
+            "value": "string",
+            "description": "This is the target list element to hold the list of found suggestions",
+            "on": "input",
+            "links": [
+                "this-autocomplete",
                 "this-type"
             ]
         },
@@ -468,6 +515,16 @@
             ],
             "on": "models"
         },
+        "this-min-chars": {
+            "id": "this-min-chars",
+            "value": "integer",
+            "description": "This is the minimum number of characters the user must have entered before trying to autocomplete entry",
+            "on": "input",
+            "links": [
+                "this-autocomplete",
+                "this-delay"
+            ]
+        },
         "this-model": {
             "id": "this-model",
             "value": "string",
@@ -486,6 +543,14 @@
             "links": [
                 "this-uid",
                 "this-model"
+            ]
+        },
+        "this-multiple": {
+            "id": "this-multiple",
+            "description": "This indicates that multiple suggestions can be selected instead of the default one",
+            "on": "input",
+            "links": [
+                "this-autocomplete"
             ]
         },
         "this-not-with": {
@@ -513,6 +578,73 @@
             ],
             "on": "link elements"
         },
+        "this-paginate": {
+            "id": "this-paginate",
+            "value": "integer",
+            "description": [
+                "Indicates that the collection should be paginated",
+                "Value is the number of results to show per page.",
+                "If no value is provided, the config limit apply."
+            ],
+            "on": "collections",
+            "links": [
+                "this-paginate-next",
+                "this-paginate-previous",
+                "this-pagination-overwrite"
+            ]
+        },
+        "this-paginate-next": {
+            "id": "this-paginate-next",
+            "value": "string",
+            "description": [
+                "Indicates that the element to show the next page on the target collection.",
+                "Value is the id of the target collection.",
+                "If no value is provided, the sibling collection is targeted."
+            ],
+            "links": [
+                "this-paginate",
+                "this-paginate-previous",
+                "this-pagination-overwrite"
+            ]
+        },
+        "this-paginate-previous": {
+            "id": "this-paginate-previous",
+            "value": "string",
+            "description": [
+                "Indicates that the element to show the previous page on the target collection.",
+                "Value is the id of the target collection.",
+                "If no value is provided, the sibling collection is targeted."
+            ],
+            "links": [
+                "this-paginate",
+                "this-paginate-next",
+                "this-pagination-overwrite"
+            ]
+        },
+        "this-pagination-overwrite": {
+            "id": "this-pagination-overwrite",
+            "value": "boolean",
+            "description": [
+                "Indicates that new page results should overwrite existing collection content"
+            ],
+            "on": "collections",
+            "links": [
+                "this-paginate",
+                "this-paginate-next",
+                "this-pagination-previous"
+            ]
+        },
+        "this-path": {
+            "id": "this-path",
+            "value": "string",
+            "description": [
+                "The relative path to the page file based on the config pages bast path"
+            ],
+            "links": [
+                "this-goto"
+            ],
+            "on": "pages"
+        },
         "this-prepend": {
             "id": "this-prepend",
             "description": "Indicates that each element in the collection/loop should be prepended to the container",
@@ -535,7 +667,17 @@
                 "this-do",
                 "this-search"
             ],
+            "internal": true,
             "on": "pages"
+        },
+        "this-query-key": {
+            "id": "this-query-key",
+            "value": "string",
+            "description": "This is the GET parameter key on which to send the user entry when autocompleting. Defaults to `q` if not provided.",
+            "on": "input",
+            "links": [
+                "this-autcomplete"
+            ]
         },
         "this-read": {
             "id": "this-read",
@@ -589,6 +731,16 @@
                 "this-reload-page"
             ]
         },
+        "this-resettable": {
+            "id": "this-resettable",
+            "value": "string",
+            "description": [
+                "Used on any element within a form and indicates that the element should be reset when other form elements are being reset.",
+                "Value can be a semi-colon separated string of attribute:value to be set when resetting the form.",
+                "For example, on an image, the value may be 'src:/path/to/default/image.jpg;class:default",
+                "If value is empty, it is treated like other forms and the `value` attribute is set to empty"
+            ]
+        },
         "this-search": {
             "id": "this-search",
             "value": "string",
@@ -602,6 +754,16 @@
             ],
             "on": "forms, input"
         },
+        "this-selection-list": {
+            "id": "this-selection-list",
+            "value": "string",
+            "description": "Holds the id of the list element that would hold selected suggestions",
+            "on": "lists",
+            "links": [
+                "this-autocomplete",
+                "this-type"
+            ]
+        },
         "this-show": {
             "id": "this-show",
             "value": "string",
@@ -614,6 +776,17 @@
                 "this-toggle"
             ],
             "on": "link elements"
+        },
+        "this-static": {
+            "id": "this-static",
+            "description": [
+                "This indicates that the collection should only be loaded once on the page.",
+                "To ensure staticity, make the collection a component."
+            ],
+            "on": "collections",
+            "links": [
+                "this-component"
+            ]
         },
         "this-tar": {
             "id": "this-tar",
@@ -648,10 +821,11 @@
                 "collection",
                 "component",
                 "layout",
+                "list",
                 "..."
             ],
             "description": "Indicates the type of container an element is",
-            "on": "pages, models, collections, components, layouts"
+            "on": "pages, models, collections, components, layouts, lists"
         },
         "this-update": {
             "id": "this-update",
@@ -717,6 +891,5 @@
             ],
             "internal": true
         }
-    },
-    "expires": 1800
+    }
 }

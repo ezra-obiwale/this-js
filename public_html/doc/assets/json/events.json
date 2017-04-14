@@ -1,0 +1,291 @@
+{
+	"data": {
+		"collection.cache.loaded": {
+			"id": "collection.cache.loaded",
+			"description": "Triggered when a collection has been loaded from cache",
+			"on": "collections",
+			"links": [
+				{
+					"label": "collections",
+					"goto": "collections"
+				}
+			]
+		},
+		"collection.loaded": {
+			"id": "collection.loaded",
+			"description": "Triggered when a collection has been loaded from url",
+			"on": "collections",
+			"links": [
+				{
+					"label": "collections",
+					"goto": "collections"
+				}
+			]
+		},
+		"component.loaded": {
+			"id": "component.loaded",
+			"description": "Triggered when a component has been loaded",
+			"on": "components",
+			"links": [
+				{
+					"label": "components",
+					"goto": "components"
+				}
+			]
+		},
+		"delete.canceled": {
+			"id": "delete.canceled",
+			"description": "Triggered when a delete action is canceled, that is, when the beforeDelete() method return `FALSE`",
+			"on": "models",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				}
+			]
+		},
+		"delete.complete": {
+			"id": "delete.complete",
+			"description": "Triggered when sending a delete request to the server/backend is completed, whether successful or not.",
+			"on": "models",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				},
+				"delete.success",
+				"delete.failed",
+				"delete.error"
+			]
+		},
+		"delete.error": {
+			"id": "delete.error",
+			"description": "Triggered when an error occurs with sending a delete request to the server/backend",
+			"on": "models",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				},
+				"delete.success",
+				"delete.failed",
+				"delete.complete"
+			]
+		},
+		"delete.failed": {
+			"id": "delete.failed",
+			"description": "Triggered when a delete request was successfully sent to the server, the response status is greater or equal to 200 and less that 400 BUT the response data IS NOT as expected",
+			"on": "models",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				},
+				"delete.success",
+				"delete.error",
+				"delete.complete"
+			]
+		},
+		"delete.success": {
+			"id": "delete.success",
+			"description": "Triggered when a delete request was successfully sent to the server, the response status is greater or equal to 200 and less that 400 AND the response data is as expected",
+			"on": "models",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				},
+				"delete.failed",
+				"delete.error",
+				"delete.complete"
+			]
+		},
+		"form.invalid.submission": {
+			"id": "form.invalid.submission",
+			"description": "Triggered when a monitored form submission is submitted and all required fields are not filled",
+			"on": "forms",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				},
+				"form.valid.submission"
+			]
+		},
+		"form.loaded": {
+			"id": "form.loaded",
+			"description": "Triggered when a form and all its elements have been loaded",
+			"on": "forms",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				}
+			]
+		},
+		"form.submission.complete": {
+			"id": "form.submission.complete",
+			"description": "Triggered when sending of a submitted form's data to the server/backend is completed, whether successful or not.",
+			"on": "form",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				},
+				"form.submission.success",
+				"form.submission.failed",
+				"form.submission.error"
+			]
+		},
+		"form.submission.error": {
+			"id": "form.submission.error",
+			"description": "Triggered when an error occurs with sending the submitted form's data to the server/backend",
+			"on": "form",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				},
+				"form.submission.success",
+				"form.submission.failed",
+				"form.submission.complete"
+			]
+		},
+		"form.submission.failed": {
+			"id": "form.submission.failed",
+			"description": "Triggered when a submitted form's data was successfully sent to the server, the response status is greater or equal to 200 and less that 400 BUT the response data IS NOT as expected",
+			"on": "form",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				},
+				"form.submission.success",
+				"form.submission.error",
+				"form.submission.complete"
+			]
+		},
+		"form.submission.success": {
+			"id": "form.submission.success",
+			"description": "Triggered when a submitted form's data was successfully sent to the server, the response status is greater or equal to 200 and less that 400 AND the response data is as expected",
+			"on": "form",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				},
+				"form.submission.failed",
+				"form.submission.error",
+				"form.submission.complete"
+			]
+		},
+		"form.valid.submission": {
+			"id": "form.valid.submission",
+			"description": "Triggered when a monitored form submission is submitted and all required fields are filled properly",
+			"on": "forms",
+			"links": [
+				{
+					"label": "forms",
+					"goto": "forms"
+				},
+				"form.invalid.submission"
+			]
+		},
+		"invalid.response": {
+			"id": "invalid.response",
+			"description": "Triggered when the response from an AJAX request does not match the expected type",
+			"on": "AJAX",
+			"links": ["load.content.success", "load.content.error", "load.content.complete"]
+		},
+		"load.content.complete": {
+			"id": "load.content.complete",
+			"description": "Triggered when an AJAX response has been received. This is called whether the request is successful or fails",
+			"on": "AJAX",
+			"links": ["load.content.success", "load.content.error"]
+		},
+		"load.content.error": {
+			"id": "load.content.error",
+			"description": "Triggered when an AJAX response status IS NOT greater or equal to 200 and and less than 400",
+			"on": "AJAX",
+			"links": ["load.content.success", "load.content.complete"]
+		},
+		"load.content.success": {
+			"id": "load.content.success",
+			"description": "Triggered when an AJAX response status IS greater or equal to 200 and and less than 400",
+			"on": "AJAX",
+			"links": ["load.content.error", "load.content.complete"]
+		},
+		"model.cache.loaded": {
+			"id": "model.cache.loaded",
+			"description": "Triggered when a model has been loaded from cache",
+			"on": "model",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				}
+			]
+		},
+		"model.loaded": {
+			"id": "model.loaded",
+			"description": "Triggered when a model has been loaded from url or a collection",
+			"on": "model",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				}
+			]
+		},
+		"page.leave": {
+			"id": "page.leave",
+			"description": "Triggered when the current page is about to be left and another page is about to be loaded",
+			"on": "pages",
+			"links": [
+				{
+					"label": "pages",
+					"goto": "pages"
+				}
+			]
+		},
+		"page.load.canceled": {
+			"id": "page.load.canceled",
+			"description": "Triggered when the requested page is canceled, that is beforePage() method returns `FALSE`",
+			"on": "pages",
+			"links": [
+				{
+					"label": "pages",
+					"goto": "pages"
+				}
+			]
+		},
+		"page.load.failed": {
+			"id": "page.load.failed",
+			"description": "Triggered when the requested page is found but cannot be loaded",
+			"on": "pages",
+			"links": [
+				{
+					"label": "pages",
+					"goto": "pages"
+				}
+			]
+		},
+		"variables.binded": {
+			"id": "variables.binded",
+			"description": "Triggered when a model has been binded to an element",
+			"on": "model",
+			"links": [
+				{
+					"label": "models",
+					"goto": "models"
+				},
+				{
+					"label": "this-bind, this-binding",
+					"goto": "attributes",
+					"target": "#models"
+				}
+			]
+		}
+	},
+	"expires": 1800
+}

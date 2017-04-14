@@ -4,43 +4,115 @@
  * License (http://thisjs.com/#license)
  */
 (function () {
+    FormData.prototype.fromObject = function (object, appendArray) {
+        var _this = this;
+        function process(data, _key) {
+            __.forEach(data, function (key, value) {
+                if (_key) // parsing for object
+                    key = _key + '[' + (isNaN(key) || !appendArray ? key : '') + ']';
+                if (__.isObject(value, true)) {
+                    process(value, key);
+                }
+                else {
+                    _this.append(key, value);
+                }
+            });
+        }
+        process(object);
+        return this;
+    };
+    FormData.prototype.toObject = function () {
+        var object = {};
+        for (var [key, value] of this) {
+            var obj = object, last;
+            __.forEach(key.split('['), function (i, v) {
+                var ky = v.replace(']', '');
+                if (!i) {
+                    last = ky;
+                    return;
+                }
+                if (!ky || ky.replace(/[^0-9]/g, '') == ky) {
+                    if (!__.isArray(obj[last])) {
+                        obj[last] = [];
+                    }
+                    obj = obj[last];
+                    if (obj[ky] === undefined) {
+                        obj.push(null);
+                        last = obj.length - 1;
+                    }
+                    else {
+                        last = ky;
+                    }
+                }
+                else {
+                    if (!__.isObject(obj[last], true) || obj[last] === null) {
+                        obj[last] = {};
+                    }
+                    obj = obj[last];
+                    last = ky;
+                }
+            });
+            obj[last] = value;
+        }
+        return object;
+    };
+    FormData.prototype.toQuery = function () {
+        var str = '';
+        for (var [key, value] of this) {
+            if (str !== '')
+                str += '&';
+            str += key + '=' + encodeURIComponent(value);
+        }
+        return str;
+    };
+    function getElemType(elem) {
+        return _(elem).length ?
+                (_(elem).attr('this-type') || _(elem).get(0).tagName.toLowerCase())
+                : null;
+    }
+    function getRealData(data) {
+        // use dataKey if available
+        if (this.config.dataKey) {
+            return data[this.config.dataKey];
+        }
+    }
     /**
      * Creates an AJAX connection
      * @param object config
      * @returns ajax object
      */
-    var Ajax = function (config, __) {
-        var __this = __ || this;
+    var Ajax = function (config, app) {
         function parseData(data) {
-            if (!__this.isObject(data))
+            if (!__.isObject(data))
                 return data;
             var str = '';
-            __this.forEach(data, function (i, v) {
+            __.forEach(data, function (i, v) {
                 if (str)
                     str += '&';
-                if (__this.isObject(v, true)) {
-                    var isArray = __this.isArray(v);
-                    __this.forEach(v, function (j, w) {
+                if (__.isObject(v, true)) {
+                    var isArray = __.isArray(v);
+                    __.forEach(v, function (j, w) {
                         if (j)
                             str += '&';
                         if (isArray)
                             j = null;
-                        if (__this.isObject(w, true))
+                        if (__.isObject(w, true))
                             str += i + '[' + j + ']=' + parseData(w);
-                        else
-                            str += i + '[' + j + ']=' + encodeURIComponent(w);
+                        else if (('' + w).trim())
+                            str += i + '[' + j + ']=' + encodeURIComponent(('' + w).trim());
                     });
                 }
-                else
-                    str += i + '=' + encodeURIComponent(v);
+                else if (('' + v).trim())
+                    str += i + '=' + encodeURIComponent(('' + v).trim());
             });
             return str;
         }
-        config = __this.extend({
+        config = __.extend({
             type: 'get',
             url: location.href,
             data: null,
             dataType: 'json',
+            headers: {},
             success: function () {
             },
             error: function () {
@@ -54,41 +126,82 @@
             clearCache: false
         }, config);
         var httpRequest = new XMLHttpRequest();
+        if (app && config.api) {
+            var records = internal.record.call(app),
+                    key = internal.generateRequestKey.call(app),
+                    headers = {},
+                    data = {};
+            if (false === __.callable(records.secureAPI).call(app, key, headers, data)) {
+                return __.callable(config.error).call(httpRequest);
+            }
+            __.forEach(headers, function (i, v) {
+                config.headers[i] = v;
+            });
+            __.forEach(data, function (i, v) {
+                config.data[i] = v;
+            });
+        }
         httpRequest.onreadystatechange = function () {
             if (httpRequest.readyState === XMLHttpRequest.DONE) {
                 if (httpRequest.status >= 200 && httpRequest.status < 400) {
-                    __this.callable(config.success).call(httpRequest, httpRequest.response);
+                    __.callable(config.success).call(httpRequest, httpRequest.response);
                 }
                 else {
-                    __this.callable(config.error).call(httpRequest);
+                    __.callable(config.error).call(httpRequest);
                 }
-                __this.callable(config.complete).call(httpRequest);
+                __.callable(config.complete).call(httpRequest);
             }
         };
+        if (config.type.toLowerCase() === 'get' && config.data) {
+            if (__.isObject(config.data)) {
+                if (config.data instanceof FormData)
+                    config.data = config.data.toQuery();
+                else if (Object.keys(config.data).length)
+                    config.data = parseData(config.data);
+            }
+            if (__.isString(config.data)) {
+                if (config.data.startsWith('&') || config.data.startsWith('?'))
+                    config.data = config.data.substr(1);
+                config.url += ((/\?/).test(config.url) ? "&" : "?") + config.data;
+                config.data = null;
+            }
+        }
         if (config.clearCache) {
             config.url += ((/\?/).test(config.url) ? "&" : "?") + (new Date()).getTime();
-        }
-        if (config.type.toLowerCase() === 'get' && config.data && __this.isObject(config.data) &&
-                Object.keys(config.data).length) {
-            config.url += ((/\?/).test(config.url) ? "&" : "?") + parseData(config.data);
-            config.data = null;
         }
         httpRequest.open(config.type.toUpperCase(), config.url, config.async);
         httpRequest.responseType = config.dataType;
         httpRequest.withCredentials = config.crossDomain;
         httpRequest.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         httpRequest.setRequestHeader('Requested-With', 'XMLHttpRequest');
-        if (config.data)
+        if (__.isObject(config.headers)) {
+            __.forEach(config.headers, function (key, value) {
+                httpRequest.setRequestHeader(key, value);
+            });
+        }
+        // convert data to query string if put or patch
+        if (config.type.toLowerCase() === 'put' || config.type.toLowerCase() === 'patch') {
+            if (config.data instanceof FormData) {
+                config.data = config.data.toQuery();
+            }
+            else if (__.isObject(config.data)) {
+                config.data = parseData(config.data);
+            }
+        }
+        if (__.isObject(config.data) && !(config.data instanceof FormData)) {
+            config.data = parseData(config.data);
+        }
+        if (__.isString(config.data)) {
             httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        __this.tryCatch(function () {
+        }
+        __.tryCatch(function () {
             httpRequest.upload.onprogress = function (e) {
                 if (e.lengthComputable) {
-                    __this.callable(config.progress).call(httpRequest, e, e.loaded, e.total);
+                    __.callable(config.progress).call(httpRequest, e, e.loaded, e.total);
                 }
             };
         });
-        httpRequest.send(__this.isObject(config.data) ?
-                JSON.stringify(config.data) : config.data);
+        httpRequest.send(config.data);
         return httpRequest;
     },
             __ = Object.create({
@@ -142,7 +255,8 @@
                  * Keys include:
                  * type (string): GET | POST | PATCH | PUT | DELETE
                  * url (string): The url to connect to. Default is current url
-                 * data (string|object}: The data to send with the request
+                 * data (string|object): The data to send with the request
+                 * headers (object): Object of string keys to string values to pass to the request header
                  * success (function): Function to call when a success response is gotten. The response data
                  * is passed as a parameter
                  * error (function) : Function to call when error occurs
@@ -161,7 +275,7 @@
                         complete: function () {
                         }
                     }, config);
-                    return Ajax(config, this);
+                    return Ajax(config);
                 },
                 /**
                  * Append content to the elements
@@ -182,44 +296,6 @@
                         _content.each(function () {
                             _this.insertAdjacentElement('beforeEnd', this);
                         });
-                    });
-                },
-                /**
-                 * Removes the item at the given index from the given array
-                 * @param array array
-                 * @param integer index
-                 * @returns mixed The removed item
-                 */
-                arrayRemoveIndex: function (array, index) {
-                    return this.tryCatch(function () {
-                        return array.splice(index, 1)[0];
-                    });
-                },
-                /**
-                 * Removes the given item from the given array
-                 * @param array array
-                 * @param mixed item
-                 * @param boolean all Indicates whether to remove all occurrences
-                 * @returns array|index Index if removing just one
-                 */
-                arrayRemoveValue: function (array, item, all) {
-                    return this.tryCatch(function () {
-                        var index = array.indexOf(item);
-                        if (index < 0) {
-                            index = array.indexOf(parseInt(item));
-                        }
-                        if (!all) {
-                            return index > -1 ? [this.arrayRemoveIndex(array, index)] : [];
-                        }
-                        else {
-                            while (index > -1) {
-                                this.arrayRemoveIndex(array, index);
-                                index = array.indexOf(item);
-                                if (index < 0)
-                                    index = array.indexOf(parseInt(item));
-                            }
-                        }
-                        return array;
                     });
                 },
                 /**
@@ -244,9 +320,11 @@
                             return this;
                         }
                         if (!this.items.length)
-                            return null;
-                        return attr ? this.items[0].getAttribute(attr)
-                                : Array.from(this.items[0].attributes);
+                            return;
+                        if (!attr)
+                            return Array.from(this.items[0].attributes);
+                        if (this.items[0].getAttribute(attr) !== null)
+                            return this.items[0].getAttribute(attr);
                     });
                 },
                 /**
@@ -298,9 +376,9 @@
                         return func === window ? this.callable(null, true) : this.callable(func);
                     }
                     else if (!nullable) {
-                        return function () {
-                        };
+                        return function () { };
                     }
+                    return;
                 },
                 /**
                  * Gets the immediate descendants of the current items
@@ -329,6 +407,20 @@
                         result = result.concat(Array.from(this.children));
                     });
                     return _(result, this.debug);
+                },
+                /**
+                 * Generates random string 
+                 * @returns {string}
+                 */
+                randomString: function (len) {
+                    var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefjhijklmnopqrstuvwxyz',
+                            str = '';
+                    if (!len)
+                        len = 6;
+                    while (str.length < len) {
+                        str += alpha[Math.floor(Math.random() * 52)];
+                    }
+                    return str + '-' + Date.now();
                 },
                 /**
                  * Clones the first item
@@ -411,9 +503,10 @@
                         return this.items[0].style;
                     else if (!val && this.items.length)
                         return this.items[0].style[attr];
-                    return this.each(function () {
+                    this.each(function () {
                         this.style[attr] = val;
                     });
+                    return this;
                 },
                 /**
                  * Sets/Gets a value into/from the dataset
@@ -438,7 +531,7 @@
                         return this;
                     }
                     if (!this.items.length || !this.items[0].dataset)
-                        return null;
+                        return;
                     value = this.items[0].dataset[key];
                     return this.tryCatch(function () {
                         return eval(value);
@@ -479,6 +572,11 @@
                             newObject = {},
                             newArray = [],
                             _this = this;
+                    // deep should be last argument
+                    deep = args[args.length - 1];
+                    // set to false
+                    if (!this.isBoolean(deep))
+                        deep = false;
                     this.forEach(args, function (i, o) {
                         if (_this.isArray(o)) {
                             _this.forEach(o, function (j, v) {
@@ -510,15 +608,16 @@
                         }
                         else if (_this.isObject(o)) {
                             _this.forEach(o, function (i, v) {
-                                if (newObject[i] && _this.isObject(newObject[i], true) &&
-                                        _this.isObject(v, true) && deep)
+                                // extend if old and new are object but new isn't an array
+                                if (newObject[i] && _this.isObject(newObject[i]) &&
+                                        _this.isObject(v) && !_this.isArray(v) && deep)
                                     newObject[i] = _this.extend(newObject[i], v, deep);
                                 else
                                     newObject[i] = v;
                             });
                         }
                     });
-                    return newArray.length && this.isArray(object)
+                    return this.isArray(object)
                             ? newArray : newObject;
                 },
                 /**
@@ -593,7 +692,7 @@
                  */
                 hasAttr: function (attr) {
                     return this.tryCatch(function () {
-                        return this.attr(attr) !== null;
+                        return this.attr(attr) !== null && this.attr(attr) !== undefined;
                     });
                 },
                 /**
@@ -604,8 +703,16 @@
                 hasClass: function (className) {
                     var has = false;
                     if (this.length) {
+                        var _this = this,
+                                classNames = className.split(' ');
                         this.forEach(Array.from(this.items[0].classList), function (i, v) {
-                            if (v === className) {
+                            var found = 0;
+                            _this.forEach(classNames, function (j, w) {
+                                if (v === w) {
+                                    found++;
+                                }
+                            });
+                            if (found === classNames.length) {
                                 has = true;
                                 return false;
                             }
@@ -703,6 +810,14 @@
                  */
                 isObject: function (item, allowArray) {
                     return typeof item === 'object' && (allowArray || !Array.isArray(item));
+                },
+                /**
+                 * Checks if the given item is a number
+                 * @param mixed item
+                 * @returns {Boolean}
+                 */
+                isNumber: function (item) {
+                    return !isNaN(item);
                 },
                 /**
                  * Checks if the given item is a string
@@ -834,7 +949,7 @@
                  */
                 prop: function (prop, value) {
                     return this.tryCatch(function () {
-                        if (value) {
+                        if (value !== undefined) {
                             this.each(function (i, v) {
                                 v[prop] = value;
                             });
@@ -865,13 +980,41 @@
                     return _(removed, this.debug);
                 },
                 /**
-                 * Removes a data key
-                 * @param {string} key
-                 * @returns {ThisApp}
+                 * Removes the item at the given index from the given array
+                 * @param array array
+                 * @param integer index
+                 * @returns mixed The removed item
                  */
-                removeData: function (key) {
-                    return this.each(function () {
-                        delete this.dataset[key];
+                removeArrayIndex: function (array, index) {
+                    return this.tryCatch(function () {
+                        return array.splice(index, 1)[0];
+                    });
+                },
+                /**
+                 * Removes the given item from the given array
+                 * @param array array
+                 * @param mixed item
+                 * @param boolean all Indicates whether to remove all occurrences
+                 * @returns array|index Index if removing just one
+                 */
+                removeArrayValue: function (array, item, all) {
+                    return this.tryCatch(function () {
+                        var index = array.indexOf(item);
+                        if (index < 0) {
+                            index = array.indexOf(parseInt(item));
+                        }
+                        if (!all) {
+                            return index > -1 ? [this.removeArrayIndex(array, index)] : [];
+                        }
+                        else {
+                            while (index > -1) {
+                                this.removeArrayIndex(array, index);
+                                index = array.indexOf(item);
+                                if (index < 0)
+                                    index = array.indexOf(parseInt(item));
+                            }
+                        }
+                        return array;
                     });
                 },
                 /**
@@ -912,6 +1055,16 @@
                     });
                 },
                 /**
+                 * Removes a data key
+                 * @param {string} key
+                 * @returns {ThisApp}
+                 */
+                removeData: function (key) {
+                    return this.each(function () {
+                        delete this.dataset[key];
+                    });
+                },
+                /**
                  * Replaces current items with the given content
                  * @param mixed content
                  * @returns __
@@ -939,7 +1092,7 @@
                     this.each(function () {
                         var rId = false, query = '', _this = this;
                         if (!this.id) {
-                            this.id = 'rANd' + Math.ceil(Math.random() * 100);
+                            this.id = __.randomString();
                             rId = true;
                         }
                         if (selector) {
@@ -1022,7 +1175,7 @@
                 toJSONObject: function (string) {
                     return this.tryCatch(function () {
                         return JSON.parse(string);
-                    });
+                    }, function () {});
                 },
                 /**
                  * Parse an object to string
@@ -1032,7 +1185,7 @@
                 toJSONString: function (object) {
                     return this.tryCatch(function () {
                         return JSON.stringify(object);
-                    });
+                    }, function () {});
                 },
                 /**
                  * Triggers the given event on current items
@@ -1139,6 +1292,7 @@
              * Internal (hidden) methods
              */
             internal = Object.create({
+                records: {},
                 /**
                  * Binds the target to the model
                  * @param _ _target
@@ -1146,42 +1300,42 @@
                  * @param boolean ignoreCache Indicates whether to ignore cache
                  * @returns ThisApp
                  */
-                bindToModel: function (_target, _model, ignoreCache) {
-                    var model_name = _model.attr('this-model') || _model.attr('this-id'),
-                            _this = this;
-                    if (!_model.attr('this-mid')) {
+                bindToModel: function (_target, _model) {
+                    if (!_target.length || !_model.length)
+                        return this;
+                    else if (!_model.attr('this-mid')) {
                         this.error('Model to bind to does not have an id');
                         return;
                     }
-                    if (!ignoreCache)
-                        this.collection(model_name, {
-                            success: function (collection) {
-                                var model = collection.model(_model.attr('this-mid'));
-                                if (model) {
-                                    model.url = _target.attr('this-url');
+                    var model_name = _model.attr('this-model') || _model.attr('this-id'),
+                            _this = this;
+
+                    _target = internal.doTar.call(this, _target, true);
+
+                    this.collection(model_name, {
+                        success: function (collection) {
+                            collection.model(_model.attr('this-mid'), {
+                                url: _model.attr('this-url'),
+                                success: function (model) {
                                     model.bind(_target);
-                                    _target.trigger('model.binded', {
-                                        data: model
-                                    });
                                 }
-                                else {
-                                    _this.request(_model, function (data) {
-                                        data = _this.config.dataKey ? data[_this.config.dataKey] : data;
-                                        model = new Model(_model.attr('mid'), data, {
-                                            name: _model.attr('this-id'),
-                                            app: _this,
-                                            uid: _model.attr('this-uid'),
-                                            url: _model.attr('this-url')
-                                        });
-                                        model.bind(_target);
-                                        _target.trigger('model.binded', {
-                                            data: model
-                                        });
-                                    });
-                                }
-                            }
-                        });
+                            });
+                        }
+                    });
                     return this;
+                },
+                /**
+                 * Binds an elem to the given object
+                 * @param {_}|{HTMLElement} elem
+                 * @param {Object} object
+                 * @param {string}|{integer} key The unique identifier of the object, if coming
+                 * from a list
+                 * @returns {_}
+                 */
+                bindToObject: function (elem, object, callback) {
+                    return internal.loadComponents.call(this, function () {
+                        return internal.parseData.call(this, object, elem, null, false, true, callback);
+                    }.bind(this), elem.find('[this-component]'));
                 },
                 /**
                  * Saves to cache or retrieves from cache
@@ -1206,18 +1360,12 @@
 
                     // saving
                     // update if exists
-                    if (update) {
-                        // data at id exists already
-                        if (__data[id])
-                            // data at id has key data. extend new data on it
-                            if (__data[id].data)
-                                data.data = this.__.extend(__data[id].data, data.data, true);
+                    if (update && __data[id]) {
                         // save data to id
-                        __data[id] = data;
+                        __data[id] = this.__.extend(__data[id], data, true);
                     }
                     else // overwrite otherwise
                         __data[id] = data;
-
                     // set the length of objects in collection
                     __data[id].length = Object.keys(__data[id].data).length;
                     // save to store
@@ -1257,13 +1405,21 @@
                     return this.store(type.toLowerCase(), data);
                 },
                 /**
-                 * Fetches the debug level
-                 * @returns {Number}
+                 * Called when a component has been loaded
+                 * @param {_} components All components being loaded
+                 * @param {Function} callback Function to call when all components have been loaded
                  */
-                debugLevel: function () {
-                    if (this.__.isBoolean(this.config.debug))
-                        return this.config.debug ? 3 : 0;
-                    return this.config.debug;
+                componentLoaded: function (components, callback) {
+                    if (!this.__proto__.components)
+                        this.__.callable(callback).call(this);
+                    else {
+                        var _this = this;
+                        internal.loadComponent
+                                .call(this, components.get(components.length - this.components),
+                                        function () {
+                                            internal.componentLoaded.call(_this, components, callback);
+                                        });
+                    }
                 },
                 /**
                  * Does the loading
@@ -1283,30 +1439,36 @@
                     var uid = container.attr('this-model-uid') ||
                             container.attr('this-uid') || '',
                             id = internal.getUIDValue.call(this, data, uid),
-                            _callback = function (_temp) {
-                                while (level) {
-                                    _temp = _temp.children();
-                                    level--;
-                                }
-                                if (!isModel) {
-                                    _temp.attr('this-mid', id)
-                                            .attr('this-uid', uid)
-                                            .attr('this-type', 'model')
-                                            .attr('this-in-collection', '');
-                                    if (!_temp.attr('this-url'))
-                                        _temp.attr('this-url', container.attr('this-url') + id);
-                                    if (container.attr('this-model'))
-                                        _temp.attr('this-id', container.attr('this-model'));
-                                    container[container.hasAttr('this-prepend') ? 'prepend' : 'append'](_temp.show())
-                                            .removeAttr('this-loading');
-                                }
-                                else {
-                                    container.attr('this-uid', uid).attr('this-mid', id);
-                                    container.html(_temp.html());
-                                }
-                                this.__.callable(callback).call(container);
-                            }.bind(this),
-                            _temp = internal.parseData
+                            url = container.attr('this-url') || '',
+                            url_parts = url.split('?');
+                    url = url_parts[0];
+                    if (url && !url.endsWith('/'))
+                        url += '/';
+                    var _callback = function (_temp) {
+                        while (level) {
+                            _temp = _temp.children();
+                            level--;
+                        }
+                        if (!isModel) {
+                            _temp.attr('this-mid', id)
+                                    .attr('this-uid', uid)
+                                    .attr('this-type', 'model')
+                                    .attr('this-in-collection', '');
+                            if (!_temp.attr('this-url'))
+                                _temp.attr('this-url', url + id);
+                            if (container.attr('this-model'))
+                                _temp.attr('this-id', container.attr('this-model'));
+                            container[container.hasAttr('this-prepend')
+                                    ? 'prepend' : 'append'](_temp.show())
+                                    .removeAttr('this-loading');
+                        }
+                        else {
+                            container.attr('this-uid', uid).attr('this-mid', id);
+                            container.html(_temp.html()).show();
+                        }
+                        this.__.callable(callback).call(this, container);
+                    }.bind(this);
+                    internal.parseData
                             .call(this, data, content, variables, false, isModel, _callback);
                     return this;
                 },
@@ -1361,7 +1523,6 @@
                     var __layout = _layout.clone(), _this = this;
                     // load layout assets (css)
                     internal.loadAssets.call(this, __layout);
-
                     // get existing layout in container
                     _layout = this.reloadLayouts ? _() :
                             this.container.find('layout[this-id="'
@@ -1371,7 +1532,7 @@
                     // layout doesn't exist in container
                     if (!_layout.length)
                         // get from templates
-                        _layout = this.templates.children('[this-type="layouts"] layout[this-id="'
+                        _layout = this.getTemplate('[this-type="layouts"] layout[this-id="'
                                 + __layout.attr('this-extends') + '"],'
                                 + '[this-type="layouts"] [this-type="layout"][this-id="'
                                 + __layout.attr('this-extends') + '"]').clone();
@@ -1389,7 +1550,6 @@
                                     else
                                         internal.finalizePageLoad
                                                 .call(_this, _layout, replaceInState);
-
                                 },
                                 function () {
                                     _this.error('Layout [' + __layout.attr('this-extends')
@@ -1401,23 +1561,25 @@
                     else {
                         __layout.removeAttr('this-extends');
                         if (_layout.attr('this-url')) {
-                            this.request(_layout.attr('this-url'),
-                                    function (data) {
-                                        _layout.removeAttr('this-url')
-                                                .html(data)
-                                                .find('[this-content]')
-                                                .html(__layout.show());
-                                        if (_layout.attr('this-extends')) {
-                                            internal.extendLayout.call(_this, _layout, replaceInState);
-                                        }
-                                        else {
-                                            internal.finalizePageLoad.call(_this, _layout,
-                                                    replaceInState);
-                                        }
-                                    },
-                                    function () {
-                                    },
-                                    null, 'text');
+                            this.request({
+                                url: _layout.attr('this-url'),
+                                success: function (data) {
+                                    _layout.removeAttr('this-url')
+                                            .html(data)
+                                            .find('[this-content]')
+                                            .html(__layout.show());
+                                    if (_layout.attr('this-extends')) {
+                                        internal.extendLayout.call(_this, _layout, replaceInState);
+                                    }
+                                    else {
+                                        internal.finalizePageLoad.call(_this, _layout,
+                                                replaceInState);
+                                    }
+                                },
+                                error: function () {
+                                },
+                                dataType: 'text'
+                            });
                         }
                         else {
                             _layout.find('[this-content]')
@@ -1471,76 +1633,136 @@
                                     + this.page.attr('this-id')
                                     + '"]:not([this-dead])')
                             .attr('this-current', '')
-                            .removeAttr('this-layout');
+                            .removeAttr('this-layout').hide();
                     this.container.find('[this-type]:not([this-type="page"]):not(page)'
                             + ':not(layout):not([this-type="layout"])'
                             + ':not(component):not([this-type="component"])').hide();
-                    internal.loadAssets.call(this, this.page, function () {
+                    // delete pageModel for last page
+                    delete this.pageModel;
+                    this.pageIsLoaded = false;
+                    // callback for when page assets have been loaded
+                    var loadedAssets = function () {
                         internal.loadComponents.call(this, function () {
-                            this.page = internal.doTar.call(this, this.page);
-                            if (this.page.attr('this-url') && !this.page.attr('this-model')) {
-                                this.request(this.page.attr('this-url'), function (data) {
-                                    _this.page.html(data);
-                                    internal.loadModels.call(_this, replaceInState, true);
-                                },
-                                        function () {
-                                        }, null, 'text');
-                            }
-                            else if (this.page.attr('this-url') && this.page.attr('this-model')) {
-                                // continue loading other models once page has been loaded as a model
-                                internal.loadModel.call(this, this.page, null, function () {
-                                    internal.showPage.call(this, replaceInState);
+                            this.page = internal.doTar.call(this, this.page).hide();
+                            // load page as model if attached to a model
+                            if (this.page.attr('this-url') && this.page.attr('this-model')) {
+                                // get page model's collection
+                                this.collection(this.page.attr('this-model'), {
+                                    success: function (collection) {
+                                        collection.model(this.page.attr('this-mid'), {
+                                            url: this.page.attr('this-url'),
+                                            success: function (model) {
+                                                this.pageModel = model;
+                                                // load page model. data provided
+                                                internal.loadModel.call(this, this.page, model.attributes, function () {
+                                                    internal.showPage.call(this, replaceInState);
+                                                }.bind(this));
+                                            }.bind(this),
+                                            error: function () {
+                                                // load page model. no data provided. request anew
+                                                internal.loadModel.call(this, this.page, null, function () {
+                                                    internal.showPage.call(this, replaceInState);
+                                                }.bind(this));
+                                            }
+                                        });
+                                    }.bind(this)
                                 });
                             }
                             else {
                                 internal.showPage.call(this, replaceInState);
                             }
                         }.bind(this));
-                    });
+                    }.bind(this);
+                    // load page content from elsewhere
+                    if (this.page.attr('this-path')) {
+                        this.request({
+                            url: this.page.attr('this-path'),
+                            success: function (data) {
+                                _this.page.html(data).show()
+                                        .find('[this-type]'
+                                                + ':not(component):not([this-type="component"])')
+                                        .hide();
+                                internal.loadAssets.call(_this, _this.page, loadedAssets);
+                            },
+                            error: function () {
+                            },
+                            dataType: 'text'
+                        });
+                    }
+                    // just load the page assets
+                    else {
+                        internal.loadAssets.call(this, this.page, loadedAssets);
+                    }
                 },
                 /**
                  * Loads a type fully from URL
                  * @param {string} type page || layout || component
-                 * @param {string} id
+                 * @param {string} idOrPath
                  * @param {boolean} replaceInState
                  * @returns {void}
                  */
-                fullyFromURL: function (type, id, success, error) {
+                fullyFromURL: function (type, idOrPath, success, error) {
                     if (!this.config.paths) {
                         this.__.callable(error).call(this);
                         return;
                     }
                     var _this = this,
-                            pathConfig = this.config.paths[type + 's'],
-                            url = pathConfig.dir + id + pathConfig.ext;
-                    this.request(url,
-                            function (data) {
-                                var elem = _this.__.createElement(data);
-                                if (type !== 'component') {
-                                    if (!elem.length || elem.length > 1 ||
-                                            (!elem.is(type) && elem.attr('this-type') !== type))
-                                    {
-                                        elem = _this._('<div this-type="' + type + '" this-id="'
-                                                + id + '" />')
-                                                .html(data);
-                                    }
-                                    elem.attr('this-id', id);
-                                    _this.templates.append(elem);
+                            pathConfig = this.config.paths[type + 's'];
+                    if (!this.__.isObject(pathConfig)) {
+                        this.__callable(error).call(this);
+                        return;
+                    }
+                    var url = pathConfig.dir + idOrPath + pathConfig.ext;
+                    this.request({
+                        url: url,
+                        success: function (data) {
+                            var elem = _this.__.createElement(data);
+                            // components
+                            if (type === 'component') {
+                                if (elem.length > 1)
+                                    elem = _this._('<div/>').html(elem);
+                                elem.attr('this-component-url', idOrPath);
+                                _this.addTemplate(_this._('<div this-type="component"'
+                                        + ' this-url="' + idOrPath + '" />')
+                                        .html(elem.clone().removeAttr('this-url')));
+                            }
+                            // pages and layouts
+                            else {
+                                if (!elem.length || elem.length > 1 ||
+                                        (!elem.is(type) && elem.attr('this-type') !== type))
+                                {
+                                    elem = _this._('<div this-type="' + type + '" />')
+                                            .html(data);
                                 }
-                                else {
-                                    if (elem.length > 1)
-                                        elem = _this._('<div/>').html(elem);
-                                    if (!elem.attr('this-url'))
-                                        elem.attr('this-url', id);
-                                    _this.templates.append(_this._('<div this-type="component"'
-                                            + ' this-url="' + id + '" />')
-                                            .html(elem.clone().removeAttr('this-url')));
+                                // overwrite id from idOrPath
+                                elem.attr('this-id', idOrPath.replace(/\/\\/g, '-'));
+                                if (type === 'page') {
+                                    if (idOrPath.indexOf('/') !== -1)
+                                        elem.attr('this-path', idOrPath);
+                                    elem.find('[this-type="collection"]:not([this-model]),collection:not([this-model])')
+                                            .each(function () {
+                                                _this._(this).attr('this-model', _this._(this).attr('this-id'));
+                                            });
                                 }
-                                _this.__.callable(success).call(this, elem.clone());
-                            },
-                            function (e) {
-                                _this.__.callable(error).call(this, e);
-                            }, null, 'text');
+                                _this.addTemplate(elem);
+                            }
+                            _this.__.callable(success).call(this, elem.clone());
+                        },
+                        error: function (e) {
+                            _this.__.callable(error).call(this, e);
+                        },
+                        dataType: 'text'
+                    });
+                },
+                /**
+                 * Generates a key for the request
+                 */
+                generateRequestKey: function () {
+                    if (!internal.isRunning.call(this))
+                        return;
+                    var key = this.__.randomString(12);
+                    internal.record.call(this, 'requestKey', key);
+                    return key;
                 },
                 /**
                  * Fetches the value of the variable on a deep level
@@ -1572,6 +1794,17 @@
                     return exps;
                 },
                 /**
+                 * Fetches and clears the generated request key
+                 * @returns {string}
+                 */
+                getRequestKey: function () {
+                    if (!internal.isRunning.call(this))
+                        return;
+                    var key = internal.record.call(this, 'requestKey');
+                    delete internal.records[this.container.attr('this-id')].requestKey;
+                    return key;
+                },
+                /**
                  * Fetches the value of the uid of the given data
                  * @param {object} data
                  * @param {string} uid If not provided, the default in the config is fallen
@@ -1579,44 +1812,27 @@
                  * @returns {mixed}
                  */
                 getUIDValue: function (data, uid) {
-                    return this.tryCatch(function () {
-                        uid = uid || this.config.modelUID;
-                        var value;
-                        if (!data)
-                            return value;
-                        this.__.forEach(uid.split('.'), function (i, v) {
-                            if (!i) // first uid part. set value to data at v
-                                value = data[v];
-                            else if (value) // not first uid part. value should exist. 
-                                //set value to data at v of value
-                                value = value[v];
-                        });
-                        return value;
-                    },
-                            function () {
-                                return null;
-                            });
+                    return internal.getDeepValue.call(this, uid || this.config.modelUID, data);
                 },
                 /**
                  * Retrieves the value of the variable from the data and filters it if required
                  * @param {string} variable
                  * @param {object} data
-                 * @param {Boolean} raw Indicates whether to return value without surrounding span tag
                  * @returns {mixed}
                  */
-                getVariableValue: function (variable, data, raw) {
+                getVariableValue: function (variable, data) {
                     if (!variable)
                         return;
                     var _this = this,
                             vars = variable.replace(/{*}*/g, '')
                             .replace(/\\\|/g, '__fpipe__').split('|'),
-                            key = this.__.arrayRemoveIndex(vars, 0),
+                            key = this.__.removeArrayIndex(vars, 0),
                             value = this.__.contains(key, '.') ?
                             internal.getDeepValue.call(null, key, data) : data[key];
                     if (value || value == 0)
                         this.__.forEach(vars, function (i, v) {
                             v = v.replace(/__fpipe__/g, '|');
-                            var exp = v.split(':'), filter = _this.__.arrayRemoveIndex(exp, 0);
+                            var exp = v.split(':'), filter = _this.__.removeArrayIndex(exp, 0);
                             if (Filters[filter])
                                 value = Filters[filter](value, exp.join(':'));
                             if (!value) /* stop filtering if no value exists anymore */
@@ -1625,23 +1841,6 @@
                     if (!value && value != 0)
                         return;
                     return value;
-                },
-                /**
-                 * Groups the function output on the console
-                 * @param {String} name
-                 * @param {Function} func The action to be performed in the group
-                 * @param (Boolean) isMethod Indicates whether the group name is a method name
-                 * @returns {mixed}
-                 */
-                groupConsoleOutput: function (name, func, isMethod) {
-                    if (isMethod)
-                        name += '(...)';
-                    if (internal.debugLevel.call(this) >= 2)
-                        this.console('group', name);
-                    var result = this.tryCatch(this.__.callable(func));
-                    if (internal.debugLevel.call(this) >= 2)
-                        this.console('groupEnd');
-                    return result;
                 },
                 /**
                  * Does things on looped objects
@@ -1731,7 +1930,6 @@
                                             __this.removeAttr('this-end-if');
                                         delete matched[level];
                                         level--;
-
                                     }
                                     catch (e) {
                                     }
@@ -1748,6 +1946,15 @@
                  */
                 is: function (type, container) {
                     return this._(container).attr('this-type') === type || this._(container).is(type);
+                },
+                /**
+                 * Check if an app is running
+                 */
+                isRunning: function () {
+                    var record;
+                    if (this.container)
+                        record = internal.record.call(this);
+                    return record && record.running;
                 },
                 /**
                  * Loads the given type of asset on the given elementF
@@ -1773,7 +1980,7 @@
                         if (!url.endsWith('.css'))
                             url += '.css';
                         // request new version if debugging
-                        if (this.config.debug)
+                        if (internal.record.call(this, 'debug'))
                             url += '?' + Math.round(Math.random() * 99999);
                         // create link
                         var link = this.__.createElement(null, 'link')
@@ -1801,9 +2008,8 @@
                         if (!url.endsWith('.js'))
                             url += '.js';
                         // request new version if debugging
-                        if (this.config.debug)
+                        if (internal.record.call(this, 'debug'))
                             url += '?' + Math.round(Math.random() * 99999);
-
                         // create script
                         var script = this.__.createElement(null, 'script')
                                 // add attributes
@@ -1816,7 +2022,6 @@
                             _this.__.callable(callback).call(_this);
                         };
                         script.attr('src', url);
-
                         // append script to body
                         this._('body').append(script);
                         return internal;
@@ -1847,7 +2052,6 @@
                     if (!Object.keys(this.removedAssets).length)
                         this._('script[this-app="' + this.container.attr('this-id') + '"]')
                                 .removeAttr('this-loaded');
-
                     if (elem.attr('this-load-js-first') && !elem.hasAttr('this-with-first-js'))
                     {
                         leaveUnrequired = true;
@@ -1900,7 +2104,7 @@
                     // collection must have an id
                     if (!__this.attr('this-id')) {
                         __this.removeAttr('this-loading');
-                        if (looping)
+                        if (looping && this.__proto__.collections)
                             this.__proto__.collections--;
                         if (chain && !this.collections)
                             internal.loadForms.call(this, null, null, replaceState, chain);
@@ -1908,31 +2112,39 @@
                     if (!__this.attr('this-model'))
                         __this.attr('this-model', __this.attr('this-id'));
                     // ensure collection content is grouped together
-                    if (__this.children().length > 1)
+                    if (!__this.hasAttr('this-loaded') && __this.children().length > 1) {
                         __this.innerWrap('<div/>');
-
+                    }
+                    var _content;
                     // cache collection if not exist in dom as unloaded
-                    if (!this.templates.children('collection[this-id="'
+                    if (!this.getTemplate('collection[this-id="'
                             + __this.attr('this-id') +
                             '"],[this-type="collection"][this-id="'
                             + __this.attr('this-id') + '"]').length) {
-                        var cache = __this.clone().removeAttr('this-loaded')
-                                .removeAttr('this-loading').hide().outerHtml()
-                                .replace(/\(\{/g, '__obrace2__').replace(/\}\)/g, '__cbrace2__');
-                        this.templates.append(cache);
+                        this.addTemplate(__this.clone().removeAttr('this-loaded')
+                                .removeAttr('this-loading').hide().outerHtml());
                     }
-
+                    else {
+                        _content = this.getTemplate('collection[this-id="'
+                                + __this.attr('this-id') +
+                                '"],[this-type="collection"][this-id="'
+                                + __this.attr('this-id') + '"]')
+                                .children()
+                                .clone().removeAttr('this-cache').outerHtml();
+                    }
                     var _this = this,
-                            content = __this.removeAttr('this-cache').html(),
+                            content = _content || __this.removeAttr('this-cache').html(),
                             model_name = __this.attr('this-model'),
                             model_to_bind = this.container.find('model[this-id="' + model_name
                                     + '"],[this-type="model"][this-id="' + model_name
                                     + '"]');
-
-                    __this = internal.doTar.call(this, __this, true).html('');
+                    __this = internal.doTar.call(this, __this, true);
+                    if (!__this.hasAttr('this-paginate') ||
+                            !__this.children(':first-child').attr('this-mid')) {
+                        __this.html('');
+                    }
                     if (model_name && model_to_bind.length)
                         model_to_bind.attr('this-bind', true);
-
                     var requestData = {}, save = true, success, error;
                     if (_this.page.attr('this-query')) {
                         requestData['query'] = _this.page.attr('this-query');
@@ -1941,7 +2153,25 @@
                     }
                     if (__this.attr('this-search'))
                         requestData['keys'] = __this.attr('this-search');
-
+                    // paginate collection
+                    if (__this.hasAttr('this-paginate')) {
+                        // update pagination
+                        if (!__this.attr('this-pagination-page')) {
+                            __this.attr('this-pagination-page', 0);
+                        }
+                        // add request data with pagination info
+                        if (__this.attr('this-pagination-page') !== undefined) {
+                            requestData['page'] = parseInt(__this.attr('this-pagination-page')) + 1;
+                            __this.attr('this-pagination-page', requestData['page']);
+                            // add limit
+                            if (__this.attr('this-paginate')) {
+                                requestData['limit'] = __this.attr('this-paginate');
+                            }
+                            else if (this.config.pagination && this.config.pagination.limit) {
+                                requestData['limit'] = this.config.pagination.limit;
+                            }
+                        }
+                    }
                     // callbacks for request
                     success = function (data, uid, handled) {
                         if (uid)
@@ -1952,22 +2182,26 @@
                         }
                         internal.loadData
                                 .call(_this, __this, data, content, false, save,
-                                        function () {
-                                            __this.attr('this-loaded', '')
-                                                    .removeAttr('this-loading')
-                                                    .trigger('collection.loaded');
-
+                                        function (elem) {
+                                            if (elem)
+                                                elem.attr('this-loaded', '')
+                                                        .removeAttr('this-loading')
+                                                        .trigger('collection.loaded');
                                             this.__.callable(callback).call(this, data);
                                         }.bind(_this));
-                        if (looping)
+                        if (looping && _this.__proto__.collections)
                             _this.__proto__.collections--;
                         if (chain && !_this.collections)
                             internal.loadForms.call(_this, null, null, replaceState, chain);
                     },
                             error = function () {
+                                // revert pagination page to former page count
+                                if (__this.attr('this-pagination-page') !== undefined) {
+                                    __this.attr('this-pagination-page', parseInt(__this.attr('this-pagination-page')) - 1);
+                                }
                                 __this.removeAttr('this-loading');
                                 _this.__.callable(callback).call(_this);
-                                if (looping)
+                                if (looping && _this.__proto__.collections)
                                     _this.__proto__.collections--;
                                 if (chain && !_this.collections)
                                     internal.loadForms.call(_this, null, null, replaceState, chain);
@@ -1996,7 +2230,7 @@
                             + ':not([this-data]):not([this-loading]),'
                             + '[this-type="collection"]:not([this-loaded])'
                             + ':not([this-data]):not([this-loading])');
-                    this.__proto__.collections += collections.length;
+                    this.__proto__.collections = collections.length;
                     if (chain && !collections.length)
                         internal.loadForms.call(this, null, null, replaceState, chain);
                     collections.each(function () {
@@ -2007,7 +2241,7 @@
                 /**
                  * Loads a single component
                  * @param {_} __this The component placeholder
-                 * @param function callback To be called when all components have been loaded
+                 * @param {function} callback To be called when all components have been loaded
                  * @param {_} component The component template
                  * @returns {void}
                  */
@@ -2017,13 +2251,12 @@
                     // component does not exist
                     if (!component || !this._(component).length) {
                         if (__this.attr('this-url')) {
-                            var cached = this.templates
-                                    .children('component[this-url="' + __this.attr('this-url') + '"],'
+                            var cached = this
+                                    .getTemplate('component[this-url="' + __this.attr('this-url') + '"],'
                                             + '[this-type="component"][this-url="'
-                                            + __this.attr('this-url') + '"]');
+                                            + __this.attr('this-url') + '"]', true);
                             if (cached.length)
-                                internal.loadComponent.call(this, __this, callback, cached.clone()
-                                        .removeAttr('this-url'));
+                                internal.loadComponent.call(this, __this, callback, cached.children().clone().show());
                             else {
                                 internal.fullyFromURL
                                         .call(_this, 'component', __this.attr('this-url'),
@@ -2038,13 +2271,13 @@
                             }
                         }
                         else {
-                            component = this.templates.children('component[this-id="'
+                            component = this.getTemplate('component[this-id="'
                                     + __this.attr('this-component') + '"],'
                                     + '[this-type="component"][this-id="'
                                     + __this.attr('this-component')
                                     + '"]').clone();
                             if (!component.length) {
-                                if (this.__proto__.components)
+                                if (this.__proto__.components && this.__proto__.components)
                                     this.__proto__.components--;
                                 if (!this.__proto__.components)
                                     this.__.callable(callback).call(this);
@@ -2057,32 +2290,31 @@
                     component = this._(component).clone();
                     if (component.is('component') || component.attr('this-type') === 'component')
                         component.removeAttr('this-url');
+
                     // load component
-                    __this.replaceWith(component).trigger('component.loaded').show();
-                    if (this.__proto__.components)
+                    __this.replaceWith(component.show()).trigger('component.loaded');
+                    if (this.__proto__.components && this.__proto__.components)
                         this.__proto__.components--;
-                    if (!this.__proto__.components)
-                        this.__.callable(callback).call(this);
+                    this.__.callable(callback).call(this);
                 },
                 /**
                  * Loads all components in the current page
                  * @param function callback To be called when all components have been loaded
                  * @returns ThisApp
                  */
-                loadComponents: function (callback) {
+                loadComponents: function (callback, components) {
                     var _this = this,
-                            components = this.container.find('[this-component]'),
+                            components = components || this.container.find('[this-component]'),
                             loaded = 0;
-                    this.__proto__.components += components.length;
-                    if (!components.length)
+                    this.__proto__.components = components.length;
+                    if (!components.length) {
                         this.__.callable(callback).call(this);
-                    components.each(function () {
-                        internal.loadComponent.call(_this, this, function () {
-                            loaded++;
-                            if (loaded === components.length)
-                                _this.__.callable(callback).call(_this);
-                        });
-                    });
+                    }
+                    else {
+                        internal.loadComponent.call(_this, components.get(0), function () {
+                            internal.componentLoaded.call(this, components, callback);
+                        }.bind(this));
+                    }
                     return this;
                 },
                 /**
@@ -2098,23 +2330,39 @@
                  */
                 loadData: function (container, data, content, isModel, save, callback) {
                     container = this._(container);
+                    var hidePaginationBtns = function () {
+                        // was paginating
+                        if (container.hasAttr('this-paginate')) {
+                            // next button
+                            var selector = '[this-paginate-next="'
+                                    + container.attr('this-id')
+                                    + '"],[this-paginate-previous="'
+                                    + container.attr('this-id') + '"]',
+                                    selector2 = '[this-paginate-next=""],[this-paginate-previous=""]';
+                            setTimeout(function () {
+                                // hide pagination button selector 
+                                this.container.find(selector).hide();
+                                // hide sibling buttons
+                                container.siblings(selector2).hide();
+                            }.bind(this));
+                            // reset page index to previous
+                            container.attr('this-pagination-page', parseInt(container.attr('this-pagination-page')) - 1);
+                        }
+                    }.bind(this);
                     // trigger invalid.response trigger if no data
                     if (!data) {
+                        hidePaginationBtns();
                         container.trigger('invalid.response');
+                        this.__.callable(callback).call(this);
                         return;
                     }
-                    // get variables in content
-                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
-                            // model_name for containers, model id for models
-                            save_as = container.attr('this-model')
-                            || container.attr('this-id'),
-                            // default data structure
-                            _data = {
-                                data: {},
-                                // set expiration timestamp to 24 hours
-                                expires: new Date().setMilliseconds(1000 * 3600 * 24)
-                            };
-
+                    // default data structure
+                    var _data = {
+                        data: {},
+                        // set expiration timestamp to 24 hours
+                        expires: new Date().setMilliseconds(1000 * 3600 * 24)
+                    },
+                            real_data = getRealData.call(this, data);
                     // get expiration if set and data from dataKey if specified
                     if (this.config.dataKey) {
                         // set data expiration timestamp too.
@@ -2122,14 +2370,31 @@
                             _data.expires = new Date().setMilliseconds(1000 * data.expires);
                         else if (this.__.isString(data.expires)) // expiration is a string. Must be date
                             _data.expires = new Date(data.expires).getTime();
-                        data = data[this.config.dataKey];
+                        data = real_data;
                     }
-
-                    var _callback = function () {
-                        container.removeAttr('this-filter').show();
-                        this.__.callable(callback).apply(this, Array.from(arguments));
-                    }.bind(this);
-
+                    // trigger empty.response trigger if no data
+                    if (!data) {
+                        hidePaginationBtns();
+                        container.trigger('empty.response');
+                        this.__.callable(callback).call(this);
+                        return;
+                    }
+                    // get variables in content
+                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
+                            // model_name for containers, model id for models
+                            save_as = container.attr('this-model')
+                            || container.attr('this-id'),
+                            _callback = function () {
+                                container.removeAttr('this-filter').show();
+                                if (container.hasAttr('this-static')) {
+                                    var id = container.attr('this-id'),
+                                            type = getElemType(container);
+                                    this.getTemplate(type + '[this-id="' + id
+                                            + '"],[this-type="' + type + '"][this-id="'
+                                            + id + '"]').replaceWith(container.attr('this-loaded', '').clone());
+                                }
+                                this.__.callable(callback).apply(this, Array.from(arguments));
+                            }.bind(this);
                     // loading a collection
                     if (this.__.isArray(data) || isModel === false) {
                         // check if can continue with rendering
@@ -2166,16 +2431,79 @@
                                     break;
                             }
                         }
-                        this.collectionData = Object.keys(data).length;
+                        this.collectionData = Object.keys(this.cacheTargets || data).length;
+                        var done = function () {
+                            // was paginating
+                            if (container.hasAttr('this-paginate')) {
+                                // next button
+                                var selector = '[this-paginate-next="'
+                                        + container.attr('this-id')
+                                        + '"]',
+                                        selector2 = '[this-paginate-next=""]';
+                                // overwrite is on
+                                if ((container.hasAttr('this-paginate-overwrite')
+                                        && container.attr('this-paginate-overwrite') === 'true')
+                                        || (!container.hasAttr('this-paginate-overwrite')
+                                                && this.config.pagination
+                                                && this.config.pagination.overwrite)
+                                        // and current page is the first
+                                        && container.attr('this-pagination-page') === 1) {
+                                    // hide previous button too
+                                    selector += ',[this-paginate-previous="'
+                                            + container.attr('this-id') + '"]';
+                                    selector2 += ',[this-paginate-previous=""]';
+                                }
+                                // hide pagination button selector 
+                                this.container.find(selector).hide();
+                                // hide sibling buttons
+                                container.siblings(selector2).hide();
+
+                                // reset page index to previous
+                                container.attr('this-pagination-page', parseInt(container.attr('this-pagination-page')) - 1);
+                            }
+                        }.bind(this);
+                        // data is not empty
                         if (this.collectionData) {
-                            this.__.forEach(data, function (index, model) {
+                            // inline overwrite command exist
+                            if (container.hasAttr('this-paginate-overwrite')) {
+                                // empty collection element if true
+                                if (container.attr('this-paginate-overwrite') === 'true') {
+                                    container.html('');
+                                }
+                            }
+                            // inline command not exist. check config pagination command
+                            else if (this.config.pagination && this.config.pagination.overwrite) {
+                                container.html('');
+                            }
+                            // the indices of the all models in collection
+                            var indices = [];
+                            // needed for subsequent pagination attempts
+                            this.__.forEach(this.cacheTargets || data, function (_index, _model) {
+                                var index, model;
+                                if (_this.cacheTargets) {
+                                    index = _model;
+                                    model = data[index];
+                                }
+                                else {
+                                    model = _model;
+                                    index = _index;
+                                }
+                                container.children('[this-mid="' + index + '"]').remove();
                                 // get id from model with uid
                                 var id = internal.getUIDValue.call(_this, model, uid);
+                                // keep index for later cached pagination
+                                indices.push(id || index);
                                 // if saving data is allowed
                                 if (save !== false) {
                                     // set model into data to save. use id if available,
                                     // or else index
-                                    _data.data[id || index] = model;
+                                    if (container.hasAttr('this-paginate')) {
+                                        _data.data[id || index] = _this.__.extend(model, {__page: container.attr('this-pagination-page')});
+                                    }
+                                    else {
+                                        _data.data[id || index] = model;
+                                    }
+
                                 }
                                 // process content as being in a loop
                                 var _content = internal.inLoop.call(_this, {
@@ -2183,7 +2511,7 @@
                                     model: model
                                 }, filter,
                                         content.replace(/{{_index}}/g, index));
-                                // if there's not content, go to the next model
+                                // if there's no content, go to the next model
                                 if (!_content)
                                     return;
                                 // process expressions in content
@@ -2212,21 +2540,72 @@
                                         false, level, function () {
                                             if (!--this.collectionData) {
                                                 delete this.collectionData;
-                                                this.__.callable(_callback).call(this, Array.from(arguments));
+                                                this.__.callable(_callback).call(this, container);
                                             }
                                         }.bind(_this));
                             });
+                            delete this.cacheTargets;
+
+                            var pageIndex = container.attr('this-pagination-page');
+                            if (pageIndex !== undefined) {
+                                // first page loaded
+                                if (pageIndex == 1) {
+                                    // hide previous button
+                                    this.container.find('[this-paginate-previous="'
+                                            + container.attr('this-id') + '"]').hide();
+                                    container.siblings('[this-paginate-previous=""]').hide();
+                                }
+                                // overwrite is one
+                                else if ((container.hasAttr('this-paginate-overwrite')
+                                        && container.attr('this-paginate-overwrite') === 'true')
+                                        || (!container.hasAttr('this-paginate-overwrite')
+                                                && this.config.pagination
+                                                && this.config.pagination.overwrite)) {
+                                    // show previous button
+                                    this.container.find('[this-paginate-previous="'
+                                            + container.attr('this-id') + '"]').show();
+                                    container.siblings('[this-paginate-previous=""]').show();
+                                }
+                                // show next button
+                                this.container.find('[this-paginate-next="'
+                                        + container.attr('this-id') + '"]').show();
+                                container.siblings('[this-paginate-next=""]').show();
+                            }
+                            // if saving data is allowed
+                            if (save !== false) {
+                                // save uid
+                                _data.uid = uid;
+                                // save url
+                                _data.url = url;
+                                if (container.hasAttr('this-paginate')) {
+                                    // save pagination index
+                                    _data.pagination = {};
+                                    _data.pagination[pageIndex] = indices;
+                                }
+                            }
+                            // mark pagination done if length of last result is not
+                            // equal to the expected limit
+                            if ((container.attr('this-paginate') && indices.length != container.attr('this-paginate'))
+                                    || (!container.attr('this-paginate') && this.config.pagination
+                                            && this.config.pagination.limit && indices.length != this.config.pagination.limit)) {
+                                done();
+                            }
                         }
+                        // data is empty
                         else {
+                            done();
+                            save = false;
                             delete this.collectionData;
-                            this.__.callable(_callback).call(this);
+                            this.__.callable(_callback).call(this, container);
                         }
-                        // if saving data is allowed
-                        if (save !== false) {
-                            // save uid
-                            _data.uid = uid;
-                            // save url
-                            _data.url = url;
+                        if (container.hasAttr('this-paginate')) {
+                            this.container.find('[this-paginate-next="'
+                                    + container.attr('this-id')
+                                    + '"],[this-paginate-previous="'
+                                    + container.attr('this-id') + '"]')
+                                    .removeAttr('disabled');
+                            container.siblings('[this-paginate-next=""],[this-paginate-previous=""]')
+                                    .removeAttr('disabled');
                         }
                     }
                     // loading a model
@@ -2243,7 +2622,6 @@
                             data = __data;
                         // saving is allowed
                         if (save !== false) {
-                            save_as = container.attr('this-id');
                             var id = internal.getUIDValue
                                     .call(this, data, container.attr('this-uid'));
                             // store data under its uid
@@ -2252,7 +2630,7 @@
                             // split into array by /
                             var _url = container.attr('this-url').split('/');
                             // remove the last value
-                            this.__.arrayRemoveIndex(_url, _url.length - 1);
+                            this.__.removeArrayIndex(_url, _url.length - 1);
                             // save the url
                             _data.url = _url.join('/') + '/';
                         }
@@ -2262,6 +2640,7 @@
                         internal.doLoad.call(this, container, data, content, variables, true, null, _callback);
                     }
                     // remove filter attribute and show
+                    container.removeAttr('this-filter');
                     if (save !== false)
                         internal.cache.call(this, 'model', save_as, _data, true);
                     return this;
@@ -2321,13 +2700,13 @@
                  */
                 loadForms: function (forms, model, replaceState, chain) {
                     var _this = this, isPage = false;
+                    // load all forms in container or page
                     if (!forms) {
                         isPage = this.page.is('form');
                         forms = isPage ? this.page : this.container.find('form');
                     }
                     forms.each(function () {
-                        var __this = _this._(this),
-                                elements = Array.from(this.elements);
+                        var __this = _this._(this);
                         // pass form action type from page to form if not exist on form                 
                         if (!__this.hasAttr('this-do') && _this.page.attr('this-do'))
                             __this.attr('this-do', _this.page.attr('this-do'));
@@ -2346,7 +2725,7 @@
                             return;
                         if (!model)
                             model = internal.modelFromStore.call(_this, mid, model_name);
-                        internal.loadFormElements.call(_this, elements, model);
+                        internal.loadFormElements.call(_this, Array.from(this.elements), model);
                         __this.attr('this-loaded', '').trigger('form.loaded');
                     });
                     if (chain)
@@ -2370,7 +2749,7 @@
                         // layout does not exist in container
                         if (!_layout.length) {
                             // get layout template
-                            _layout = this.templates.children('layout[this-id="'
+                            _layout = this.getTemplate('layout[this-id="'
                                     + layout + '"],'
                                     + '[this-type="layout"][this-id="'
                                     + layout + '"]').clone().attr('this-loaded', '');
@@ -2397,26 +2776,28 @@
                             }
                             else {
                                 if (_layout.attr('this-url')) {
-                                    this.request(_layout.attr('this-url'),
-                                            function (data) {
-                                                _layout.removeAttr('this-url')
-                                                        .html(data)
-                                                        .find('[this-content]')
-                                                        .html(_this.page);
-                                                if (_layout.attr('this-extends'))
-                                                    internal.extendLayout.call(_this, _layout,
-                                                            replaceInState);
-                                                else {
-                                                    internal.finalizePageLoad.call(_this, _layout,
-                                                            replaceInState);
-                                                }
-                                            },
-                                            function () {
-                                                _this.error('Layout [' + layout + '] not found!');
+                                    this.request({
+                                        url: _layout.attr('this-url'),
+                                        success: function (data) {
+                                            _layout.removeAttr('this-url')
+                                                    .html(data)
+                                                    .find('[this-content]')
+                                                    .html(_this.page);
+                                            if (_layout.attr('this-extends'))
+                                                internal.extendLayout.call(_this, _layout,
+                                                        replaceInState);
+                                            else {
                                                 internal.finalizePageLoad.call(_this, _layout,
                                                         replaceInState);
-                                            },
-                                            null, 'text');
+                                            }
+                                        },
+                                        error: function () {
+                                            _this.error('Layout [' + layout + '] not found!');
+                                            internal.finalizePageLoad.call(_this, _layout,
+                                                    replaceInState);
+                                        },
+                                        dataType: 'text'
+                                    });
                                 }
                                 else {
                                     _layout.find('[this-content]').html(_this.page);
@@ -2450,21 +2831,20 @@
                     var __this = this._(target),
                             content = __this.hide().outerHtml(),
                             _this = this,
-                            common_selector = '',
                             type = __this.attr('this-type')
-                            || __this.get(0).tagName.toLowerCase();
+                            || __this.get(0).tagName.toLowerCase(),
+                            common_selector = '';
                     __this.attr('this-loading', '')
                             .find('collection,[this-type="collection"]')
                             .attr('this-loading', '');
-
                     if (__this.attr('this-id'))
                         common_selector += '[this-id="' + __this.attr('this-id') + '"]';
                     else if (__this.attr('this-model'))
                         common_selector += '[this-model="' + __this.attr('this-model') + '"]';
                     __this = internal.doTar.call(this, __this, true);
-
                     if (!data && !__this.attr('this-url')) {
-                        this.__proto__.models--;
+                        if (this.__proto__.models)
+                            this.__proto__.models--;
                         if (chain && !this.models) {
                             internal.loadCollections.call(this, replaceState, chain);
                         }
@@ -2472,10 +2852,10 @@
                     }
 
                     if (type !== 'page') {
-                        if (this.templates.children(type + common_selector + ',[this-type="'
+                        if (this.getTemplate(type + common_selector + ',[this-type="'
                                 + type + '"]' + common_selector).length) {
                             // necessary in case of binding and target has already been used
-                            content = __this.html(this.templates.children(type + common_selector
+                            content = __this.html(this.getTemplate(type + common_selector
                                     + ',[this-type="' + type + '"]' + common_selector)
                                     .hide().html()).outerHtml();
                         }
@@ -2483,7 +2863,7 @@
                             var cache = _this._(content
                                     .replace(/\(\{/g, '__obrace2__')
                                     .replace(/\}\)/g, '__cbrace2__'));
-                            this.templates.append(cache.hide());
+                            this.addTemplate(cache.hide());
                         }
                     }
 
@@ -2514,20 +2894,26 @@
                     var success = function (data, uid, handled) {
                         if (handled)
                             return;
-                        internal.loadData.call(_this, __this, data, content, true, true,
-                                function () {
-                                    __this.attr('this-loaded', '')
-                                            .removeAttr('this-loading')
-                                            .trigger('model.loaded');
+                        internal.loadData.call(_this, __this, data, content, true,
+                                // only save the data if not loading page
+                                type !== 'page',
+                                function (elem) {
+                                    if (elem)
+                                        elem.attr('this-loaded', '')
+                                                .removeAttr('this-loading')
+                                                .trigger('model.loaded')
+                                                .show();
                                     this.__.callable(callback).call(this, data);
                                 }.bind(_this));
-                        _this.__proto__.models--;
+                        if (_this.__proto__.models)
+                            _this.__proto__.models--;
                         if (chain && !this.models)
                             internal.loadCollections.call(_this, replaceState, chain);
                     },
                             error = function () {
                                 __this.removeAttr('this-loading');
-                                _this.__proto__.models--;
+                                if (_this.__proto__.models)
+                                    _this.__proto__.models--;
                                 if (chain && !this.models)
                                     internal.loadCollections.call(_this, replaceState, chain);
                                 _this.__.callable(callback).call(_this);
@@ -2590,6 +2976,28 @@
                     // get model cache
                     if (!isCollection && cache)
                         cache = cache[config.elem.attr('this-mid')];
+
+                    // check pagination page data exists in cached data for collection
+                    if (isCollection && config.elem.hasAttr('this-paginate') &&
+                            // cached data exists and no pagination exists already
+                            cached) {
+                        if ((!cached.pagination
+                                // or paginaion exists but the page meta doesn't exist yet
+                                || cached.pagination[config.elem.attr('this-pagination-page')] === undefined
+                                // or paginaion exists and page meta exists but limit has changed
+                                || cached.pagination[config.elem.attr('this-pagination-page')].length !== config.requestData.limit))
+                            cache = null;
+                        else
+                            this.cacheTargets = cached.pagination[config.elem.attr('this-pagination-page')];
+                    }
+
+                    var success = function () {
+                        _this.__.callable(config.success)
+                                .apply(config.elem, Array.from(arguments));
+                        config.elem.trigger('load.content.success');
+                        config.elem.trigger('load.content.complete');
+                    }.bind(this);
+
                     // if no data is provided and collection has url 
                     if (!config.data && config.elem.attr('this-url')
                             // and no cache or cache exists but is expired
@@ -2607,13 +3015,8 @@
                                     id: config.elem.attr('this-mid'),
                                     url: config.elem.attr('this-url'),
                                     isCollection: isCollection,
-                                    success: function () {
-                                        _this.__.callable(config.success)
-                                                .apply(config.elem, Array.from(arguments));
-
-                                        config.elem.trigger('load.content.success');
-                                        config.elem.trigger('load.content.complete');
-                                    },
+                                    data: config.requestData,
+                                    success: success,
                                     error: function () {
                                         _this.__.callable(config.error)
                                                 .apply(config.elem, Array.from(arguments));
@@ -2621,79 +3024,85 @@
                                         config.elem.trigger('load.content.complete');
                                     }
                                 });
-                        return this;
                     }
-                    // if no data and no explicit ignore-cache on collection config.element 
-                    // and cache exists
-                    else if (!config.data && cache) {
-                        if (config.looping)
-                            this.__proto__[type + 's']--;
-                        config.data = cache;
-                        config.uid = cache_uid;
-                        fromCache = true;
-                    }
-                    // if data exists/found
-                    if (config.data) {
-                        var _data = {};
-                        // use dataKey if available
-                        if (_this.config.dataKey) {
-                            _data[_this.config.dataKey] = config.data;
-                            config.data = _data;
-                        }
-                        // watch for updates
-                        internal.watch.call(this, config.elem);
-                        // loads the data
-                        internal.loadData.call(this, config.elem, config.data, config.content,
-                                !isCollection, false, function () {
-                                    config.elem.removeAttr('this-loading');
-                                    if (fromCache) {
-                                        // trigger expired.cache.loaded event
-                                        if (cache_expired)
-                                            config.elem.trigger('expired.' + type + '.cache.loaded');
-                                        // trigger cache.loaded event
-                                        else
-                                            config.elem.trigger(type + '.cache.loaded');
-                                        setTimeout(function () {
-                                            config.success.call(this, config.data, null, true);
-                                        }.bind(this));
-                                        // mark as loaded and trigger event
-                                        config.elem.removeAttr('this-loading').attr('this-loaded', '');
-                                    }
-                                    this.__.callable(config.callback).call(this, _data);
-                                }.bind(this));
-                        // if chaining methods
-                        if (config.chain) {
-                            // if collection and done with all collections
-                            if (isCollection && !this.collections)
-                                internal.loadForms.call(this, null, null, config.replaceState,
-                                        config.chain);
-                            // if model and done with all models
-                            else if (!isCollection && !this.models)
-                                internal.loadCollections.call(this, config.replaceState,
-                                        config.chain);
-                        }
-                    }
-                    // use default request method
-                    else if (config.elem.attr('this-url')) {
-                        _this.request(config.elem.attr('this-url'), config.success, config.error,
-                                config.requestData);
-                    }
-                    // Cannot load type. Move on.
                     else {
-                        config.elem.trigger(type + '.load.failed');
-                        if (config.looping)
-                            this.__proto__[type + 's']--;
-                        if (config.chain) {
-                            // if collection and done with all collections
-                            if (isCollection && !this.collections)
-                                internal.loadForms.call(this, null, null, config.replaceState,
-                                        config.chain);
-                            // if model and done with all models
-                            else if (!isCollection && !this.models)
-                                internal.loadCollections.call(this, config.replaceState,
-                                        config.chain);
+                        // if no data and no explicit ignore-cache on collection config.element 
+                        // and cache exists
+                        if (!config.data && cache) {
+                            if (config.looping)
+                                this.__proto__[type + 's']--;
+                            config.data = cache;
+                            config.uid = cache_uid;
+                            fromCache = true;
+                        }
+                        // if data exists/found
+                        if (config.data) {
+                            var _data = {};
+                            // use dataKey if available
+                            if (this.config.dataKey) {
+                                _data[this.config.dataKey] = config.data;
+                                config.data = _data;
+                            }
+                            // watch for updates
+                            internal.watch.call(this, config.elem);
+                            // loads the data
+                            internal.loadData.call(this, config.elem, config.data, config.content,
+                                    !isCollection, false, function (elem) {
+                                        if (elem && fromCache) {
+                                            // trigger expired.cache.loaded event
+                                            if (cache_expired) {
+                                                elem.trigger('expired.' + type + '.cache.loaded');
+                                            }
+                                            // trigger cache.loaded event
+                                            else {
+                                                elem.trigger(type + '.cache.loaded');
+                                            }
+                                            setTimeout(function () {
+                                                config.success.call(this, config.data, null, true);
+                                            }.bind(this));
+                                            // mark as loaded and trigger event
+                                            elem.removeAttr('this-loading').attr('this-loaded', '');
+                                        }
+                                        this.__.callable(config.callback).call(this, _data);
+                                    }.bind(this));
+                            // if chaining methods
+                            if (config.chain) {
+                                // if collection and done with all collections
+                                if (isCollection && !this.collections)
+                                    internal.loadForms.call(this, null, null, config.replaceState,
+                                            config.chain);
+                                // if model and done with all models
+                                else if (!isCollection && !this.models)
+                                    internal.loadCollections.call(this, config.replaceState,
+                                            config.chain);
+                            }
+                        }
+                        // use default request method
+                        else if (config.elem.attr('this-url')) {
+                            _this.request({
+                                type: _this.config.crud.methods.read,
+                                url: config.elem.attr('this-url'),
+                                success: success,
+                                error: config.error,
+                                data: config.requestData
+                            });
+                        }
+                        // Cannot load type. Move on.
+                        else {
+                            this.__.callable(config.error).call(this);
                         }
                     }
+                },
+                /**
+                 * The function called when logging a message
+                 * @param {string} method
+                 * @param {string}|{array} param
+                 * @returns {ThisApp}
+                 */
+                log: function (method, param) {
+                    if (internal.record.call(this, 'debug'))
+                        console[method].apply(null, this.__.isArray(param) ? param : [param]);
+                    return this;
                 },
                 /**
                  * Loops elem through the given data
@@ -2701,9 +3110,11 @@
                  * @param {_}|HTLElement elem
                  * @param {string} filter
                  * @param {string} content
+                 * @param {function} func Called on each elem created.Parameters are elem, key
+                 * and value while the value is also the `this` of the function
                  * @returns {_}
                  */
-                loop: function (data, elem, filter, content) {
+                loop: function (data, elem, filter, content, func) {
                     if (!data)
                         return;
                     elem = this._(elem);
@@ -2762,7 +3173,8 @@
                                         });
                             });
                         }
-                        elem[elem.hasAttr('this-prepend') ? 'prepend' : 'append'](_content.show());
+                        elem[elem.hasAttr('this-prepend') ? 'prepend' : 'append'](_content.show().removeAttr('this-cache'));
+                        _this.__.callable(func).call(value, _content, key, value);
                     });
                 },
                 /**
@@ -2787,13 +3199,17 @@
                  * @param string uid
                  * @returns object|null
                  */
-                modelToStore: function (model_name, model_id, model, uid) {
+                modelToStore: function (model_name, model_id, model, uid, expired) {
                     return this.tryCatch(function () {
                         var collection = internal.cache.call(this, 'model', model_name)
                                 || {data: {}, uid: uid, length: 0};
                         if (!model_id)
                             model_id = internal.getUIDValue.call[this, model,
                                     collection.uid || uid];
+                        if (expired) {
+                            collection.expires = Date.now();
+                            delete collection.pagination;
+                        }
                         model = this.__.extend(collection.data[model_id], model, true);
                         collection.data[model_id] = model;
                         internal.cache.call(this, 'model', model_name, collection, false);
@@ -2811,7 +3227,7 @@
                         pageId: page
                     });
                     if (this.__.isString(this.notFound)) {
-                        page = this.templates.children(internal.selector.call(this, this.notFound
+                        page = this.getTemplate(internal.selector.call(this, this.notFound
                                 .startsWith('page#') ? this.notFound : 'page#' + this.notFound));
                         if (!page.length) {
                             return this.error('Page [' + this.notFound + '] also not found');
@@ -2819,8 +3235,10 @@
                         internal.pageFound.call(this, page, true);
                         return this;
                     }
-                    else
+                    else {
+                        delete this._params;
                         return this.__.callable(this.notFound).call(this, page);
+                    }
                 },
                 /**
                  * Called when the target page is found
@@ -2830,22 +3248,24 @@
                 pageFound: function (page, replaceInState) {
                     if (internal.is.call(this, 'page', page)) {
                         if (!internal.canContinue
-                                .call(this, 'page.load', [page.items[0]]))
-                        {
+                                .call(this, 'page.load', [page.items[0]])) {
                             return this;
                         }
                         if (this.page) {
-                            this.oldPage = this.page.attr('this-dead', '');
+                            this.oldPage = this.page.attr('this-dead', '')
+                                    .trigger('page.leave');
                             if (this.oldPage.attr('this-id') === page.attr('this-id'))
                                 replaceInState = true;
                         }
                         if (this.store('last_page') === page.attr('this-id'))
                             replaceInState = true;
-                        this.page = page.clone();
-                        this.page.hide();
+                        this.page = page.clone().show();
+                        this.params = this._params;
+                        delete this._params;
                         internal.loadLayouts.call(this, replaceInState);
                     }
                     else {
+                        delete this._params;
                         this.error('Load page failed: ' + page.attr('this-id'));
                         page.trigger('page.load.failed');
                     }
@@ -2855,15 +3275,27 @@
                  * @returns {string} Target page ID
                  */
                 pageIDFromLink: function (link) {
+                    // get file path if link starts with #
                     if (link.startsWith('#'))
                         link = link.substr(1);
+                    // get file path if link still starts with /
                     if (link.startsWith('/'))
                         link = link.substr(1);
-
-                    var parts = link.split('&');
-                    if (parts.length > 1)
-                        this.target_on_page = parts[1];
-                    return parts[0];
+                    var parts = link.split('#');
+                    this._params = [];
+                    // parameters exist
+                    if (parts.length > 1) {
+                        // remove first / from parameters part
+                        if (parts[1].startsWith('/'))
+                            parts[1] = parts[1].substr(1);
+                        // remove last / from parameters part
+                        if (parts[1].endsWith('/'))
+                            parts[1] = parts[1].substr(0, parts[1].length - 1);
+                        // save parameters
+                        this._params = parts[1].split('/');
+                    }
+                    // remove last / from file path if available
+                    return parts[0].endsWith('/') ? parts[0].substr(0, parts[0].length - 1) : parts[0];
                 },
                 /**
                  * Called after the page has been fully loaded
@@ -2877,7 +3309,6 @@
                             || this.__proto__.components || this.__proto__.modelCollections)
                         // still loading. can't mark as loaded
                         return this;
-
                     var _this = this;
                     // page was just loaded and not restored from history
                     if (!restored) {
@@ -2904,7 +3335,6 @@
                         this.container
                                 .html(internal.processExpressions.call(this, this.container.html(),
                                         null, true));
-                        this.page.attr('this-loaded', '');
                         this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
                                 + '"]:not([this-dead]), [this-type="page"][this-id="'
                                 + this.page.attr('this-id') + '"]:not([this-dead])');
@@ -2915,13 +3345,27 @@
                             });
                             delete this.notWiths;
                         }
-                        internal.resolveTargetOnPage.call(this);
+                        this.page.find('[this-hidden]').hide();
+                        // prepare autocomplete list elements
+                        this.container.find('[this-type="list"],list')
+                                .each(function () {
+                                    var _list = _this._(this).html('');
+                                    if (_list.hasAttr('this-selection-list'))
+                                        _this.container
+                                                .find('[this-type="list"][this-id="'
+                                                        + _list.attr('this-selection-list')
+                                                        + '"],list[this-id="'
+                                                        + _list.attr('this-selection-list')
+                                                        + '"]')
+                                                .attr('this-parent-list',
+                                                        _list.attr('this-id'));
+                                });
                         internal.saveState.call(this, replaceState);
                     }
                     // page was restored from history
                     else {
                         this.page.attr('this-restored', '');
-                        internal.updatePage.call(this);
+                        internal.updatePage.call(this, true);
                     }
                     if (this.firstPage) {
                         if (restored)
@@ -2931,7 +3375,6 @@
                                     + '[this-loaded]').each(function () {
                                 internal.watch.call(_this, this);
                             });
-
                         // get all previously watched collections and models
                         var watching = this.store('watching');
                         if (watching)
@@ -2956,6 +3399,7 @@
                         });
                         this.page.attr('this-with-first-js', '');
                     }
+                    this.pageIsLoaded = true;
                     return this;
                 },
                 /**
@@ -2986,7 +3430,7 @@
                 parseData: function (data, content, variables, forCollection, isModel, callback)
                 {
                     if (!variables)
-                        variables = internal.parseBrackets.call(this, '{{', '}}', content);
+                        variables = internal.parseBrackets.call(this, '{{', '}}', this.__.isString(content) ? content : content.outerHtml());
                     var _temp, _this = this, custom = false;
                     if (this.__.isString(content)) {
                         content = content.replace(/__obrace2__/g, '({').replace(/__cbrace2__/g, '})');
@@ -3027,7 +3471,8 @@
                         _each = _temp.find('[this-each]');
                     }
                     if (isModel) {
-                        _temp.find('collection,[this-type="collection"]')
+                        _temp.find('collection:not([this-loaded]),'
+                                + '[this-type="collection"]:not([this-loaded])')
                                 .each(function () {
                                     _this._(this).html(this.innerHTML
                                             .replace(/{{/g, '__obrace__')
@@ -3052,8 +3497,15 @@
                     }
                     content = internal.fillVariables.call(this, variables, data, content);
                     _temp.replaceWith(content);
+                    var done = function () {
+                        if (custom)
+                            _temp = _temp.children();
+                        _temp.find('[this-muted]').removeAttr('this-muted');
+                        this.__.callable(callback).call(this, _temp);
+                    }.bind(this);
                     if (isModel) {
-                        var collections = _temp.find('collection,[this-type="collection"]');
+                        var collections = _temp.find('collection:not([this-loaded]),'
+                                + '[this-type="collection"]:not([this-loaded])');
                         if (collections.length) {
                             this.__proto__.modelCollections = collections.length;
                             collections.each(function () {
@@ -3067,20 +3519,14 @@
                                 internal.loadCollection.call(_this, __this, data, function () {
                                     if (!--this.__proto__.modelCollections) {
                                         delete this.__proto__.modelCollections;
-                                        if (custom)
-                                            _temp = _temp.children();
-                                        _temp.find('[this-muted]').removeAttr('this-muted');
-                                        this.__.callable(callback).call(this, _temp.show());
+                                        done();
                                     }
                                 });
                             });
                             return;
                         }
                     }
-                    if (custom)
-                        _temp = _temp.children();
-                    _temp.find('[this-muted]').removeAttr('this-muted');
-                    this.__.callable(callback).call(this, _temp.show());
+                    done();
                     return this;
                 },
                 /**
@@ -3097,12 +3543,28 @@
                         _this.tryCatch(function () {
                             content = content.replace(v, eval(v.trim().substr(2, v.trim().length - 4)));
                         }, function (e) {
-                            _this.console('error', e.message);
+                            internal.log.call(_this, 'error', e.message);
+                            console.trace(current);
                             if (removeUnresolved)
                                 content = content.replace(v, '');
                         });
                     });
                     return content;
+                },
+                /**
+                 * Fetch current app records
+                 * @param {string} key
+                 * @praram mixed value
+                 * @returns mixed
+                 */
+                record: function (key, value) {
+                    // set a record
+                    if (key && value !== undefined && this.container) {
+                        internal.records[this.container.attr('this-id')][key] = value;
+                        return this;
+                    }
+                    var records = this.container ? internal.records[this.container.attr('this-id')] : null;
+                    return records && key ? records[key] : records;
                 },
                 /**
                  * Escapes a regex string
@@ -3128,29 +3590,36 @@
                 },
                 /**
                  * Resets a form wisely without removing values from buttons
+                 * and hidden input elements
                  */
                 resetForm: function (form) {
                     var _this = this;
-                    this._(form).find('[type="button"],[type="submit"],[type="reset"]')
+                    this._(form)
+                            .find('input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="hidden"])'
+                                    + ',textarea,select,[this-resettable]')
                             .each(function () {
-                                _this._(this).data('oldValue', this.value);
+                                var __this = _this._(this);
+                                if (__this.attr('this-resettable')) {
+                                    _this.__.forEach(__this.attr('this-resettable').split(';'), function (i, v) {
+                                        var part = v.split(':');
+                                        __this.attr(part[0], part[1]);
+                                    });
+                                }
+                                if (this.type === 'radio' || this.type === 'checkbox') {
+                                    _this._(this).prop('checked', false)
+                                            .removeAttr('checked');
+                                }
+                                this.value = '';
+                                if (this.tagName.toLowerCase() === 'select') {
+                                    _this._(this).children(':nth-child(1)')
+                                            .prop('selected', true)
+                                            .attr('selected', 'selected')
+                                            .siblings('[selected="selected"]').
+                                            prop('selected', false)
+                                            .removeAttr('selected');
+                                }
                             });
-                    form.reset();
-                    this._(form).find('[type="button"],[type="submit"],[type="reset"]')
-                            .each(function () {
-                                this.value = _this._(this).data('oldValue');
-                                _this._(this).removeData('oldValue');
-                            });
-                },
-                /**
-                 * Scrolls to the target on page
-                 * @returns {void}
-                 */
-                resolveTargetOnPage: function () {
-                    if (!this.target_on_page)
-                        return this;
-                    this._('#' + this.target_on_page).trigger('click');
-                    delete this.target_on_page;
+                    return this;
                 },
                 /**
                  * Restores a saved state
@@ -3159,16 +3628,13 @@
                  */
                 restoreState: function (state) {
                     var _this = this;
-                    if (this.page) {
-                        this.page.trigger('page.leave');
-                    }
                     this.container.html(state.content);
                     this.page = this.container.find('page[this-id="' + state.id
-                            + '"]:not([this-dead]),[this-type="page"][this-id="'
-                            + state.id + '"]:not([this-dead])');
+                            + '"],[this-type="page"][this-id="'
+                            + state.id + '"]').removeAttr('this-dead');
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(state.title);
-                    this.store('last_page', state.id);
+                    this.store('last_page', state.url);
                     this.__proto__.components = 0;
                     this.__proto__.collections = 0;
                     this.__proto__.models = 0;
@@ -3179,11 +3645,25 @@
                                         .removeAttr('this-with-first-js')
                                         .removeAttr('this-with-js'));
                             });
+                    delete this.pageModel;
+                    // page is bound to a model
+                    if (this.page.attr('this-mid')) {
+                        // save page model for later use in the app
+                        this.collection(this.page.attr('this-model'), {
+                            success: function (collection) {
+                                collection.model(this.page.attr('this-mid'), {
+                                    success: function (model) {
+                                        this.pageModel = model;
+                                    }.bind(this)
+                                });
+                            }.bind(this)
+                        });
+                    }
                     internal.loadAssets.call(this, this.page
                             .removeAttr('this-with-first-js')
                             .removeAttr('this-with-js'), function () {
                         internal.pageLoaded.call(this, null, true);
-                    });
+                    }.bind(this));
                 },
                 /**
                  * Saves the app state
@@ -3194,13 +3674,30 @@
                     var action = 'pushState';
                     if (replace || this.firstPage)
                         action = 'replaceState';
+                    var url = '#/' + (this.page.attr('this-path') || this.page.attr('this-id'));
+                    if (this.params.length)
+                        url += '/#/' + this.params.join('/');
                     history[action]({
                         id: this.page.attr('this-id'),
                         title: this.page.attr('this-title'),
-                        content: this.container.html()
-                    }, this.page.attr('this-title'), '#/'
-                            + this.page.attr('this-id'));
-                    this.store('last_page', this.page.attr('this-id'));
+                        content: this.container.html(),
+                        url: url
+                    }, this.page.attr('this-title'), url);
+                    this.store('last_page', url);
+                    return this;
+                },
+                /**
+                 * Provide function to ensure api requests are secured by providing either
+                 * headers or request body data, or both.
+                 * @param {Function} func The function to be called when making api
+                 * requests. The function would receive 3 parameters: (string) key, 
+                 * (object) header, (object) body
+                 * @returns {ThisApp}
+                 */
+                secureAPI: function (func) {
+                    if (internal.isRunning.call(this))
+                        return;
+                    this.secap = func;
                     return this;
                 },
                 /**
@@ -3215,7 +3712,7 @@
                         append = '';
                     var attrs = id[id.length - 1].split('[');
                     id[id.length - 1] = attrs[0];
-                    this.__.arrayRemoveIndex(attrs, 0);
+                    this.__.removeArrayIndex(attrs, 0);
                     if (attrs.length)
                         append += '[' + attrs.join('[');
                     return id.length > 1 ? '[this-type="' + id[0] + '"][this-id="' + id[1] + '"]' + append + ',' + id[0] + '[this-id="' + id[1] + '"]' + append : '[this-id="' + id[0] + '"]' + append;
@@ -3235,8 +3732,6 @@
                         this._(window).on('beforeunload', function () {
                             internal.saveState.call(_this, true);
                         });
-                        // update debug mode
-                        this.__.__proto__.debug = this.config.debug;
                         // ensure paths end with /
                         if (this.config.paths) {
                             this.__.forEach(this.config.paths, function (i, v) {
@@ -3257,7 +3752,7 @@
                                         _this.loadPage(last_page);
                                     }
                                     else if (_this.config.startWith) {
-                                        if (this.templates.children('page[this-id="'
+                                        if (this.getTemplate('page[this-id="'
                                                 + _this.config.startWith
                                                 + '"]').length)
                                             _this.loadPage(_this.config.startWith);
@@ -3277,7 +3772,17 @@
                         if (!this.container.length)
                             this.container = this._('body');
                         else if (!this.container.attr('this-id'))
-                            this.container.attr('this-id', Math.ceil(Math.random() * 9999));
+                            this.container.attr('this-id', __.randomString());
+                        // setup record for this app
+                        internal.records[this.container.attr('this-id')] = {
+                            running: true,
+                            secureAPI: this.secap || function () {},
+                            uploader: this.setup || null
+                        };
+                        delete this.secap;
+                        delete this.setup;
+                        // set debug mode
+                        internal.record.call(this, 'debug', this.config.debug || false);
                         // mark all loaded element's children as loaded too
                         this.container.find('[this-loaded] [this-type], [this-loaded] page,'
                                 + '[this-loaded] layout, [this-loaded] component,'
@@ -3304,7 +3809,7 @@
                                         .hide());
                         if (this.config.titleContainer)
                             this.config.titleContainer = this._(this.config.titleContainer,
-                                    this.config.debug);
+                                    internal.record.call(this, 'debug'));
                         var autocomplete_timeout;
                         this.container
                                 /* reload current page or loaded collection|model */
@@ -3331,7 +3836,7 @@
                                             // reload value: collection| 
                                             var reload = __this.attr('this-reload'),
                                                     // template to reload
-                                                    toReload = _this.templates.children(internal.selector
+                                                    toReload = _this.getTemplate(internal.selector
                                                             .call(_this, reload)),
                                                     // target to reload
                                                     _reload = _this.container.find(internal.selector
@@ -3344,7 +3849,7 @@
                                                 _this.__.forEach(__this.attr('this-attributes').split(';'),
                                                         function (i, v) {
                                                             var attr = v.split(':'),
-                                                                    name = _this.__.arrayRemoveIndex(attr, 0);
+                                                                    name = _this.__.removeArrayIndex(attr, 0);
                                                             attr = attr.join(':');
                                                             toReload.attr(name, attr);
                                                         });
@@ -3380,19 +3885,22 @@
                                             .closest('model,[this-type="model"],[this-model][this-binding]'),
                                             model_id = __this.attr('this-model-id') ||
                                             _model.attr('this-mid'),
+                                            model_name = _model.attr('this-model') || _model.attr('this-id'),
                                             url = __this.attr('this-read')
                                             || _model.attr('this-url')
                                             || '#',
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
+                                                    __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
                                     // keep attributes for page
-                                    _this.tar['page#' + goto] = {
+                                    _this.tar['page#' + pageId] = {
                                         reading: '',
                                         url: url,
-                                        model: _model.attr('this-model') || _model.attr('this-id')
+                                        model: model_name
                                     };
-
-                                    _this.tar['page#' + goto]['mid'] = model_id;
+                                    _this.tar['page#' + pageId]['mid'] = model_id;
+                                    __this.attr('this-goto', goto + '/#/' + model_name + '/' + url);
                                 })
                                 /*
                                  * UPDATE event
@@ -3415,18 +3923,20 @@
                                             url = __this.attr('this-update')
                                             || model.attr('this-url') || '#',
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
+                                                    __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    _this.tar['page#' + pageId] = {
                                         "do": "update",
                                         mid: model_id,
                                         action: url,
                                         model: model_name
                                     };
                                     if (__this.attr('this-model-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] =
+                                        _this.tar['page#' + pageId]['model-uid'] =
                                                 __this.attr('this-model-uid');
                                     else if (model.attr('this-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = model
+                                        _this.tar['page#' + pageId]['model-uid'] = model
                                                 .attr('this-uid');
                                 })
                                 /*
@@ -3443,16 +3953,18 @@
                                     var __this = _this._(this),
                                             url = __this.attr('this-create') || '#';
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
+                                            __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    _this.tar['page#' + pageId] = {
                                         "do": "create",
                                         action: url
                                     };
                                     if (__this.attr('this-model'))
-                                        _this.tar['page#' + goto]['model'] = __this
+                                        _this.tar['page#' + pageId]['model'] = __this
                                                 .attr('this-model');
                                     if (__this.attr('this-model-uid'))
-                                        _this.tar['page#' + goto]['model-uid'] = __this
+                                        _this.tar['page#' + pageId]['model-uid'] = __this
                                                 .attr('this-model-uid');
                                 })
                                 /*
@@ -3476,31 +3988,17 @@
                                             ]), common_selector = '',
                                             type = _target.attr('this-type')
                                             || _target.get(0).tagName.toLowerCase();
-                                    if (_target.attr('this-id'))
-                                        common_selector += '[this-id="' + _target.attr('this-id') + '"]';
-                                    else if (_target.attr('this-model'))
-                                        common_selector += '[this-model="' + _target.attr('this-model') + '"]';
-                                    if (!_this.templates.children(type + common_selector + ',[this-type="'
-                                            + type + '"]' + common_selector).length) {
-                                        var cache = _this._(_target.outerHtml()
-                                                .replace(/\(\{/g, '__obrace2__')
-                                                .replace(/\}\)/g, '__cbrace2__'));
-                                        _this.templates.append(cache.hide());
-                                    }
-                                    var content = internal.processExpressions
-                                            .call(_this, _target.html(), null, true),
-                                            variables = internal.parseBrackets
-                                            .call(_this, '{{', '}}', content);
-                                    content = internal.fillVariables.call(_this, variables, {}, content);
-                                    _target.html(content).attr({
-                                        "this-do": "create",
-                                        "this-action": __this.attr('this-create'),
-                                        "this-model": __this.attr('this-model') || '',
-                                        "this-model-uid": __this.attr('this-model-uid') || '',
-                                        "this-binding": ""
-                                    }).show();
-                                    internal.resetForm.call(_this, _target.get(0));
-                                    _target.trigger('create.form.cleared');
+                                    internal.bindToObject.call(_this, _target, {}, function (elem) {
+                                        elem.attr({
+                                            "this-do": "create",
+                                            "this-action": __this.attr('this-create'),
+                                            "this-model": __this.attr('this-model') || '',
+                                            "this-model-uid": __this.attr('this-model-uid') || '',
+                                            "this-binding": ""
+                                        }).show();
+                                        internal.resetForm.call(this, elem.get(0));
+                                        elem.trigger('create.form.cleared');
+                                    }.bind(_this));
                                 })
                                 /*
                                  * DELETE event - Show Page
@@ -3515,21 +4013,26 @@
                                 .on('click', '[this-goto][this-delete]', function ()
                                 {
                                     var __this = _this._(this),
-                                            model = __this.closest('model,[this-type="model"]'),
+                                            _model = __this.closest('model,[this-type="model"]'),
                                             url = __this.attr('this-delete')
-                                            || model.attr('this-url') || '#',
+                                            || _model.attr('this-url') || '#',
                                             model_name = __this.attr('this-model')
-                                            || model.attr('this-id'),
-                                            uid = model.attr('this-uid'),
+                                            || _model.attr('this-id'),
+                                            uid = _model.attr('this-uid'),
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto'));
-                                    _this.tar['page#' + goto] = {
+                                                    __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    _this.tar['page#' + pageId] = {
                                         "do": "delete",
                                         action: url,
                                         uid: uid
                                     };
-                                    if (model)
-                                        _this.tar['page#' + goto]['model'] = model_name;
+                                    if (_model) {
+                                        _this.tar['page#' + pageId]['model'] = model_name;
+                                        __this.attr('this-goto', goto + '/#/' +
+                                                (_model.attr('this-mid') || __this.attr('this-model-id')));
+                                    }
                                 })
                                 /*
                                  * Load page
@@ -3543,105 +4046,20 @@
                                     var __this = _this._(this);
                                     if (!__this.attr('this-goto'))
                                         return;
-                                    _this.page.trigger('page.leave');
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto'));
-                                    if (!_this.tar['page#' + goto])
-                                        _this.tar['page#' + goto] = {};
+                                            __this.attr('this-goto')),
+                                            // necessary in case goto is a url and not an id
+                                            pageId = goto.replace(/\/\\/g, '-');
+                                    if (!_this.tar['page#' + pageId])
+                                        _this.tar['page#' + pageId] = {};
                                     if (__this.attr('this-page-title'))
-                                        _this.tar['page#' + goto]['title'] =
+                                        _this.tar['page#' + pageId]['title'] =
                                                 __this.attr('this-page-title');
-                                    if (__this.attr('this-run'))
-                                        _this.tar['page#' + goto]['run'] = __this.attr('this-run');
                                     if (__this.attr('this-ignore-cache'))
-                                        _this.tar['page#' + goto]['ignore-cache'] =
+                                        _this.tar['page#' + pageId]['ignore-cache'] =
                                                 __this.attr('this-ignore-cache');
-                                    _this.loadPage(goto);
+                                    _this.loadPage(__this.attr('this-goto'));
                                     e.stop = true;
-                                })
-                                /*
-                                 * DELETE event
-                                 * 
-                                 * This is where the actual DELETE request is sent.
-                                 * 
-                                 * Target must have attribute `this-delete` which may contain 
-                                 * the url of the model.
-                                 * 
-                                 * If DELETE must update model and/or collection, then attributes 
-                                 * `this-model` must be provided if target isn't
-                                 *  within a model or page loaded as a result of a previous 
-                                 *  delete click.
-                                 */
-                                .on('click', '[this-delete]', function (e) {
-                                    if (e.stop)
-                                        return;
-                                    e.preventDefault();
-                                    var __this = _this._(this),
-                                            _model = __this.closest('model,[this-type="model"],'
-                                                    + '[this-model]'),
-                                            _do = __this.closest('[this-do="delete"]');
-                                    if (!internal.canContinue
-                                            .call(_this, 'model.delete',
-                                                    [_model.get(0)])) {
-                                        return;
-                                    }
-                                    var __model = new Model(_model.attr('this-mid') ||
-                                            _do.attr('this-mid'), {}, {
-                                        app: _this,
-                                        name: __this.attr('this-model') ||
-                                                _model.attr('this-model') ||
-                                                _model.attr('this-id') ||
-                                                _do.attr('this-model'),
-                                        uid: _model.attr('this-uid') ||
-                                                _do.attr('this-uid'),
-                                        url: __this.attr('this-delete') ||
-                                                _model.attr('this-url') ||
-                                                _do.attr('this-action')
-                                    });
-                                    __model.remove({
-                                        success: function (data) {
-                                            var crudStatus = _this.config.crudStatus;
-                                            if ((crudStatus &&
-                                                    data[crudStatus.key] === crudStatus.successValue)
-                                                    || !crudStatus) {
-                                                if (_this.page.attr('this-do') === 'delete'
-                                                        || _model.attr('this-type') === 'page')
-                                                    _this.back();
-                                                else {
-                                                    _this.container.find('[this-model="'
-                                                            + (_model.attr('this-model')
-                                                                    || _model.attr('this-id'))
-                                                            + '"][this-binding]').hide();
-                                                }
-                                                data = _this.config.dataKey ? data[_this.config.dataKey] : data;
-                                                _model.trigger('delete.success', {
-                                                    response: this,
-                                                    responseData: data,
-                                                    model: __model
-                                                });
-                                            }
-                                            else
-                                                _model.trigger('delete.failed', {
-                                                    response: this,
-                                                    model: __model
-                                                });
-                                        },
-                                        error: function (data) {
-                                            data = _this.config.dataKey && _this.__.isObject(data)
-                                                    ? data[_this.config.dataKey] : data;
-                                            _model.trigger('delete.error', {
-                                                response: this,
-                                                responseData: data,
-                                                model: __model
-                                            });
-                                        },
-                                        complete: function () {
-                                            _model.trigger('delete.complete', {
-                                                response: this,
-                                                model: __model
-                                            });
-                                        }
-                                    });
                                 })
                                 /*
                                  * Click event
@@ -3660,12 +4078,11 @@
                                             .call(_this, bind, ':not([this-in-collection])'));
                                     if (!_target.length)
                                         return;
-
                                     _target.attr('this-model', _model.attr('this-model')
                                             || _model.attr('this-id'))
                                             .attr('this-binding', '')
                                             .attr('this-uid', _model.attr('this-uid') || '')
-                                            .attr('this-url', _model.attr('this-url'))
+                                            .attr('this-url', _model.attr('this-url') || '')
                                             .removeAttr('this-action');
                                     if (__this.hasAttr('this-read')) {
                                         _this.container.find('[this-model="'
@@ -3688,8 +4105,99 @@
                                         if (__this.attr('this-delete'))
                                             _target.attr('this-url',
                                                     __this.attr('this-delete'));
+                                        __this.attr('this-treated', '');
+                                        setTimeout(function () {
+                                            __this.removeAttr('this-treated');
+                                        });
                                     }
                                     internal.bindToModel.call(_this, _target, _model);
+                                })
+                                /*
+                                 * DELETE event
+                                 * 
+                                 * This is where the actual DELETE request is sent.
+                                 * 
+                                 * Target must have attribute `this-delete` which may contain 
+                                 * the url of the model.
+                                 * 
+                                 * If DELETE must update model and/or collection, then attributes 
+                                 * `this-model` must be provided if target isn't
+                                 *  within a model or page loaded as a result of a previous 
+                                 *  delete click.
+                                 */
+                                .on('click', '[this-delete]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this);
+                                    if (__this.hasAttr('this-treated'))
+                                        return;
+                                    var _model = __this.closest('model,[this-type="model"],'
+                                            + '[this-model]'),
+                                            _do = __this.closest('[this-do="delete"]'),
+                                            model_url = __this.attr('this-delete') ||
+                                            _model.attr('this-url') ||
+                                            _do.attr('this-action'),
+                                            model_id = _model.attr('this-mid') ||
+                                            _do.attr('this-mid');
+                                    if (!internal.canContinue
+                                            .call(_this, 'model.delete',
+                                                    [_model.get(0)])) {
+                                        return;
+                                    }
+                                    _this.collection(__this.attr('this-model') ||
+                                            _model.attr('this-model') ||
+                                            _model.attr('this-id') ||
+                                            _do.attr('this-model'), {
+                                        uid: _model.attr('this-uid') ||
+                                                _do.attr('this-uid'),
+                                        success: function (collection) {
+                                            collection.model(model_id, {
+                                                url: model_url,
+                                                success: function (model) {
+                                                    model.remove({
+                                                        success: function (data) {
+                                                            var crudStatus = _this.config.crud.status;
+                                                            if ((crudStatus &&
+                                                                    data[crudStatus.key] === crudStatus.successValue)
+                                                                    || !crudStatus) {
+                                                                if (_this.page.attr('this-do') === 'delete'
+                                                                        || _model.attr('this-type') === 'page')
+                                                                    _this.back();
+                                                                else {
+                                                                    _this.container.find('[this-model="'
+                                                                            + (_model.attr('this-model')
+                                                                                    || _model.attr('this-id'))
+                                                                            + '"][this-binding]').hide();
+                                                                }
+                                                                data = getRealData.call(_this, data) || data;
+                                                                _model.trigger('delete.success', {
+                                                                    response: this,
+                                                                    responseData: data,
+                                                                    model: model
+                                                                });
+                                                            }
+                                                            else
+                                                                _model.trigger('delete.failed', {
+                                                                    response: this,
+                                                                    model: model
+                                                                });
+                                                        },
+                                                        error: function () {
+                                                            _model.trigger('delete.error', {
+                                                                response: this,
+                                                                model: model
+                                                            });
+                                                        },
+                                                        complete: function () {
+                                                            _model.trigger('delete.complete', {
+                                                                response: this,
+                                                                model: model
+                                                            });
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    });
                                 })
                                 /*
                                  * Click event
@@ -3756,8 +4264,7 @@
                                         + ' form[this-do="update"]:not([this-ignore-submit])',
                                         function (e) {
                                             e.preventDefault();
-                                            var data = {},
-                                                    __this = _this._(this),
+                                            var __this = _this._(this),
                                                     creating = __this.attr('this-do')
                                                     === 'create',
                                                     method = __this.attr('this-method')
@@ -3767,50 +4274,11 @@
                                                 return;
                                             }
                                             __this.trigger('form.valid.submission');
-                                            // parse form elements' data into data object
-                                            _this.__.forEach(Array.from(this.elements),
-                                                    function () {
-                                                        if (!this.name)
-                                                            return;
-                                                        if (this.name.indexOf('[]') !== -1) {
-                                                            var name = this.name.replace('[]', '');
-                                                            if (!data[name]) {
-                                                                data[name] = [];
-                                                            }
-                                                            data[name].push(this.value);
-                                                        }
-                                                        else if (this.name.indexOf('[') !== -1)
-                                                        {
-                                                            var exp = this.name.replace(']', '').split('['),
-                                                                    _data = data,
-                                                                    lastKey = exp.pop();
-                                                            _this.__.forEach(exp, function (i, v)
-                                                            {
-                                                                if (!_data[v])
-                                                                    _data[v] = {};
-                                                                _data = _data[v];
-                                                            });
-                                                            _data[lastKey] = this.value;
-                                                        }
-                                                        else {
-                                                            data[this.name] = this.value;
-                                                        }
-                                                    });
                                             var id = null;
                                             if (__this.attr('this-mid'))
                                                 id = __this.attr('this-mid');
-                                            // @todo remove?
-//                                            else if (_this.page.attr('this-mid'))
-//                                                id = _this.page.attr('this-mid');
-                                            var __data = internal.canContinue
-                                                    .call(_this, creating ? 'create.form.submission'
-                                                            : 'update.form.submission', [data, __this]);
-                                            if (!__data) {
-                                                return;
-                                            }
-                                            else if (_this.__.isObject(__data))
-                                                data = __data;
-                                            var _model = new Model(id, data, {
+                                            // @todo Use collection.model()
+                                            var _model = new Model(id, null, {
                                                 app: _this,
                                                 name: __this.attr('this-model') ||
                                                         _this.page.attr('this-model'),
@@ -3824,11 +4292,11 @@
                                                 method: method
                                             });
                                             _model.save({
+                                                form: this,
                                                 method: method,
                                                 success: function (data) {
-                                                    var model = _this.config.dataKey ?
-                                                            data[_this.config.dataKey] : data;
-                                                    var crudStatus = _this.config.crudStatus;
+                                                    var model = getRealData.call(_this, data) || data;
+                                                    var crudStatus = _this.config.crud.status;
                                                     if (((crudStatus &&
                                                             data[crudStatus.key] ===
                                                             crudStatus.successValue)
@@ -3914,7 +4382,6 @@
                                         filter += '_this.__.contains(filters.lcase(model#' + key
                                                 + '),filters.lcase("' + _search.val() + '"))';
                                     });
-
                                     // reload only the collection
                                     if (_form.attr('this-reload')) {
                                         _collection = page.find(internal.selector.call(_this,
@@ -3926,20 +4393,22 @@
                                     }
                                     // load a page and the collection in it
                                     else {
-                                        goto = internal.pageIDFromLink.call(this, goto);
-                                        var _page = _this.templates.children('page[this-id="'
-                                                + goto + '"],[this-type="page"][this-id="'
-                                                + goto + '"]'),
+                                        var _goto = internal.pageIDFromLink.call(this, goto),
+                                                // necessary in case _goto is a url and not an id
+                                                pageId = _goto.replace(/\/\\/g, '-'),
+                                                _page = _this.getTemplate('page[this-id="'
+                                                        + _goto + '"],[this-type="page"][this-id="'
+                                                        + _goto + '"]'),
                                                 _component = _page.find('[this-component="'
                                                         + exp[0] + '"]');
                                         _component.attr('this-filter', 'collection#' + exp[0] + ':'
                                                 + filter).attr('this-search', 'collection#'
                                                 + exp[0] + ':' + keys.join(','));
-                                        _this.tar['page#' + goto] = {
+                                        _this.tar['page#' + pageId] = {
                                             query: _search.val().trim()
                                         };
                                         if (_search.attr('this-ignore-cache'))
-                                            _this.tar['page#' + goto]['ignore-cache'] =
+                                            _this.tar['page#' + pageId]['ignore-cache'] =
                                                     _search.attr('this-ignore-cache');
                                         _collection = _page.find(selector);
                                         _collection.attr('this-filter', filter).attr('this-search',
@@ -3955,68 +4424,271 @@
                                     var __this = _this._(this),
                                             min_chars = __this.attr('this-min-chars') || 3,
                                             url = __this.attr('this-autocomplete')
-                                            || __this.attr('this-url'),
-                                            _list = _this.container.find('[this-type="list"][this-id="'
-                                                    + __this.attr('this-list') + '"],list[this-id="'
-                                                    + __this.attr('this-list') + '"]');
-                                    // do nothing if chars are less than required
-                                    if (__this.val().length < min_chars)
+                                            || __this.attr('this-url');
+                                    // block searching for same thing multiple times
+                                    if (__this.val() === __this.attr('this-last-query'))
                                         return;
+                                    // do nothing if chars are less than required
+                                    if (__this.val().length < min_chars) {
+                                        var _list = _this.container
+                                                .find('[this-type="list"][this-id="'
+                                                        + __this.attr('this-list')
+                                                        + '"],list[this-id="'
+                                                        + __this.attr('this-list')
+                                                        + '"]');
+                                        if (_list.children().length > 1) {
+                                            _list.children(':not([this-cache])').remove();
+                                        }
+                                        _this.store('autocompleting', null);
+                                        return;
+                                    }
                                     url += (url.indexOf('?') === -1) ? '?' : '&';
-                                    url += 'q=' + __this.val();
+                                    url += (__this.attr('this-query-key') || 'q') + '='
+                                            + __this.val();
                                     autocomplete_timeout = setTimeout(function () {
-                                        _this.request(url, function (data) {
-                                            internal.loop.call(_this, _this.config.dataKey ?
-                                                    data[_this.config.dataKey] : data, _list,
-                                                    __this.attr('this-filter'));
-                                        });
-                                    }, __this.attr('this-delay') || 300);
-                                });
-                        this.when('page.loaded', 'page', function () {
-                            _this.container.find('[this-autocomplete][this-list]')
-                                    .each(function () {
-                                        var __this = _this._(this),
-                                                _list = _this.container.find('[this-type="list"][this-id="'
-                                                        + __this.attr('this-list') + '"],list[this-id="'
-                                                        + __this.attr('this-list') + '"]');
-                                        if (_list.length > 1)
-                                            _list.innerWrap('<div />');
-                                        _list.children().hide();
-                                    });
-                            // hide all elements that should be hidden by default
-                            _this.container.find('[this-hidden]')
-                                    .removeAttr('this-hidden').hide();
-                        })
-                                .when('component.loaded', 'component', function () {
-                                    var component = _this._(this);
-                                    _this.container.find('[this-autocomplete][this-list]')
-                                            .each(function () {
-                                                var __this = _this._(this),
-                                                        _list = component
+                                        __this.attr('this-last-query', __this.val());
+                                        _this.request({
+                                            url: url,
+                                            success: function (data) {
+                                                data = getRealData.call(_this, data) || data;
+                                                if (!data)
+                                                    return;
+                                                _this.store('autocompleting', data);
+                                                var _list = _this.container
                                                         .find('[this-type="list"][this-id="'
                                                                 + __this.attr('this-list')
                                                                 + '"],list[this-id="'
-                                                                + __this.attr('this-list') + '"]');
-                                                if (_list.length > 1)
-                                                    _list.innerWrap('<div />');
-                                                _list.children().hide();
+                                                                + __this.attr('this-list')
+                                                                + '"]'),
+                                                        _tplList = _this
+                                                        .getTemplate('[this-type="list"][this-id="'
+                                                                + __this.attr('this-list')
+                                                                + '"],list[this-id="'
+                                                                + __this.attr('this-list')
+                                                                + '"]');
+                                                if (!_tplList.length) {
+                                                    _this.addTemplate(_list.clone());
+                                                }
+                                                else {
+                                                    _list.html(_tplList.html());
+                                                }
+                                                if (!_list.length) {
+                                                    _this.error('List #' + __this.attr('this-list')
+                                                            + ' not found');
+                                                    return;
+                                                }
+                                                if (!__this.attr('this-id'))
+                                                    __this.attr('this-id', _this.__.randomString());
+                                                _list.attr('this-autocompleting',
+                                                        __this.attr('this-id'))
+                                                        .children().attr('this-cache', '')
+                                                        .hide();
+                                                internal.loop.call(_this, data, _list,
+                                                        __this.attr('this-filter'), null,
+                                                        function (elem, key) {
+                                                            // avoid showing elem if already
+                                                            // selected
+                                                            var selected = _list
+                                                                    .attr('this-selected') || '';
+                                                            if (selected.indexOf(key + ',') !== -1)
+                                                            {
+                                                                elem.remove();
+                                                                return;
+                                                            }
+                                                            elem.attr('this-key', key);
+                                                        });
+                                                _list.show();
+                                            }
+                                        });
+                                    }, __this.attr('this-delay') || 300);
+                                })
+                                .on('click', '[this-autocompleting]>[this-key]', function ()
+                                {
+                                    var __this = _this._(this),
+                                            selectedListSelector = '[this-type="list"][this-id="'
+                                            + __this.parent().attr('this-selection-list')
+                                            + '"],list[this-id="'
+                                            + __this.parent().attr('this-selection-list')
+                                            + '"]',
+                                            _selectedList = _this.container
+                                            .find(selectedListSelector),
+                                            elem = _this.getTemplate(selectedListSelector)
+                                            .children(),
+                                            list = _this.store('autocompleting'),
+                                            key = __this.attr('this-key'),
+                                            _dropDownList = __this.parent(),
+                                            _input = _this.container
+                                            .find('[this-autocomplete][this-id="'
+                                                    + _dropDownList
+                                                    .attr('this-autocompleting') +
+                                                    '"]');
+                                    internal.bindToObject
+                                            .call(_this, elem, list[key], function (elem) {
+                                                elem.removeAttr('this-cache')
+                                                        .attr('this-key', key)
+                                                        .show();
+                                                _dropDownList.attr('this-selected',
+                                                        (_dropDownList.attr('this-selected') || '')
+                                                        + key + ',');
+                                                _selectedList.append(elem).show();
+                                                if (!_input.hasAttr('this-multiple')) {
+                                                    _input.hide();
+                                                    _dropDownList.hide();
+                                                }
+                                                else
+                                                    __this.remove();
+                                            });
+                                })
+                                .on('click', 'list[this-parent-list] [this-remove],'
+                                        + '[this-type="list"][this-parent-list] [this-remove]',
+                                        function () {
+                                            var __this = _this._(this).closest('[this-key]'),
+                                                    _dropDownList = _this.container
+                                                    .find('[this-type="list"][this-id="'
+                                                            + __this.parent()
+                                                            .attr('this-parent-list')
+                                                            + '"],list[this-id="'
+                                                            + __this.parent()
+                                                            .attr('this-parent-list')
+                                                            + '"]');
+                                            _dropDownList.attr('this-selected',
+                                                    _dropDownList.attr('this-selected')
+                                                    .replace(__this.attr('this-key')
+                                                            + ',', '')).show();
+                                            var _input = _this.container
+                                                    .find('[this-autocomplete][this-id="'
+                                                            + _dropDownList
+                                                            .attr('this-autocompleting') +
+                                                            '"]').show();
+                                            __this.remove();
+                                            if (_input.hasAttr('this-multiple')) {
+                                                _input.attr('this-last-query', '')
+                                                        .trigger('keyup');
+                                            }
+                                        })
+                                /**
+                                 * Load next set of results on a paginated collection
+                                 */
+                                .on('click', '[this-paginate-next]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _collection;
+                                    // collection not specified. Target sibling collection
+                                    if (!__this.attr('this-paginate-next'))
+                                        _collection = __this.siblings('collection,[this-type="collection"]');
+                                    // collection is specified. get it
+                                    else
+                                        _collection = _this.container.find('collection[this-id="'
+                                                + __this.attr('this-paginate-next')
+                                                + '"],[this-type="collection"][this-id="'
+                                                + __this.attr('this-paginate-next') + '"]');
+                                    // collection must have attribute `this-paginate`
+                                    if (!_collection.hasAttr('this-paginate'))
+                                        return;
+                                    __this.attr('disabled', 'disabled');
+                                    // load target collection
+                                    // page is already set right
+                                    _this.load(_collection);
+                                })
+                                /**
+                                 * Load previous set of results on a paginated collection
+                                 */
+                                .on('click', '[this-paginate-previous]', function (e) {
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _collection;
+                                    // collection not specified. Target sibling collection
+                                    if (!__this.attr('this-paginate-previous'))
+                                        _collection = __this.siblings('collection,[this-type="collection"]');
+                                    // collection is specified. get it
+                                    else
+                                        _collection = _this.container.find('collection[this-id="'
+                                                + __this.attr('this-paginate-previous')
+                                                + '"],[this-type="collection"][this-id="'
+                                                + __this.attr('this-paginate-previous') + '"]');
+                                    // if page is 0, can't before to previous anymore
+                                    if (_collection.attr('this-pagination-page') == 0
+                                            // collection must have attribute `this-paginate`
+                                            || !_collection.hasAttr('this-paginate'))
+                                        return;
+                                    __this.attr('disabled', 'disabled');
+                                    // reduce page by 2
+                                    _collection.attr('this-pagination-page', parseInt(_collection.attr('this-pagination-page')) - 2);
+                                    // load collection
+                                    _this.load(_collection);
+                                });
+
+                        this.when('page.loaded', 'page', function () {
+                            if (!_this.page.hasAttr('this-restored'))
+                                document.scrollingElement.scrollTop = 0;
+                        })
+                                .when('component.loaded', 'component', function ()
+                                {
+                                    var elem = _this._(this);
+                                    if (_this.pageIsLoaded) {
+                                        elem.find('[this-type]:not([this-loaded])')
+                                                .each(function (i, v) {
+                                                    this.load(v);
+                                                }.bind(_this));
+                                    }
+                                    // XXX
+                                    elem.find('[this-type="list"],list')
+                                            .each(function () {
+                                                var _list = _this._(this);
+                                                if (!_list.children('[this-cache]').length)
+                                                {
+                                                    if (_list.children().length > 1)
+                                                        _list.innerWrap('<div />');
+                                                    _list.children()
+                                                            .attr('this-cache', '').hide();
+                                                }
+                                                if (_list.hasAttr('this-selection-list'))
+                                                    _this.container
+                                                            .find('[this-type="list"][this-id="'
+                                                                    + _list.
+                                                                    attr('this-selection-list')
+                                                                    + '"],list[this-id="'
+                                                                    + _list
+                                                                    .attr('this-selection-list')
+                                                                    + '"]')
+                                                            .attr('this-parent-list',
+                                                                    _list.attr('this-id'));
                                             });
                                 });
                         /*
                          * State resuscitation
                          */
                         this._(window).on('popstate', function (e) {
-                            if (e.state)
-                                internal.restoreState.call(_this, e.state);
-                        });
+                            if (e.state) {
+                                if (this.page) {
+                                    this.page.trigger('page.leave');
+                                }
+                                location.replace(e.state.url);
+                                internal.pageIDFromLink.call(this, e.state.url);
+                                this.params = this._params;
+                                delete this._params;
+                                internal.restoreState.call(this, e.state);
+                            }
+                        }.bind(this));
                         /*
                          * Container events activation
                          */
                         this.__.forEach(this.events, function () {
                             _this.container.on(this.event, this.selector, this.callback);
                         });
+                        delete this.__proto__.events;
                     });
-                    this.__proto__.running = true;
+                    return this;
+                },
+                /**
+                 * Sets the funtion to call when there are files to be upload in a form
+                 * @param {Function} func
+                 * @returns {ThisApp}
+                 */
+                setUploader: function (func) {
+                    if (internal.isRunning.call(this))
+                        return;
+                    this.setup = func;
                     return this;
                 },
                 /**
@@ -4026,7 +4698,8 @@
                  * @return {void}
                  */
                 showPage: function (replaceInState) {
-                    var transit = this.__.callable(this.config.transition, true), wait;
+                    var transit = this.__.callable(this.config.transition, true),
+                            wait, _this = this;
                     if (transit)
                         wait = transit.call(null, this.oldPage.removeAttr('this-current'),
                                 this.page, this.config.transitionOptions);
@@ -4040,7 +4713,7 @@
                     setTimeout(function () {
                         this.oldPage.remove();
                         delete this.oldPage;
-                    }.bind(this), wait);
+                    }.bind(this), this.__.isNumber(wait) ? wait : 0);
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(this.page.attr('this-title'));
                     // load models
@@ -4056,8 +4729,8 @@
                             updated = internal.cache.call(this, 'updated') || {},
                             collection = internal.cache.call(this, 'model') || {},
                             _this = this,
-                            _collections = this.container.find('collection[this-loaded],'
-                                    + '[this-type="collection"][this-loaded]'),
+                            _collections = this.container.find('collection,'
+                                    + '[this-type="collection"]'),
                             _models = this.container.find('model,[this-type="model"]'),
                             touched = {
                                 deleted: {},
@@ -4071,17 +4744,17 @@
                         this.__.forEach(created, function (model_name, arr) {
                             var _collection = _this.container.find('collection[this-model="'
                                     + model_name
-                                    + '"][this-loaded],[this-type="collection"][this-model="'
-                                    + model_name + '"][this-loaded]');
+                                    + '"],[this-type="collection"][this-model="'
+                                    + model_name + '"]');
                             if (!_collection.length)
                                 return;
                             var __collection = collection[model_name],
                                     uid = __collection.uid || '';
                             _this.__.forEach(arr, function (i, v) {
-                                var tmpl = _this.templates.children('collection[this-model="'
-                                        + model_name
-                                        + '"],[this-type="collection"][this-model="'
-                                        + model_name + '"]').children().clone(),
+                                var tmpl = _this.getTemplate('collection[this-id="'
+                                        + _collection.attr('this-id')
+                                        + '"],[this-type="collection"][this-id="'
+                                        + _collection.attr('this-id') + '"]').children(),
                                         action = _collection.attr('this-prepend-new') ?
                                         'prepend' : 'append',
                                         data = __collection.data[v],
@@ -4103,7 +4776,7 @@
                                                     .attr('this-id', model_name)
                                                     .attr('this-in-collection', '')
                                                     .outerHtml());
-                                            this.__.arrayRemoveIndex(arr, i);
+                                            this.__.removeArrayIndex(arr, i);
                                         }.bind(_this));
                             });
                             if (!created[model_name].length)
@@ -4138,22 +4811,19 @@
                                         .each(function () {
                                             var __model = _this._(this),
                                                     _clone;
-                                            if (__model.hasAttr('this-in-collection'))
-                                            {
+                                            if (__model.hasAttr('this-in-collection')) {
                                                 in_collection = true;
                                                 var _collection = __model.parent();
-                                                _clone = _this.templates.children('collection[this-model="'
-                                                        + _collection.attr('this-model')
-                                                        + '"],[this-type="collection"][this-model="'
-                                                        + _collection.attr('this-model') + '"]').children()
-                                                        .clone();
+                                                _clone = _this.getTemplate('collection[this-id="'
+                                                        + _collection.attr('this-id')
+                                                        + '"],[this-type="collection"][this-id="'
+                                                        + _collection.attr('this-id') + '"]').children();
                                             }
                                             else {
-                                                _clone = _this.templates.children('model[this-id="'
+                                                _clone = _this.getTemplate('model[this-id="'
                                                         + __model.attr('this-id')
                                                         + '"],[this-type="collection"][this-id="'
-                                                        + __model.attr('this-id') + '"]')
-                                                        .clone();
+                                                        + __model.attr('this-id') + '"]');
                                             }
                                             var data = v.data,
                                                     __data = internal.canContinue
@@ -4181,6 +4851,8 @@
                                                         else
                                                             _cl_col.remove();
                                                     });
+                                            // put back current model's url
+                                            _clone.attr('this-url', __model.attr('this-url'));
                                             internal.parseData.call(_this, data,
                                                     _clone.outerHtml(), null, false, true, function (tmpl) {
                                                 __model.html(tmpl.html()).show()
@@ -4240,7 +4912,7 @@
                     var del = false;
                     this.__.forEach(touched.deleted, function (mod, arr) {
                         _this.__.forEach(arr, function (i, v) {
-                            _this.__.arrayRemoveValue(deleted[mod], v);
+                            _this.__.removeArrayValue(deleted[mod], v);
                             del = true;
                         });
                         /* remove model from deleted if operated on all */
@@ -4251,7 +4923,6 @@
                     });
                     if (del)
                         this.store('deleted', deleted);
-
                     if (touched.back)
                         return this.back();
                     else if (touched.created || touched.updated || touched.deleted) {
@@ -4291,7 +4962,7 @@
                                             action[model_name] = [];
                                         /* Remove model uid if exists to avoid duplicates */
                                         action[model_name] = this.__
-                                                .arrayRemoveValue(action[model_name], resp.id, true);
+                                                .removeArrayValue(action[model_name], resp.id, true);
                                         action[model_name].push(resp.id);
                                         break;
                                     case 'updated':
@@ -4323,7 +4994,7 @@
                                             action[model_name] = [];
                                         /* Indicate model as deleted */
                                         action[model_name] = this.__
-                                                .arrayRemoveValue(action[model_name], resp.id, true);
+                                                .removeArrayValue(action[model_name], resp.id, true);
                                         action[model_name].push(resp.id);
                                         break;
                                 }
@@ -4716,21 +5387,108 @@
              * @returns {Model}
              */
             Model = function (id, attributes, props) {
-                function toURL(attributes, _key) {
-                    var url = '';
-                    __.forEach(attributes, function (key, value) {
-                        if (_key) // parsing for object
-                            key = _key + '[' + key + ']';
-                        if (url)
-                            url += '&';
-                        if (__.isObject(value, true)) {
-                            url += toURL(value, key);
-                        }
+                function finalizeSave(config, data) {
+                    var _this = this,
+                            method = this.id
+                            ? this.app.config.crud.methods.update
+                            : this.app.config.crud.methods.create,
+                            formData = new FormData(config.form).fromObject(data);
+
+                    if (this.method)
+                        method = this.method;
+                    if (this.id && config.cacheOnly)
+                        /* save model to collection */
+                        internal.modelToStore.call(this.app, this.name, this.id,
+                                formData.toObject(), this.uid);
+                    else if (_this.url || config.url) {
+                        var _success = function (data, id) {
+                            if (data) {
+                                var model = getRealData.call(_this.app, data) || data,
+                                        crudStatus = _this.app.config.crud.status;
+                                if (((crudStatus &&
+                                        data[crudStatus.key] === crudStatus.successValue)
+                                        || !crudStatus) && model) {
+                                    _this.attributes = model;
+                                    id = id || internal.getUIDValue
+                                            .call(_this.app, model, _this.uid);
+                                    // Don't cache for update if watching for updates already
+                                    if (!_this.app.watchCallback) {
+                                        // save model to collection and set whole data as model
+                                        model = internal.modelToStore
+                                                .call(_this.app, _this.name, id, model,
+                                                        _this.uid, !_this.id &&
+                                                        _this.app.container
+                                                        .find('collection[this-model="'
+                                                                + _this.name + '"],[this-type="collection"][this-model="'
+                                                                + _this.name + '"]').hasAttr('this-paginate'));
+                                        var _action = _this.id ? 'updated' : 'created',
+                                                action = _this.app.store(_action) || {};
+                                        // saved existing model for dom update
+                                        if (_this.id) {
+                                            if (!action[_this.name])
+                                                action[_this.name] = {};
+                                            action[_this.name][_this.id] = {
+                                                data: model,
+                                                timestamp: Date.now()
+                                            };
+                                        }
+                                        // saved new model for dom update
+                                        else {
+                                            _this.id = id;
+                                            // update the url
+                                            _this.url += _this.id;
+                                            if (!action[_this.name])
+                                                action[_this.name] = [];
+                                            // Remove model uid if exists to avoid duplicates
+                                            action[_this.name] = _this.app.__
+                                                    .removeArrayValue(action[_this.name],
+                                                            _this.id, true);
+                                            action[_this.name].push(_this.id);
+                                        }
+                                        _this.app.store(_action, action);
+                                        // update current page 
+                                        internal.updatePage.call(_this.app);
+                                    }
+                                    // update model's collection
+                                    if (_this.collection) {
+                                        _this.collection.models[id] = model;
+                                        _this.collection.length++;
+                                    }
+                                }
+                                _this.app.__.callable(config.success).call(this, data, id);
+                            }
+                            else {
+                                _this.app.__.callable(config.fail).call(this);
+                            }
+                            _this.app.__.callable(config.complete).call(this);
+                        },
+                                _error = function (e) {
+                                    _this.app.__.callable(config.error).call(this, e);
+                                    _this.app.__.callable(config.complete).call(this, e);
+                                };
+                        if (this.app.dataTransport)
+                            this.app.__.callable(this.app.dataTransport)
+                                    .call(this.app, {
+                                        url: config.url || this.url,
+                                        id: this.id,
+                                        data: formData,
+                                        action: this.id ? 'update' : 'create',
+                                        success: _success,
+                                        error: _error
+                                    });
                         else {
-                            url += encodeURIComponent(key) + '=' + encodeURIComponent(value);
+                            this.app.request({
+                                type: config.method || method,
+                                url: config.url || _this.url,
+                                data: formData,
+                                success: _success,
+                                error: _error
+                            });
                         }
-                    });
-                    return url;
+                    }
+                    else {
+                        _this.app.error('Cannot save model to server: No URL supplied.');
+                    }
                 }
                 var _Model = Object.create({
                     app: props && props.app ? props.app : null,
@@ -4748,23 +5506,46 @@
                      */
                     bind: function (elem) {
                         elem = this.app._(elem);
+                        if (!elem.length)
+                            return;
                         if (this.id)
                             elem.attr('this-mid', this.id);
                         if (this.uid)
                             elem.attr('this-uid', this.uid);
                         if (this.url)
                             elem.attr('this-url', this.url);
-                        elem = internal.loadModel.call(this.app, elem, this.attributes,
-                                function () {
-                                    if (!elem.is('form')) {
-                                        elem.find('form[this-loaded]').remove();
-                                        elem = elem.find('form').attr('this-url', elem.attr('this-url'));
-                                        if (!elem.length)
-                                            return this;
-                                    }
-                                    internal.loadForms.call(this.app, elem, this.attributes);
-                                }.bind(this))
-                                .show();
+                        var type = getElemType(elem),
+                                selector = type + '[this-id="' + elem.attr('this-id')
+                                + '"],[this-type="' + type + '"][this-id="'
+                                + elem.attr('this-id') + '"]',
+                                _template = this.app.getTemplate(selector);
+                        if (_template.length)
+                            elem.html(_template.html());
+                        internal.bindToObject.call(this.app, elem, this.attributes, function (elem) {
+                            elem.show();
+                            var attr = {
+                                "this-type": "model",
+                                "this-uid": this.uid,
+                                "this-mid": this.id,
+                                "this-url": this.url
+                            };
+                            if (!elem.is('form')) {
+                                elem.attr(attr);
+                                elem.find('form[this-loaded]').remove();
+                                var _elem = elem.find('form');
+                                if (_elem.length)
+                                    elem = _elem;
+                            }
+                            if (elem.is('form')) {
+                                delete attr['this-type'];
+                                delete attr['this-id'];
+                                elem.attr(attr);
+                                internal.loadForms.call(this.app, elem, this.attributes);
+                            }
+                            elem.trigger('model.binded', {
+                                data: this
+                            });
+                        }.bind(this));
                         return this;
                     },
                     /**
@@ -4803,11 +5584,76 @@
                             return false;
                         }
 
-                        if (config.cacheOnly)
+                        var done = function () {
+                            // model is a part of a page pagination
+                            // sanitize!
+                            if (this.attributes.__page) {
+                                // get cache
+                                var collection = internal.cache.call(this.app, 'model', this.name);
+                                // pagination exists
+                                if (collection.pagination) {
+                                    var page = parseInt(this.attributes.__page),
+                                            removed = false,
+                                            appended = false,
+                                            selector = 'collection[this-model="'
+                                            + this.name + '"],[this-type="collection"][this-model="'
+                                            + this.name + '"]',
+                                            _collection = this.app.container
+                                            .find(selector),
+                                            cache = this.app.getTemplate(selector)
+                                            .children().attr('this-type', 'model');
+                                    // go through all pagination metas
+                                    while (collection.pagination[page]) {
+                                        if (!removed) {
+                                            // remove model id from pagination
+                                            this.app.__.removeArrayValue(collection.pagination[page], this.id);
+                                            removed = true;
+                                        }
+                                        else {
+                                            // shift first value into last page's pagination meta
+                                            if (page > 0) {
+                                                var last = collection.pagination[page].shift();
+                                                if (!appended) {
+                                                    if (!_collection.children('[this-mid="' + last + '"]').length && collection.data[last]) {
+                                                        internal.bindToObject.call(this.app, cache, collection.data[last], function (elem) {
+                                                            elem.attr({
+                                                                "this-id": this.name,
+                                                                "this-in-collection": "",
+                                                                "this-type": "model",
+                                                                "this-url": this.url.replace(this.id, last),
+                                                                "this-mid": last,
+                                                                "this-uid": this.uid
+                                                            }).show();
+                                                            _collection.append(elem);
+                                                        }.bind(this));
+                                                        appended = true;
+                                                    }
+                                                }
+                                                collection.pagination[page - 1].push(last);
+                                            }
+                                        }
+                                        page++;
+                                    }
+                                    // collection listing is empty
+                                    if (!_collection.children().length) {
+                                        this.app.load(_collection.attr('this-pagination-page', parseInt(_collection.attr('this-pagination-page')) - 1));
+                                    }
+                                    // delete last pagination meta if empty
+                                    if (!collection.pagination[page - 1].length)
+                                        delete collection.pagination[page - 1];
+                                    // save collection back to cache
+                                    internal.cache.call(this.app, 'model', this.name, collection);
+                                }
+                            }
+                        }.bind(this);
+
+                        if (config.cacheOnly) {
                             internal.removeModelFromStore.call(this.app, this.name, this.id);
+                            done();
+                        }
                         else if (this.url || config.url) {
                             var _success = function (data) {
-                                var crudStatus = _this.app.config.crudStatus;
+                                var crudStatus = _this.app.config.crud.status;
                                 if ((crudStatus &&
                                         data[crudStatus.key] === crudStatus.successValue)
                                         || !crudStatus) {
@@ -4819,9 +5665,10 @@
                                             deleted[_this.name] = [];
                                         /* Indicate model as deleted */
                                         deleted[_this.name] = _this.app.__
-                                                .arrayRemoveValue(deleted[_this.name], _this.id, true);
+                                                .removeArrayValue(deleted[_this.name], _this.id, true);
                                         deleted[_this.name].push(_this.id);
                                         _this.app.store('deleted', deleted);
+                                        done();
                                         /* update current page */
                                         internal.updatePage.call(_this.app);
                                     }
@@ -4847,11 +5694,12 @@
                                             error: _error
                                         });
                             else
-                                this.app.ajax({
-                                    type: config.method || 'delete',
-                                    url: _this.app.config.baseURL + (config.url || _this.url),
+                                this.app.request({
+                                    type: config.method || this.app.config.crud.methods.delete,
+                                    url: config.url || _this.url,
                                     success: _success,
-                                    error: _error});
+                                    error: _error
+                                });
                         }
                         else {
                             this.app.error('Cannot remove model from server: No URL supplied.');
@@ -4862,15 +5710,10 @@
                     /**
                      * Persists the model. If not exists, it is created.
                      * @param {Object} config Keys may include cacheOnly (default: FALSE),
-                     * url, data, method (default: PUT|POST), success, error, complete
+                     * url, data, form, method (default: PUT|POST), success, error, complete
                      * @returns boolean
                      */
                     save: function (config) {
-                        config = this.app.__.extend({}, config);
-                        data = config.data || this.attributes;
-                        if (!data || (this.app.__.isObject(data) && !Object.keys(data).length))
-                            return false;
-                        var _this = this, method = this.id ? 'PUT' : 'POST';
                         if (!this.app) {
                             console.error('Invalid model object');
                             return false;
@@ -4880,120 +5723,65 @@
                             return false;
                         }
 
-                        if (this.method)
-                            method = this.method;
-                        if (this.id && config.cacheOnly)
-                            /* save model to collection */
-                            internal.modelToStore.call(this.app, this.name, this.id,
-                                    data, this.uid);
-                        else if (_this.url || config.url) {
-                            var _success = function (data, id) {
-                                if (data) {
-                                    var model = _this.app.config.dataKey ?
-                                            data[_this.app.config.dataKey] : data,
-                                            crudStatus = _this.app.config.crudStatus;
-                                    if (((crudStatus &&
-                                            data[crudStatus.key] === crudStatus.successValue)
-                                            || !crudStatus) && model) {
-                                        id = id || internal.getUIDValue
-                                                .call(_this.app, model, _this.uid);
-                                        // Don't cache for update if watching for updates already
-                                        if (!_this.app.watchCallback) {
-                                            // save model to collection and set whole data as model
-                                            model = internal.modelToStore
-                                                    .call(_this.app, _this.name, id, model,
-                                                            _this.uid);
-                                            var _action = _this.id ? 'updated' : 'created',
-                                                    action = _this.app.store(_action) || {};
-                                        }
-                                        // update model's collection
-                                        if (_this.collection)
-                                            _this.collection.models[id] = model;
+                        config = this.app.__.extend({}, config);
+                        data = config.data || this.attributes;
+                        var _data = internal.canContinue
+                                .call(this.app, this.id ? 'model.update' : 'model.create',
+                                        [config.form, data]);
+                        if (false === _data) {
+                            return;
+                        }
+                        else if (this.app.__.isObject(_data)) {
+                            data = _data;
+                        }
+                        // no data
+                        if ((!data || (this.app.__.isObject(data) && !Object.keys(data).length))
+                                // and no form
+                                && !config.form) {
+                            this.app.error('No data or form to save');
+                            return false;
+                        }
 
-                                        // saved existing model for dom update
-                                        if (_this.id && !_this.app.watchCallback) {
-                                            if (!action[_this.name])
-                                                action[_this.name] = {};
-                                            action[_this.name][_this.id] = {
-                                                data: model,
-                                                timestamp: Date.now()
-                                            };
-                                            _this.app.store(_action, action);
-                                        }
-                                        // saved new model for dom update
-                                        else {
-                                            if (!_this.app.watchCallback) {
-                                                _this.id = id;
-                                                // update the url
-                                                _this.url += _this.id;
-                                                if (!action[_this.name])
-                                                    action[_this.name] = [];
-                                                // Remove model uid if exists to avoid duplicates
-                                                action[_this.name] = _this.app.__
-                                                        .arrayRemoveValue(action[_this.name],
-                                                                _this.id, true);
-                                                action[_this.name].push(_this.id);
-                                                _this.app.store(_action, action);
-                                            }
-                                            if (_this.collection)
-                                                _this.collection.length++;
-                                        }
-
-                                        _this.attributes = model;
-                                        // Don't update if watching for updates already
-                                        if (!_this.app.watchCallback)
-                                            // update current page 
-                                            internal.updatePage.call(_this.app);
-                                    }
-                                    _this.app.__.callable(config.success).call(this, data);
-                                }
-                                else {
-                                    _this.app.__.callable(config.fail).call(this);
-                                }
-                                _this.app.__.callable(config.complete).call(this);
-                            },
-                                    _error = function (e) {
-                                        _this.app.__.callable(config.error).call(this, e);
-                                        _this.app.__.callable(config.complete).call(this, e);
-                                    };
-                            if (this.app.dataTransport)
-                                this.app.__.callable(this.app.dataTransport)
-                                        .call(this.app, {
-                                            url: config.url || this.url,
+                        // saving form while there's an uploader for the app
+                        if (config.form && internal.record.call(this.app, 'uploader')) {
+                            // get files
+                            var files = this.app._(config.form).find('input[type="file"]');
+                            if (files.length) {
+                                data = data || {};
+                                var _this = this;
+                                // send them to uploader
+                                this.app.__.callable(internal.record.call(this.app, 'uploader'))
+                                        .call(config.form, {
+                                            modelName: this.name,
+                                            files: files.items,
+                                            data: this.app.__.extend(data),
                                             id: this.id,
-                                            data: data,
-                                            action: this.id ? 'update' : 'create',
-                                            success: _success,
-                                            error: _error
+                                            url: this.url,
+                                            done: function (_data) {
+                                                if (!_data) {
+                                                    this.app.__.callable(config.error).call(this.app);
+                                                    return;
+                                                }
+                                                this.app.__.forEach(_data, function (i, v) {
+                                                    data[i] = v;
+                                                });
+                                                finalizeSave.call(this, config, data);
+                                            }.bind(this)
                                         });
-                            else
-                                this.app.ajax({
-                                    type: config.method || method,
-                                    url: _this.app.config.baseURL ? _this.app.config.baseURL +
-                                            (config.url || _this.url) : (config.url || _this.url),
-                                    data: this.toURL(data),
-                                    success: _success,
-                                    error: _error
-                                });
-                            return true;
+                                // remove them from form
+                                files.remove();
+                                return this;
+                            }
                         }
-                        else {
-                            _this.app.error('Cannot save model to server: No URL supplied.');
-                        }
-                        return false;
-                    },
-                    /**
-                     * Converts the model to a url string
-                     * @param {object} The data to save. If none is given, the
-                     * model's attributes are used.
-                     * @returns {String}
-                     */
-                    toURL: function (data) {
-                        return toURL(data || this.attributes);
+                        finalizeSave.call(this, config, data);
+                        return this;
                     }
                 });
                 if (__.isObject(attributes)) {
                     __.forEach(attributes, function (key) {
+                        // ignore internal keys
+                        if (key.startsWith('__'))
+                            return;
                         _Model.init(key);
                     });
                 }
@@ -5012,7 +5800,7 @@
                 var _Collection = Object.create({
                     app: props && props.app ? props.app : null,
                     current_index: -1,
-                    models: __.isObject(models) ? models : {},
+                    models: __.isObject(models, true) ? models : {},
                     name: props && props.name ? props.name : null,
                     uid: props && props.uid ? props.uid : '',
                     url: props && props.url ? props.url : null,
@@ -5081,13 +5869,31 @@
                         return this.get(0);
                     },
                     /**
+                     * Loops through models and applies the callback to each
+                     * @param {Function} callback
+                     * @returns {_Collection}
+                     */
+                    each: function (callback) {
+                        __.forEach(this.models, function (i, v) {
+                            __.callable(callback).call(this, i, v);
+                        });
+                        return this;
+                    },
+                    /**
                      * Fetch the model at the index location
                      * @param {integer} index                      * @returns {Model}                      */
                     get: function (index) {
                         var key = Object.keys(this.models)[index];
-                        if (key)
-                            this.parent.current_index = index;
-                        return this.model(key);
+                        if (!key)
+                            return;
+                        this.parent.current_index = index;
+                        return new Model(key, this.models[key], {
+                            name: this.name,
+                            app: this.app,
+                            uid: this.uid,
+                            url: url,
+                            collection: this
+                        });
                     },
                     /**
                      * Checks whether there's a model after the current one
@@ -5121,18 +5927,54 @@
                     /**
                      * Fetches a model from the collection
                      * @param {integer}|{string} model_id
+                     * @param {Object} Keys include url (string), success (function),
+                     * error (function)
                      * @returns {Model}
                      */
-                    model: function (model_id) {
-                        var _this = this;
-                        return model_id && this.models[model_id] ?
-                                new Model(model_id, this.models[model_id], {
-                                    name: _this.name,
-                                    app: _this.app,
-                                    uid: _this.uid,
-                                    url: _this.url + model_id + '&1',
-                                    collection: this
-                                }) : null;
+                    model: function (model_id, options) {
+                        if (!model_id)
+                            return null;
+                        var _this = this, url,
+                                options = this.app.__.extend({
+                                    success: function (model) {},
+                                    error: function (e) {}
+                                }, options);
+                        if (options.url) {
+                            url = options.url;
+                        }
+                        else if (this.url) {
+                            url = (_this.url.endsWith('/') ?
+                                    _this.url : _this.url + '/') + model_id;
+                        }
+                        if (this.models[model_id]) {
+                            this.app.__.callable(options.success).call(this,
+                                    new Model(model_id, this.models[model_id], {
+                                        name: _this.name,
+                                        app: _this.app,
+                                        uid: _this.uid,
+                                        url: url,
+                                        collection: this
+                                    }));
+                        }
+                        else {
+                            this.app.request({
+                                url: url,
+                                success: function (data) {
+                                    var _data = getRealData.call(this.app, data);
+                                    this.app.__.callable(options.success).call(this,
+                                            new Model(model_id, _data || data, {
+                                                name: _this.name,
+                                                app: _this.app,
+                                                uid: _this.uid,
+                                                url: url,
+                                                collection: this
+                                            }));
+                                }.bind(this),
+                                error: function (e) {
+                                    this.app.__.callable(options.error).call(this, e);
+                                }.bind(this)
+                            });
+                        }
                     },
                     /**
                      * Fetchs the next model
@@ -5144,19 +5986,33 @@
                     /**
                      * Removes a model
                      * @param {integer}|{string} model_id
-                     * @param {Object} config @see Model.remove()
+                     * @param {Object} options @see Model.remove()
                      * @returns {Model}
                      */
-                    remove: function (model_id, config) {
-                        config = this.app.__.extend({}, config);
+                    remove: function (model_id, options) {
+                        var _options = this.app.__.extend({}, options),
+                                url;
+                        if (options.url) {
+                            url = options.url;
+                        }
+                        else if (this.url) {
+                            url = (_this.url.endsWith('/') ?
+                                    _this.url : _this.url + '/') + model_id;
+                        }
+                        _options.url = url;
+                        _options.success = function () {
+                            delete this.models[model_id];
+                            this.length--;
+                            this.app.__.callable(options.success)
+                                    .apply(this, Array.from(arguments));
+                        }.bind(this);
                         /* remove one */
-                        var model = this.model(model_id);
-                        if (!model)
-                            return false;
-                        model.remove(config);
-                        delete this.models[model_id];
-                        this.length--;
-                        return model;
+                        this.model(model_id, {
+                            url: url,
+                            success: function (model) {
+                                model.remove(options);
+                            }.bind(this)
+                        });
                     },
                     /**
                      * Remove all models
@@ -5194,9 +6050,9 @@
                                             success: _success, error: _error
                                         });
                             else
-                                this.app.ajax({
-                                    url: this.app.config.baseURL + this.url,
-                                    type: config.method || 'delete',
+                                this.app.request({
+                                    url: this.url,
+                                    type: config.method || this.app.config.crud.methods.delete,
                                     success: _success,
                                     error: _error
                                 });
@@ -5225,7 +6081,6 @@
         this.version = '1.0';
         if (config && __.isObject(config))
             this.config = this.__.extend(this.config, config, true);
-        this.debug(this.config.debug);
     };
     /**
      * Transitions affect how old pages are exited and new pages are entered
@@ -5361,11 +6216,25 @@
              */
             baseURL: location.origin + location.pathname,
             /**
-             * Indicates the status info for crud operations
+             * CRUD settings
              */
-            crudStatus: {
-                key: 'status', // the key that holds the operation status
-                successValue: true // the key value that indicates success
+            crud: {
+                /*
+                 * Indicates the status info for crud operations
+                 */
+                status: {
+                    key: 'status', // the key that holds the operation status
+                    successValue: true // the key value that indicates success
+                },
+                /*
+                 * CRUD methods
+                 */
+                methods: {
+                    create: 'POST',
+                    read: 'GET',
+                    update: 'PUT',
+                    delete: 'DELETE'
+                }
             },
             /**
              * The key in each ajax response which holds the actual object or array of objects
@@ -5382,6 +6251,17 @@
              * Default uid for models and collections if not explicitly defined
              */
             modelUID: 'id',
+            /**
+             * Pagination settings
+             */
+            pagination: {
+                // The number of results to fetch when paginating. 
+                // FALSE means no limit should be sent. Useful for when the server
+                // takes care of its pagination limit
+                limit: 20,
+                // FALSE means new data would be appended
+                overwrite: false
+            },
             /**              * Paths to pages, layouts and components
              */
             paths: {
@@ -5446,63 +6326,53 @@
          * @param boolean debug
          * @returns _          */
         _: function (selector, debug) {
-            return _(selector, debug || this.config ? this.config.debug : true);
+            return _(selector, debug || this.config ? internal.record.call(this, 'debug') : true);
         },
         /**
-         * Sends an AJAX request
-         * @param object config
-         * Keys include:
-         * type (string): GET | POST | PATCH | PUT | DELETE
-         * url (string): The url to connect to. Default is current url
-         * data (string|object}: The data to send with the request
-         * success (function): Function to call when a success response is gotten. The response data
-         * is passed as a parameter
-         * error (function) : Function to call when error occurs
-         * complete (function): Function to call when a response has been received, error or success.          * @returns ajax object
+         * Adds an element to the template collection
+         * @param {_}|{HTMLElement} elem
+         * @returns {ThisApp}
          */
-        ajax: function (config) {
-            return internal.groupConsoleOutput.call(this, 'ajax',
-                    function () {
-                        if (!this.__.isObject(config)) {
-                            this.console('error', 'Method expects an object parameter. '
-                                    + typeof config + ' given!');
-                            return this;
-                        }
-                        return this.__.ajax(config);
-                    }, true);
+        addTemplate: function (elem) {
+            elem = this._(elem).clone();
+            var _this = this;
+            elem.find('style').each(function () {
+                _this._(this).replaceWith('<div this-type="style">' + this.innerText + '</div>');
+            });
+            this.templates.append(elem.outerHtml()
+                    .replace(/\{\{/g, '__obrace__')
+                    .replace(/\}\}/g, '__cbrace__')
+                    .replace(/\(\{/g, '__obrace2__')
+                    .replace(/\}\)/g, '__cbrace2__'));
+            return this;
         },
         /**
          * Takes the app back one step in history
          * @returns ThisApp
          */
         back: function (e) {
-            return internal.groupConsoleOutput.call(this, 'back',
-                    function () {
-                        if (e && this.__.isObject(e) && e['preventDefault'])
-                            e.preventDefault();
-                        if (history.length <= 2) {
-                            this.home();
-                            return;
-                        }
-                        history.back();
-                        return this;
-                    }, true);
+            if (e && this.__.isObject(e) && e['preventDefault'])
+                e.preventDefault();
+            if (history.length <= 2) {
+                this.home();
+                return;
+            }
+            history.back();
+            return this;
         },
         /**
          * Registers a callbact to be called before an event happens. If the callback returns false,
          * the event is terminated.
          * @param {string} event
-         * @param {function} callback          * @returns {ThisApp}
+         * @param {function} callback
+         * @returns {ThisApp}
          */
         before: function (event, callback) {
-            return internal.groupConsoleOutput.call(this, 'before',
-                    function () {
-                        var _this = this;
-                        this.__.forEach(event.split(','), function (i, v) {
-                            _this.beforeCallbacks[v.trim()] = callback;
-                        });
-                        return this;
-                    }, true);
+            var _this = this;
+            this.__.forEach(event.split(','), function (i, v) {
+                _this.beforeCallbacks[v.trim()] = callback;
+            });
+            return this;
         },
         /**
          * Fetches a collection of model
@@ -5512,80 +6382,75 @@
          * @returns {Collection}
          */
         collection: function (model_name, config) {
-            return internal.groupConsoleOutput.call(this, 'collection',
-                    function () {
-                        if (!model_name)
-                            return new Collection([], {app: this});
-                        if (!config)
-                            config = {};
-                        var data = config.data;
-                        if (!data) {
-                            var collection = internal.cache.call(this, 'model', model_name);
-                            data = [];
-                            if (collection) {
-                                data = collection.data;
-                                if (!config.url)
-                                    config.url = collection.url;
-                                if (!config.uid)
-                                    config.uid = collection.uid;
-                            }
-                        }
-                        else if (data) {
-                            if (this.config.dataKey && !data[this.config.dataKey]) {
-                                var _data = {};
-                                _data[this.config.dataKey] = data;
-                                data = _data;
-                            }
-                            internal.cache.call(this, 'model', model_name, data);
-                        }
-                        if (data && (this.__.isObject(data) ||
-                                (this.__.isArray(data) &&
-                                        (data.length || (!data.length && !config.url))))) {
-                            this.__.callable(config.success).call(this,
-                                    new Collection(data, {
-                                        name: model_name,
-                                        app: this,
-                                        uid: config ? config.uid : null,
-                                        url: config ? config.url : null
-                                    }));
-                        }
-                        else if (model_name && config.url) {
-                            var _collection = this.container.find('collection[this-model="'
-                                    + model_name
-                                    + '"][this-loaded],[this-type="collection"][this-model="'
-                                    + model_name
-                                    + '"][this-loaded]');
-                            if (!_collection.length)
-                                _collection = this.container.find('collection[this-id="' + model_name
-                                        + '"][this-loaded],[this-type="collection"][this-id="'
-                                        + model_name + '"][this-loaded]');
-                            if (!_collection.length)
-                                _collection = this._('<collection this-model="'
-                                        + model_name + '" this-url="' + config.url + '" />');
-                            _collection.attr('this-no-updates', '');
-                            var _this = this;
-                            this.request(_collection,
-                                    function (data, uid) {
-                                        _this.__.callable(config.success).call(_this,
-                                                new Collection(data, {
-                                                    name: model_name,
-                                                    app: _this,
-                                                    uid: config.uid || _collection.attr('this-model-uid') || uid,
-                                                    url: config.url || _collection.attr('this-url')
-                                                }));
-                                    }, config.error);
-                        }
-                        return this;
-                    }, true);
-        },
-        /**
-         * The function called when logging a message
-         * @param {string} msg
-         * @returns {ThisApp}
-         */
-        console: function (method, param) {
-            if (this.config.debug)
-                console[method].apply(null, this.__.isArray(param) ? param : [param]);
+            if (!model_name)
+                return new Collection([], {app: this});
+            if (!config)
+                config = {};
+            var data = config.data;
+            if (!data) {
+                var collection = internal.cache.call(this, 'model', model_name);
+                data = [];
+                if (collection) {
+                    data = collection.data;
+                    if (!config.url)
+                        config.url = collection.url;
+                    if (!config.uid)
+                        config.uid = collection.uid;
+                }
+            }
+            else if (data) {
+                // ensure data is well packaged for caching
+                if (this.config.dataKey && !data[this.config.dataKey]) {
+                    var _data = {};
+                    _data[this.config.dataKey] = data;
+                    data = _data;
+                }
+                internal.cache.call(this, 'model', model_name, data);
+            }
+            // data exists and has at least one entry or
+            // data doesn't exist and neither does config.url
+            if ((data && this.__.isObject(data, true)
+                    && Object.keys(data).length) ||
+                    !config.url) {
+                this.__.callable(config.success).call(this,
+                        new Collection(data, {
+                            name: model_name,
+                            app: this,
+                            uid: config ? config.uid : null,
+                            url: config ? config.url : null
+                        }));
+            }
+            else if (model_name && config.url) {
+                var _collection = this.container.find('collection[this-model="'
+                        + model_name
+                        + '"][this-loaded],[this-type="collection"][this-model="'
+                        + model_name
+                        + '"][this-loaded]');
+                if (!_collection.length)
+                    _collection = this.container.find('collection[this-id="' + model_name
+                            + '"][this-loaded],[this-type="collection"][this-id="'
+                            + model_name + '"][this-loaded]');
+                if (!_collection.length)
+                    _collection = this._('<collection this-model="'
+                            + model_name + '" this-url="' + config.url + '" />');
+                _collection.attr('this-no-updates', '');
+                var _this = this;
+                this.request({
+                    url: _collection,
+                    success: function (data, uid) {
+                        internal.cache.call(_this, 'model', model_name, data);
+                        data = getRealData.call(_this, data) || data;
+                        _this.__.callable(config.success).call(_this,
+                                new Collection(data, {
+                                    name: model_name,
+                                    app: _this,
+                                    uid: config.uid || _collection.attr('this-model-uid') || uid,
+                                    url: config.url || _collection.attr('this-url')
+                                }));
+                    },
+                    error: config.error
+                });
+            }
             return this;
         },
         /**
@@ -5594,12 +6459,8 @@
          * @returns ThisApp
          */
         debug: function (debug) {
-            return internal.groupConsoleOutput.call(this, 'debug',
-                    function () {
-                        this.config.debug = debug || false;
-                        this.__.__proto__.debug = this.config.debug;
-                        return this;
-                    }, true);
+            this.config.debug = debug || false;
+            return this;
         },
         /**
          * The function called when an error occurs
@@ -5607,7 +6468,7 @@
          * @returns ThisApp
          */
         error: function (msg) {
-            this.console('warn', msg);
+            internal.log.call(this, 'warn', msg);
             return this;
         },
         /**
@@ -5615,46 +6476,80 @@
          * @returns ThisApp
          */
         forward: function (e) {
-            return internal.groupConsoleOutput.call(this, 'forward',
-                    function () {
-                        if (e && this.__.isObject(e) && e['preventDefault'])
-                            e.preventDefault();
-                        history.forward();
-                        return this;
-                    }, true);
+            if (e && this.__.isObject(e) && e['preventDefault'])
+                e.preventDefault();
+            history.forward();
+            return this;
         },
         /**
          * Gets a list of available filters
          * @returns array          */
         getAvailableFilters: function () {
-            return internal.groupConsoleOutput.call(this, 'getAvailableFilters',
-                    function () {
-                        return Object.keys(Filters);
-                    }, true);
+            return Object.keys(Filters);
         },
         /**
          * Gets a list of available transitions
          * @returns array
          */
         getAvailableTransitions: function () {
-            return internal.groupConsoleOutput.call(this, 'getAvailableTransitions',
-                    function () {
-                        return Object.keys(Transitions);
-                    }, true);
+            return Object.keys(Transitions);
         },
         /**
-         * Returns the app to the home page          * @returns ThisApp
+         * Fetches the unique key generated for the last request
+         */
+        getRequestKey: function () {
+            return internal.getRequestKey.call(this);
+        },
+        /**
+         * Fetches the required elements from the template collection
+         * @param {string}|{_} selector
+         * @returns {_}
+         */
+        getTemplate: function (selector, childOnly) {
+            var _this = this,
+                    elem = this._();
+            if (!childOnly && this.page) {
+                if (!selector) {
+                    selector = 'page[this-id="' + this.page.attr('this-id')
+                            + '"],[this-type="page"][this-id="'
+                            + this.page.attr('this-id') + '"]';
+                }
+                var selectr = '';
+                this.__.forEach(selector.split(','), function (i, v) {
+                    if (selectr)
+                        selectr += ',';
+                    selectr += 'page[this-id="'
+                            + _this.page.attr('this-id') + '"] ' + v
+                            + ',[this-type="page"][this-id="'
+                            + _this.page.attr('this-id') + '"] ' + v;
+                });
+                elem = this.templates.find(selectr).clone();
+                if (!elem.length)
+                    elem = this.templates.children('[this-type="component"]')
+                            .find(selector);
+            }
+            if (!elem.length)
+                elem = this.templates.children(selector).clone();
+            elem.find('[this-type="style"]').each(function () {
+                _this._(this).replaceWith('<style>' + this.innerText + '</style>');
+            });
+            return this._(elem.outerHtml()
+                    .replace(/__obrace__/g, '{{')
+                    .replace(/__cbrace__/g, '}}')
+                    .replace(/__obrace2__/g, '({')
+                    .replace(/__cbrace2__/g, '})')).clone();
+        },
+        /**
+         * Returns the app to the home page
+         * @returns ThisApp
          */
         home: function () {
-            return internal.groupConsoleOutput.call(this, 'home',
-                    function () {
-                        this.loadPage(this.config.startWith ||
-                                this.container
-                                .find('page[this-default-page]:not([this-current]):not([this-dead]),'
-                                        + '[this-type="pages"] [this-default-page]')
-                                .attr('this-id'));
-                        return this;
-                    }, true);
+            this.loadPage(this.config.startWith ||
+                    this.container
+                    .find('page[this-default-page]:not([this-current]):not([this-dead]),'
+                            + '[this-type="pages"] [this-default-page]')
+                    .attr('this-id'));
+            return this;
         },
         /**
          * Loads an element (collection, model, component, or layout)
@@ -5662,80 +6557,76 @@
          * @returns {ThisApp}
          */
         load: function (elem) {
-            return internal.groupConsoleOutput.call(this, 'home',
-                    function () {
-                        var _this = this;
-                        this._(elem).each(function () {
-                            var type = this.getAttribute('this-type') || this.tagName.toLowerCase(),
-                                    method = 'load' + type[0].toUpperCase() + type.substr(1);
-                            if (!internal[method])
-                                return;
-                            internal[method].call(_this, this);
-                        });
-                        return this;
-                    }, true);
+            var _this = this;
+            this._(elem).each(function () {
+                var type = this.getAttribute('this-type') || this.tagName.toLowerCase(),
+                        method = 'load' + type[0].toUpperCase() + type.substr(1);
+                if (!internal[method])
+                    return;
+                internal[method].call(_this, this);
+            });
+            return this;
         },
         /**
          * Loads the given page
-         * @param {string} pageID ID of the page
+         * @param {string} pageIDorPath ID of the page or the path to the content of the page
          * @param {boolean} replaceInState Indicates whether to replace the current page's state with
          * the new page state instead of creating a different state for it.
          * @returns {ThisApp}
          */
-        loadPage: function (pageID, replaceInState) {
-            return internal.groupConsoleOutput.call(this, 'loadPage',
-                    function () {
-                        if (!pageID)
-                            return;
-                        this.oldPage = _();
-                        var newPage = this.templates.children('page[this-id="'
-                                + pageID + '"],'
-                                + '[this-type="page"][this-id="' + pageID + '"]');
-                        if (newPage.length > 1) {
-                            this.error('Target page matches multiple pages!');
-                            return this;
-                        }
-                        else if (!newPage.length) {
-                            if (this.config.paths && this.config.paths.pages) {
-                                var _this = this;
-                                internal.fullyFromURL.call(this, 'page', pageID,
-                                        function (elem) {
-                                            internal.pageFound.call(_this, elem, replaceInState);
-                                        },
-                                        function () {
-                                            internal.notAPage.call(_this, pageID);
-                                        });
-                                return this;
-                            }
-                            internal.notAPage.call(this, pageID);
-                            return this;
-                        }
-                        this.__proto__.components = 0;
-                        this.__proto__.collections = 0;
-                        this.__proto__.models = 0;
-                        internal.pageFound.call(this, newPage, replaceInState);
-                        return this;
-                    }, true);
+        loadPage: function (pageIDorPath, replaceInState) {
+            var last_page = this.store('last_page');
+            if (!pageIDorPath || ((last_page === pageIDorPath || last_page === '#/' + pageIDorPath)
+                    && !this.firstPage))
+                return;
+            this.oldPage = _();
+            pageIDorPath = internal.pageIDFromLink.call(this, pageIDorPath);
+            var newPage = this.getTemplate('page[this-id="' + pageIDorPath + '"],'
+                    + 'page[this-path="' + pageIDorPath + '"],'
+                    + '[this-type="page"][this-path="' + pageIDorPath + '"],'
+                    + '[this-type="page"][this-id="' + pageIDorPath + '"]');
+            if (newPage.length > 1) {
+                this.error('Target page matches multiple pages!');
+                return this;
+            }
+            else if (!newPage.length) {
+                if (this.config.paths && this.config.paths.pages) {
+                    var _this = this;
+                    internal.fullyFromURL.call(this, 'page', pageIDorPath,
+                            function (elem) {
+                                internal.pageFound.call(_this, elem, replaceInState);
+                            },
+                            function () {
+                                internal.notAPage.call(_this, pageIDorPath);
+                            });
+                    return this;
+                }
+                internal.notAPage.call(this, pageIDorPath);
+                return this;
+            }
+            this.__proto__.components = 0;
+            this.__proto__.collections = 0;
+            this.__proto__.models = 0;
+            internal.pageFound.call(this, newPage, replaceInState);
+            return this;
         },
         /**
          * Adds general event listeners
          * @param string event
          * @param string selector Multiple elements may be targeted by separating their selectors
          * by a comma.
-         * @param function callback          * @returns ThisApp
+         * @param function callback
+         * @returns ThisApp
          */
         on: function (event, selector, callback) {
-            return internal.groupConsoleOutput.call(this, 'on',
-                    function () {
-                        if (this.running)
-                            this.container.on(event, selector, callback);
-                        else
-                            this.events.push({
-                                event: event, selector: selector,
-                                callback: callback
-                            });
-                        return this;
-                    }, true);
+            if (internal.isRunning.call(this))
+                this.container.on(event, selector, callback);
+            else
+                this.events.push({
+                    event: event, selector: selector,
+                    callback: callback
+                });
+            return this;
         },
         /**
          * What to do when the app encounters an error
@@ -5743,14 +6634,11 @@
          * @returns ThisApp
          */
         onError: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'onError',
-                    function () {
-                        this.error = function (message) {
-                            this.__proto__.error(message);
-                            this.__.callable(callback, true).call(this, message);
-                        };
-                        return this;
-                    }, true);
+            this.error = function (message) {
+                this.__proto__.error(message);
+                this.__.callable(callback, true).call(this, message);
+            };
+            return this;
         },
         /**
          * Sets up the function to call when a page is not found
@@ -5758,11 +6646,8 @@
          * @returns {ThisApp}
          */
         pageNotFound: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'pageNotFound',
-                    function () {
-                        this.notFound = callback;
-                        return this;
-                    }, true);
+            this.notFound = callback;
+            return this;
         },
         /**
          * Reloads the current page
@@ -5771,60 +6656,95 @@
          * @returns {ThisApp}
          */
         reload: function (resources, layouts) {
-            return internal.groupConsoleOutput.call(this, 'reload',
-                    function () {
-                        this.store('last_page', null);
-                        if (resources)
-                            location.reload();
-                        else {
-                            this.reloadLayouts = layouts || false;
-                            this.loadPage(location.hash.substr(2), true);
-                        }
-                        return this;
-                    }, true);
+            this.store('last_page', null);
+            if (resources)
+                location.reload();
+            else {
+                this.reloadLayouts = layouts || false;
+                this.loadPage(location.hash.substr(2), true);
+            }
+            return this;
         },
-        /**          
-         * Sends an ajax request based on the parameter of the page.
-         * @param string selector
-         * @param function success The callback to call on success
-         * @param function error The callback to call on error
-         * @param object|string The data to send with the request
-         * @param string responseType The type of response to expect. JSON, TEXT, XML, BLOB, DOCUMENT
-         * @returns XMLHttpRequest
+        /**
+         * Sends an AJAX request
+         * @param object config
+         * Keys include:
+         * type (string): GET | POST | PATCH | PUT | DELETE
+         * url (string): The url to connect to. Default is current url
+         * data (string|object): The data to send with the request
+         * headers (object): Object of string keys to string values to pass to the request header
+         * success (function): Function to call when a success response is gotten. The response data
+         * is passed as a parameter
+         * error (function) : Function to call when error occurs
+         * complete (function): Function to call when a response has been received, error or success
+         * @returns XMLHttpRequest object
          */
-        request: function (url, success, error, data, responseType) {
-            return internal.groupConsoleOutput.call(this, 'request',
-                    function () {
-                        if (!url) {
-                            this.console('error', 'Method request() expects parameter 1 to be string. '
-                                    + typeof url + ' given');
-                            return this;
-                        }
-                        else if (this.__.isObject(url)) {
-                            url = url.attr('this-url');
-                        }
-                        if (!url.startsWith('./') && !url.startsWith('../') && url.indexOf('://') === -1)
-                            url = this.config.baseURL + url;
-                        return this.ajax({
-                            type: 'get',
-                            url: url,
-                            dataType: responseType || 'json',
-                            data: data || {},
-                            clearCache: this.config.debug,
-                            success: success,
-                            error: error
-                        });
-                    }, true);
+        request: function (config) {
+            if (!this.__.isObject(config)) {
+                internal.log.call(this, 'error', 'Method expects an object parameter. '
+                        + typeof config + ' given!');
+                return this;
+            }
+            var url = config.url;
+            config.api = false;
+            if (!url) {
+                internal.log.call(this, 'error', 'Method request() expects parameter 1 to be string. '
+                        + typeof url + ' given');
+                return this;
+            }
+            else if (this.__.isObject(url)) {
+                url = url.attr('this-url');
+            }
+            if (!url.startsWith('./') && !url.startsWith('../') && url.indexOf('://') === -1) {
+                url = this.config.baseURL + url;
+                config.api = true;
+            }
+
+            config.type = config.type || 'get';
+            config.dataType = config.dataType || 'json';
+            config.clearCache = internal.record.call(this, 'debug');
+            config.url = url;
+
+            return Ajax(config, this);
+        },
+        /**
+         * Reset an autocomplete input element
+         * @param {string} id The id of the element
+         * @return {ThisApp}
+         */
+        resetAutocomplete: function (id) {
+            var _input = this.container.find('[this-id="' + id + '"][this-autocomplete]'),
+                    _dropdownList = this.container.find('[this-id="' + _input.attr('this-list')
+                            + '"][this-type="list"],list[this-id="' + _input.attr('this-list')
+                            + '"]'),
+                    _selectedArea = this.container.find('[this-id="'
+                            + _dropdownList.attr('this-selection-list')
+                            + '"][this-type="list"],list[this-id="'
+                            + _dropdownList.attr('this-selection-list')
+                            + '"]');
+            _selectedArea.html('').hide();
+            _dropdownList.removeAttr('this-selected').hide();
+            _input.val('').trigger('keyup');
+            return this;
+        },
+        /**
+         * Provide function to ensure api requests are secured by providing either
+         * headers or request body data, or both.
+         * @param {Function} func The function to be called when making api
+         * requests. The function would receive 3 parameters: (string) key, 
+         * (object) header, (object) body
+         * @returns {ThisApp}
+         */
+        secureAPI: function (func) {
+            internal.secureAPI.call(this, func);
+            return this;
         },
         /**
          * Set the base url for the app          * @param string url
          * @returns ThisApp          */
         setBaseUrl: function (url) {
-            return internal.groupConsoleOutput.call(this, 'setBaseUrl',
-                    function () {
-                        this.config.baseURL = url;
-                        return this;
-                    }, true);
+            this.config.baseURL = url;
+            return this;
         },
         /**
          * Sets the path to components' location
@@ -5835,15 +6755,12 @@
          * @returns {ThisApp}
          */
         setComponentsPath: function (path, ext) {
-            return internal.groupConsoleOutput.call(this, 'setComponentsPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.components = {
-                            dir: path, ext: ext || '.html'
-                        };
-                        return this;
-                    }, true);
+            if (!this.config.paths)
+                this.config.paths = {};
+            this.__proto__.config.paths.components = {
+                dir: path, ext: ext || '.html'
+            };
+            return this;
         },
         /**
          * Sets the path to css styles' location
@@ -5852,24 +6769,18 @@
          * @returns {ThisApp}
          */
         setCSSPath: function (path) {
-            return internal.groupConsoleOutput.call(this, 'setCSSPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.css = path;
-                        return this;
-                    }, true);
+            if (!this.config.paths)
+                this.config.paths = {};
+            this.__proto__.config.paths.css = path;
+            return this;
         },
         /**
          * Sets the key in the response which holds the data array          * @param string key
          * @returns ThisApp
          */
         setDataKey: function (key) {
-            return internal.groupConsoleOutput.call(this, 'setDataKey',
-                    function () {
-                        this.config.dataKey = key;
-                        return this;
-                    }, true);
+            this.config.dataKey = key;
+            return this;
         },
         /**
          * Sets the the transport system to use for data connection.
@@ -5878,12 +6789,9 @@
          * id, url, data (only for create and update), success callback, error callback
          * @returns {ThisApp}          */
         setDataTransport: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'setDataTranport',
-                    function () {
-                        if (callback)
-                            this.dataTransport = callback;
-                        return this;
-                    }, true);
+            if (callback)
+                this.dataTransport = callback;
+            return this;
         },
         /**
          * Sets the default layout for the application
@@ -5891,11 +6799,8 @@
          * @returns ThisApp
          */
         setDefaultLayout: function (layout) {
-            return internal.groupConsoleOutput.call(this, 'setLayout',
-                    function () {
-                        this.config.layout = layout;
-                        return this;
-                    }, true);
+            this.config.layout = layout;
+            return this;
         },
         /**
          * Sets the path to js scripts' location
@@ -5904,13 +6809,10 @@
          * @returns {ThisApp}
          */
         setJSPath: function (path) {
-            return internal.groupConsoleOutput.call(this, 'setJSPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.js = path;
-                        return this;
-                    }, true);
+            if (!this.config.paths)
+                this.config.paths = {};
+            this.__proto__.config.paths.js = path;
+            return this;
         },
         /**
          * Sets the path to layouts' location
@@ -5921,16 +6823,13 @@
          * @returns {ThisApp}
          */
         setLayoutsPath: function (path, ext) {
-            return internal.groupConsoleOutput.call(this, 'setLayoutsPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.layouts = {
-                            dir: path,
-                            ext: ext || '.html'
-                        };
-                        return this;
-                    }, true);
+            if (!this.config.paths)
+                this.config.paths = {};
+            this.__proto__.config.paths.layouts = {
+                dir: path,
+                ext: ext || '.html'
+            };
+            return this;
         },
         /**
          * Sets the path to pages' location
@@ -5941,16 +6840,13 @@
          * @returns {ThisApp}
          */
         setPagesPath: function (path, ext) {
-            return internal.groupConsoleOutput.call(this, 'setPagesPath',
-                    function () {
-                        if (!this.config.paths)
-                            this.config.paths = {};
-                        this.__proto__.config.paths.pages = {
-                            dir: path,
-                            ext: ext || '.html'
-                        };
-                        return this;
-                    }, true);
+            if (!this.config.paths)
+                this.config.paths = {};
+            this.__proto__.config.paths.pages = {
+                dir: path,
+                ext: ext || '.html'
+            };
+            return this;
         },
         /**
          * Sets the container that would always hold the page title
@@ -5958,12 +6854,8 @@
          * @returns ThisApp
          */
         setTitleContainer: function (container) {
-            return internal.groupConsoleOutput.call(this, 'setTitleContainer',
-                    function () {
-                        this.config.titleContainer = this.running ?
-                                this._(container) : container;
-                        return this;
-                    }, true);
+            this.config.titleContainer = this._(container);
+            return this;
         },
         /**
          * Set the transition to use between pages
@@ -5973,42 +6865,58 @@
          * @returns ThisApp
          */
         setTransition: function (transition, options) {
-            return internal.groupConsoleOutput.call(this, 'setTransition',
-                    function () {
-                        this.config.transition = transition;
-                        this.config.transitionOptions = options;
-                        return this;
-                    }, true);
+            this.config.transition = transition;
+            this.config.transitionOptions = options;
+            return this;
+        },
+        /**
+         * Sets the funtion to call when there are files to be upload in a form
+         * @param {Function} func
+         * @returns {ThisApp}
+         */
+        setUploader: function (func) {
+            this.setup = func;
+            internal.setUploader.call(this, func);
+            return this;
         },
         /**
          * Initializes the app
          * @param string page The ID of the page
-         * @param boolean fromState Indicates whether to load the start page from state if avaiable
-         * or regenerate it
+         * @param boolean freshCopy Indicates to ignore copy in histor and 
+         * generate a fresh one
          * @returns app
          */
-        start: function (page, fromState) {
-            return internal.groupConsoleOutput.call(this, 'start',
-                    function () {
-                        if (this.running)
-                            return this;
-                        if (page)
-                            this.config.startWith = page;
-                        this.firstPage = true;
-                        internal.setup.call(this);
-                        var target_page = internal.pageIDFromLink.call(this, location.hash);
-                        if (fromState !== false && history.state &&
-                                target_page === this.store('last_page')) {
-                            internal.restoreState.call(this, history.state);
-                        }
-                        else {
-                            this.loadPage(target_page || this.config.startWith ||
-                                    this.templates.children('page[this-default-page],'
-                                            + '[this-type="pages"] [this-default-page]')
-                                    .attr('this-id'));
-                        }
-                        return this;
-                    }, true);
+        start: function (page, freshCopy) {
+            if (internal.isRunning.call(this))
+                return this;
+            if (page)
+                this.config.startWith = page;
+            this.firstPage = true;
+            internal.setup.call(this);
+            var hash = location.hash,
+                    target_page = internal.pageIDFromLink.call(this, hash),
+                    params = this.__.extend(this._params);
+            if (params.length) {
+                // keep attributes for page
+                this.tar['page#' + target_page] = {
+                    reading: '',
+                    model: params.shift(),
+                    mid: params[params.length - 1],
+                    url: params.join('/')
+                };
+            }
+            if (!freshCopy && history.state &&
+                    hash === this.store('last_page')) {
+                internal.restoreState.call(this, history.state);
+            }
+            else {
+                this.loadPage((hash && hash !== '#' && hash !== '#/') ? hash :
+                        this.config.startWith ||
+                        this.getTemplate('page[this-default-page],'
+                                + '[this-type="pages"] [this-default-page]')
+                        .attr('this-id'));
+            }
+            return this;
         },
         /**
          * Stores or retrieves stored data
@@ -6017,50 +6925,22 @@
          * @returns Array|Object|ThisApp
          */
         store: function (key, value) {
-            return internal.groupConsoleOutput.call(this, 'store',
-                    function () {
-                        if (!key)
-                            return localStorage;
-                        if (!value) {
-                            if (value === null) {
-                                localStorage.removeItem(key);
-                                return this;
-                            }
-                            var data = localStorage.getItem(key),
-                                    _data = this.__.toJSONObject(data);
-                            return _data || data;
-                        }
-                        if (this.__.isObject(value, true))
-                            value = this.__.toJSONString(value);
-                        if (value)
-                            localStorage.setItem(key, value);
-                        return this;
-                    }, true);
-        },
-        /**
-         * Fetches the template copy of dom elements
-         * @param {string} id
-         * @param {string} type
-         * @returns {_} If id and type are not provided, the page template is 
-         * returned
-         */
-        template: function (id, type) {
-            if (!id && !type) {
-                // return template for current page
-                id = this.page.attr('this-id');
-                type = 'page';
+            if (!key)
+                return localStorage;
+            if (!value) {
+                if (value === null) {
+                    localStorage.removeItem(key);
+                    return this;
+                }
+                var data = localStorage.getItem(key),
+                        _data = this.__.toJSONObject(data);
+                return _data || data;
             }
-            var selector = '';
-            if (!id) {
-                selector = '[this-id="' + id + '"]';
-            }
-            if (type) {
-                if (id)
-                    selector = type + selector + ',[this-type="' + type + '"]' + selector;
-                else
-                    selector = type + ',[this-type="' + type + '"]';
-            }
-            return this.templates.children(selector);
+            if (this.__.isObject(value, true))
+                value = this.__.toJSONString(value);
+            if (value)
+                localStorage.setItem(key, value);
+            return this;
         },
         /**
          * Calls the given function in a try...catch block and outputs any errors to the console if 
@@ -6087,11 +6967,8 @@
          * @returns {ThisApp}
          */
         watch: function (callback) {
-            return internal.groupConsoleOutput.call(this, 'watch',
-                    function () {
-                        this.watchCallback = callback;
-                        return this;
-                    }, true);
+            this.watchCallback = callback;
+            return this;
         },
         /**
          * A shortcut to method on()
@@ -6100,44 +6977,42 @@
          * collection#users. This means the target is a collection of id `users`. Target all collection
          * by specifying only collection
          * Multiple elements may be targeted by separating their selectors by a comma.
-         * @param function callback          * @returns ThisApp
+         * @param function callback
+         * @returns ThisApp
          */
         when: function (event, target, callback) {
-            return internal.groupConsoleOutput.call(this, 'when',
-                    function () {
-                        var selector = "", targets = target.split(',');
-                        if (selector)
-                            selector += ', ';
-                        this.__.forEach(targets, function (i, v) {
-                            switch (target) {
-                                case "layout":
-                                    selector += 'layout,[this-type="layout"]';
-                                    break;
-                                case "page":
-                                    selector += 'page,[this-type="page"]';
-                                    break;
-                                case "collection":
-                                    selector += 'collection,[this-type="collection"]';
-                                    break;
-                                case "model":
-                                    selector += 'model,[this-type="model"]';
-                                    break;
-                                case "component":
-                                    selector += 'component,[this-type="component"]';
-                                    break;
-                                default:
-                                    var exp = v.split('#');
-                                    if (exp.length > 1 && exp[0]) {
-                                        selector += '[this-type="' + exp[0] + '"][this-id="'
-                                                + exp[1] + '"]';
-                                    }
-                                    else {
-                                        selector += '[this-id="' + v + '"]';
-                                    }
-                            }
-                        });
-                        return this.on(event, selector, callback);
-                    }, true);
+            var selector = "", targets = target.split(',');
+            if (selector)
+                selector += ', ';
+            this.__.forEach(targets, function (i, v) {
+                switch (target) {
+                    case "layout":
+                        selector += 'layout,[this-type="layout"]';
+                        break;
+                    case "page":
+                        selector += 'page,[this-type="page"]';
+                        break;
+                    case "collection":
+                        selector += 'collection,[this-type="collection"]';
+                        break;
+                    case "model":
+                        selector += 'model,[this-type="model"]';
+                        break;
+                    case "component":
+                        selector += 'component,[this-type="component"]';
+                        break;
+                    default:
+                        var exp = v.split('#');
+                        if (exp.length > 1 && exp[0]) {
+                            selector += '[this-type="' + exp[0] + '"][this-id="'
+                                    + exp[1] + '"]';
+                        }
+                        else {
+                            selector += '[this-id="' + v + '"]';
+                        }
+                }
+            });
+            return this.on(event, selector, callback);
         }
     };
 })();

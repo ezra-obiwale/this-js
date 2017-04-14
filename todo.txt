@@ -1,20 +1,5 @@
-collection pagination
-
-
 Further minimize JS
 Write documentation
     - Make header fixed
 Write tests
-
 use indexdb for caching
-use promises
-use collection.model for saving new/old
-
-before
-    page.load (DomElement):Boolean
-    collection.render (Object, DomElement):Object|Boolean
-    collection.model.render (Object, DomElement):Object|Boolean
-    create.form.submission (FormElement):Boolean
-    model.delete (DomElement):Boolean
-    model.render (Object, DomElement):Object|Boolean
-    update.form.submission (FormElement):Boolean
