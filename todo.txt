@@ -1,21 +1,20 @@
 collection pagination
-stash away templates from dom, probably in the localStorage
-Use FormData on form submission
-Check CORS
 
 
 Further minimize JS
 Write documentation
     - Make header fixed
 Write tests
-use indexdb for caching
 
+use indexdb for caching
+use promises
+use collection.model for saving new/old
 
 before
     page.load (DomElement):Boolean
     collection.render (Object, DomElement):Object|Boolean
     collection.model.render (Object, DomElement):Object|Boolean
-    create.form.submission (Object, FormElement):Boolean
+    create.form.submission (FormElement):Boolean
     model.delete (DomElement):Boolean
     model.render (Object, DomElement):Object|Boolean
-    update.form.submission (Object, FormElement):Boolean
+    update.form.submission (FormElement):Boolean
