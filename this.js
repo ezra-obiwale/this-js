@@ -4417,6 +4417,44 @@
                                     }
                                 })
                                 /**
+                                 * Regular form submission
+                                 */
+                                .on('submit', 'form:not([this-do]):not([this-ignore-submit])', function (e) {
+                                    e.preventDefault();
+                                    var _form = _this._(this),
+                                            formData = new FormData(this);
+                                    if (!this.reportValidity()) {
+                                        _form.trigger('form.invalid.submission');
+                                        return;
+                                    }
+                                    _form.trigger('form.valid.submission');
+                                    var data = internal.canContinue
+                                            .call(_this, 'form.send', [this]);
+                                    if (false === data) {
+                                        return;
+                                    }
+                                    else if (_this.__.isObject(data)) {
+                                        formData.fromObject(data);
+                                    }
+                                    _this.request({
+                                        type: _form.attr('method'),
+                                        url: _form.attr('action'),
+                                        data: formData,
+                                        dataType: 'json',
+                                        success: function (data) {
+                                            _form.trigger('form.submission.success', {
+                                                responseObject: this,
+                                                responseData: data
+                                            });
+                                        },
+                                        error: function () {
+                                            _form.trigger('form.submission.error', {
+                                                responseObject: this
+                                            });
+                                        }
+                                    });
+                                })
+                                /**
                                  * Autocomplete
                                  */
                                 .on('keyup', '[this-autocomplete][this-list]', function () {
