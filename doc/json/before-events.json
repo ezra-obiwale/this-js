@@ -60,6 +60,16 @@
                 "Where the function returns nothing, boolean `TRUE` is assumed."
             ]
         },
+        "page.leave": {
+            "id": "page.leave",
+            "value": "function",
+            "description": [
+                "Called before a page is moved away from",
+                "The function receives a parameter - the HTMLElement of the page",
+                "The expected return is boolean where false means rendering should continue with the received data",
+                "Where the function returns nothing, boolean `TRUE` is assumed."
+            ]
+        },
         "page.load": {
             "id": "page.load",
             "value": "function",

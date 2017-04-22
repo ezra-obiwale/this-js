@@ -2402,9 +2402,9 @@
                                         + '"]',
                                         selector2 = '[this-paginate-next=""]';
                                 // overwrite is on
-                                if ((container.hasAttr('this-pagination-overwrite')
-                                        && container.attr('this-pagination-overwrite') === 'true')
-                                        || (!container.hasAttr('this-pagination-overwrite')
+                                if ((container.hasAttr('this-paginate-overwrite')
+                                        && container.attr('this-paginate-overwrite') === 'true')
+                                        || (!container.hasAttr('this-paginate-overwrite')
                                                 && this.config.pagination
                                                 && this.config.pagination.overwrite)
                                         // and current page is the first
@@ -2426,9 +2426,9 @@
                         // data is not empty
                         if (this.collectionData) {
                             // inline overwrite command exist
-                            if (container.hasAttr('this-pagination-overwrite')) {
+                            if (container.hasAttr('this-paginate-overwrite')) {
                                 // empty collection element if true
-                                if (container.attr('this-pagination-overwrite') === 'true') {
+                                if (container.attr('this-paginate-overwrite') === 'true') {
                                     container.html('');
                                 }
                             }
@@ -2516,9 +2516,9 @@
                                     container.siblings('[this-paginate-previous=""]').hide();
                                 }
                                 // overwrite is one
-                                else if ((container.hasAttr('this-pagination-overwrite')
-                                        && container.attr('this-pagination-overwrite') === 'true')
-                                        || (!container.hasAttr('this-pagination-overwrite')
+                                else if ((container.hasAttr('this-paginate-overwrite')
+                                        && container.attr('this-paginate-overwrite') === 'true')
+                                        || (!container.hasAttr('this-paginate-overwrite')
                                                 && this.config.pagination
                                                 && this.config.pagination.overwrite)) {
                                     // show previous button
@@ -4000,6 +4000,26 @@
                                     _this.loadPage(__this.attr('this-goto'));
                                     e.stop = true;
                                 })
+                                /**
+                                 * DELETE event
+                                 * 
+                                 * Transfers the delete action to the bounded element's [this-delete]
+                                 * descendant.
+                                 */
+                                .on('click', '[this-bind][this-delete]', function (e) {
+                                    e.stop = true;
+                                    e.preventDefault();
+                                    var __this = _this._(this),
+                                            _model = __this.closest('model,[this-type="model"]');
+                                    _this.container.find('[this-id="' + __this.attr('this-bind') + '"]')
+                                            .attr({
+                                                'this-model': _model.attr('this-id'),
+                                                'this-mid': _model.attr('this-mid'),
+                                                'this-do': 'delete',
+                                                'this-uid': _model.attr('this-uid'),
+                                                'this-action': _model.attr('this-url')
+                                            }).show();
+                                })
                                 /*
                                  * DELETE event
                                  * 
@@ -4438,6 +4458,7 @@
                                                             }
                                                             elem.attr('this-key', key);
                                                         });
+                                                _list.show();
                                             }
                                         });
                                     }, __this.attr('this-delay') || 300);
@@ -5530,7 +5551,8 @@
                                         }
                                         else {
                                             // shift first value into last page's pagination meta
-                                            collection.pagination[page - 1].push(collection.pagination[page].shift());
+                                            if (page > 0)
+                                                collection.pagination[page - 1].push(collection.pagination[page].shift());
                                             // delete pagination meta if empty
                                             if (!collection.pagination[page].length)
                                                 delete collection.pagination[page];
@@ -5622,7 +5644,7 @@
                         config = this.app.__.extend({}, config);
                         data = config.data || this.attributes;
                         var _data = internal.canContinue
-                                .call(_this, this.id ? 'model.update' : 'model.create',
+                                .call(this.app, this.id ? 'model.update' : 'model.create',
                                         [config.form, data]);
                         if (false === _data) {
                             return;

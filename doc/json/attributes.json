@@ -85,7 +85,8 @@
             "id": "this-component",
             "value": "string",
             "description": [
-                "Indicates a placeholder for a component. The value is the ID of the component to load"
+                "Indicates a placeholder for a component. The value is the ID of the component to load",
+                "If the component needs to be loaded from file, leave value has empty and add attribute `this-url` instead."
             ]
         },
         "this-content": {
@@ -524,6 +525,19 @@
                 "this-delay"
             ]
         },
+        "this-mirror-uid": {
+            "id": "this-mirror-uid",
+            "value": "string",
+            "description": [
+                "This is used on an input element with attribute `this-autocomplete`.",
+                "It implies that the given uid variable should also contain the real uid of the received data objects.",
+                "If attribute `this-is` exists on the element, this uid variable is also used as the uid for parsed objects."
+            ],
+            "links": [
+                "this-autocomplete"
+            ],
+            "on": "form elements"
+        },
         "this-model": {
             "id": "this-model",
             "value": "string",
@@ -775,6 +789,17 @@
                 "this-toggle"
             ],
             "on": "link elements"
+        },
+        "this-static": {
+            "id": "this-static",
+            "description": [
+                "This indicates that the collection should only be loaded once on the page.",
+                "To ensure staticity, make the collection a component."
+            ],
+            "on": "collections",
+            "links": [
+                "this-component"
+            ]
         },
         "this-tar": {
             "id": "this-tar",
