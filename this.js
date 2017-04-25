@@ -5,25 +5,25 @@
  */
 (function () {
     var privData = {
-                data: {},
-                get: function (elem, key) {
-                    if (!this.data[elem])
-                        return;
-                    return this.data[elem][key];
-                },
-                set: function (elem, key, value) {
-                    if (!this.data[elem])
-                        this.data[elem] = {};
-                    this.data[elem][key] = value;
-                    return this;
-                },
-                unset: function (elem, key) {
-                    if (!this.data[elem])
-                        return;
-                    delete this.data[elem][key];
-                    return this;
-                }
-            };
+        data: {},
+        get: function (elem, key) {
+            if (!this.data[elem])
+                return;
+            return this.data[elem][key];
+        },
+        set: function (elem, key, value) {
+            if (!this.data[elem])
+                this.data[elem] = {};
+            this.data[elem][key] = value;
+            return this;
+        },
+        unset: function (elem, key) {
+            if (!this.data[elem])
+                return;
+            delete this.data[elem][key];
+            return this;
+        }
+    };
     FormData.prototype.fromObject = function (object, appendArray) {
         var _this = this;
         function process(data, _key) {
@@ -144,7 +144,7 @@
                         if (j)
                             str += '&';
                         if (isArray)
-                            j = null;
+                            j = '';
                         if (__.isObject(w, true))
                             str += i + '[' + j + ']=' + parseData(w);
                         else if (('' + w).trim())
@@ -1693,8 +1693,7 @@
                     // loop through data
                     this.__.forEach(options.data, function (i, v) {
                         // get unique id value
-                        var id = internal.getUIDValue.call(_this, v, options.uid);
-                        v[options.mirrorUID] = id;
+                        var id = internal.getUIDValue.call(_this, v);
                         ids.push(id);
                         _list.append(_this
                                 .getTemplate(options.selector)
@@ -2849,31 +2848,63 @@
                                     .find('list[this-id="' + __this.attr('this-list')
                                             + '"],[this-type="list"][this-id="'
                                             + __this.attr('this-list') + '"]'),
+                                    selectedListSelector = 'list[this-id="'
+                                    + _dropDownList.attr('this-selection-list')
+                                    + '"],[this-type="list"][this-id="'
+                                    + _dropDownList.attr('this-selection-list') + '"]',
                                     _selectedList = _this.container
-                                    .find('list[this-id="' + _dropDownList.attr('this-selection-list')
-                                            + '"],[this-type="list"][this-id="'
-                                            + _dropDownList.attr('this-selection-list') + '"]');
-                            if (!__this.hasAttr('this-multiple')) {
+                                    .find(selectedListSelector);
+                            var gotData = function (data) {
+                                var ids = [];
+                                if (data && this.__.isObject(data, true)) {
+                                    ids = internal.fillAutocompleteList.call(this, {
+                                        selector: selectedListSelector,
+                                        data: data,
+                                        emptyList: true
+                                    });
+                                }
+                                _dropDownList.attr('this-selected', ids.join(',') + ',');
+                            }.bind(_this);
+                            // refill list from provided function
+                            if (_selectedList.attr('this-refill')) {
+                                return gotData(eval(_selectedList.attr('this-refill')));
+                            }
+                            // refill list from
+                            else if (_selectedList.attr('this-refill-url')) {
+                                return _this.request({
+                                    dataType: 'json',
+                                    type: 'POST',
+                                    url: _selectedList.attr('this-refill-url'),
+                                    data: {ids: data},
+                                    success: function(data){
+                                        gotData(getRealData.call(_this, data));
+                                    }
+                                });
+                            }
+                            else if (!__this.hasAttr('this-multiple')) {
+                                // ensure data is an array
                                 if (_this.__.isObject(data)) {
                                     data = [data];
                                 }
                                 else {
-                                    var obj = {};
-                                    obj[_this.config.modelUID || 'id'] = data;
+                                    var obj = {},
+                                            uid = _this.config.modelUID || 'id',
+                                            parts = uid.split('.').reverse(),
+                                            last;
+                                    _this.__.forEach(parts, function (i, v) {
+                                        if (!Object.keys(obj).length) {
+                                            obj[v] = data;
+                                        }
+                                        else {
+                                            obj[v] = app.__.extend(obj);
+                                            delete obj[last];
+                                        }
+                                        last = v;
+                                    });
                                     data = [obj];
                                 }
                             }
-
-                            var ids = internal.fillAutocompleteList.call(_this, {
-                                selector: 'list[this-id="' + _dropDownList.attr('this-selection-list')
-                                        + '"],[this-type="list"][this-id="'
-                                        + _dropDownList.attr('this-selection-list') + '"]',
-                                data: data,
-                                mirrorUID: __this.attr('this-mirror-uid'),
-                                uid: __this.attr('this-mirror-uid'),
-                                emptyList: true
-                            });
-                            _dropDownList.attr('this-selected', ids.join(',') + ',');
+                            gotData(data);
                         }
                         else {
                             // using attribute so that redumping content 
@@ -3932,12 +3963,13 @@
                                         // hide all types not loaded (pages, models, collections, layouts,
                                         // components, etc)
                                         this.container.find('page:not([this-loaded]),model:not([this-loaded]),'
-                                                + 'collection:not([this-loaded]),layout:not([this-loaded]),'
+                                                + 'collection:not([this-loaded]),layout:not([this-loaded]),list:not([this-loaded]),'
                                                 + 'component:not([this-loaded]),'
                                                 + '[this-type="page"]:not([this-loaded]),'
                                                 + '[this-type="model"]:not([this-loaded]),'
                                                 + '[this-type="collection"]:not([this-loaded]),'
                                                 + '[this-type="layout"]:not([this-loaded]),'
+                                                + '[this-type="list"]:not([this-loaded]),'
                                                 + '[this-type="component"]:not([this-loaded])')
                                         .hide());
                         if (this.config.titleContainer)
@@ -4625,7 +4657,6 @@
                                                                     + __this.attr('this-list')
                                                                     + '"]',
                                                             data: data,
-                                                            mirrorUID: __this.attr('this-mirror-uid'),
                                                             emptyList: true
                                                         });
                                                 _this.store('autocompleting', data);
@@ -7224,6 +7255,9 @@
                             break;
                         case "component":
                             selector += 'component,[this-type="component"]';
+                            break;
+                        case "list":
+                            selector += 'list,[this-type="list"]';
                             break;
                         default:
                             var exp = v.split('#');

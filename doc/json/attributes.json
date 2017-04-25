@@ -39,7 +39,7 @@
         },
         "this-bind": {
             "id": "this-bind",
-            "value": "string",
+            "value": "model ID",
             "description": [
                 "Binds an element and its children to a model. The value is the ID of the model",
                 "All variables in the element would be parsed based on the binded model",
@@ -83,7 +83,7 @@
         },
         "this-component": {
             "id": "this-component",
-            "value": "string",
+            "value": "component ID",
             "description": [
                 "Indicates a placeholder for a component. The value is the ID of the component to load",
                 "If the component needs to be loaded from file, leave value has empty and add attribute `this-url` instead."
@@ -122,7 +122,7 @@
         },
         "this-data": {
             "id": "this-data",
-            "value": "string - model property name",
+            "value": "model property name",
             "on": "collections",
             "description": "This attaches the given property name to the collection, which is in a model",
             "links": [
@@ -179,9 +179,9 @@
         },
         "this-do": {
             "id": "this-do",
-            "value": "string",
+            "value": "create|read|update|delete|search",
             "description": [
-                "If applied on pages, it indicates the CRUD action the page is expected to perform. This shouldn't be done manually as it is generated based on the link clicked",
+                "If applied on pages, it indicates the CRUD action that the page is expected to perform. This shouldn't be done manually as it is generated based on the link clicked",
                 "If applied on form and value is `search`, the form becomes a search form and expects an input field with attribute `this-search`"
             ],
             "links": [
@@ -256,7 +256,7 @@
         },
         "this-extends": {
             "id": "this-extends",
-            "value": "string",
+            "value": "layout ID",
             "description": "The name of the target layout the layout is extending",
             "on": "layouts"
         },
@@ -278,7 +278,7 @@
         },
         "this-form": {
             "id": "this-form",
-            "value": "string",
+            "value": "form ID",
             "description": [
                 "This is the id of the form to target",
                 "Combined with `this-create`, clicking the element prepares and opens the given form for model creation.",
@@ -319,9 +319,9 @@
         },
         "this-goto": {
             "id": "this-goto",
-            "value": "string",
+            "value": "id|name|path",
             "description": [
-                "Holds the id of, or the path to, the page to load when the element is clicked"
+                "Holds the id of, name of, or path to, the page to load when the element is clicked."
             ],
             "links": [
                 "this-create",
@@ -340,7 +340,7 @@
         },
         "this-hide": {
             "id": "this-hide",
-            "value": "string",
+            "value": "ID",
             "description": [
                 "When clicked, hides the target element. The value is the ID of the element.",
                 "Multiple elements can also be targeted by separating their IDs with comma"
@@ -423,10 +423,10 @@
         },
         "this-is": {
             "id": "this-is",
-            "value": "string",
+            "value": "model property",
             "description": [
-                "Bind a key of the model to the form element. The value should be the key of the model.",
-                "If the value of the key is an object or array, children value can be targeted by connecting the keys with dots (.).",
+                "Bind a property of the model to the form element. The value should be the property of the model.",
+                "If the value of the property is an object or array, children value can be targeted by connecting the propertys with dots (.).",
                 "For example, say there's an object `{name:{first:\"John\", last:\"Doe\"},hobbies:[\"Reading\",\"Playing the guitar\"]}`, `this-is` values could be `name.first`, `name.last`, `hobbies.0`, `hobbies.1`",
                 "The form must be bound to a model with attribute `this-model`."
             ],
@@ -439,8 +439,7 @@
             "id": "this-key",
             "value": "string, integer",
             "description": [
-                "This holds the unique key that identifies each suggested item when autcompleting. This is usually the index of the object applied to the suggestion item from the array list gotten from the server",
-                "When loading a selection list with previously selected items, the item parent element should bear this attribute with the corresponding unique identifier as the value. This would make sure they are watched to avoid duplications"
+                "This holds the unique key that identifies each suggested item when autcompleting. This is usually the uid of the model applied to the suggestion item from the array list gotten from the server"
             ],
             "links": [
                 "this-autocomplete",
@@ -458,8 +457,8 @@
         },
         "this-list": {
             "id": "this-list",
-            "value": "string",
-            "description": "This is the target list element to hold the list of found suggestions",
+            "value": "ID",
+            "description": "This is the id of target list element to hold the list of found suggestions",
             "on": "input",
             "links": [
                 "this-autocomplete",
@@ -469,7 +468,10 @@
         "this-load-css": {
             "id": "this-load-css",
             "value": "string",
-            "description": "Loads the given css file into the page.",
+            "description": [
+                "Loads the given css file into the page.",
+                "To load multiple files, provide a comma-separated list of file names."
+            ],
             "on": "pages, layouts",
             "links": [
                 "javascript&config"
@@ -478,7 +480,10 @@
         "this-load-js": {
             "id": "this-load-js",
             "value": "string",
-            "description": "Loads the given js file after the page has been loaded",
+            "description": [
+                "Loads the given js file after the page has been loaded",
+                "To load multiple files, provide a comma-separated list of file names."
+            ],
             "on": "pages, layouts",
             "links": [
                 "javascript&config"
@@ -487,7 +492,10 @@
         "this-load-js-first": {
             "id": "this-load-js-first",
             "value": "string",
-            "description": "Loads the given js file before the page is loaded",
+            "description": [
+                "Loads the given js file before the page is loaded",
+                "To load multiple files, provide a comma-separated list of file names."
+            ],
             "on": "pages, layouts",
             "links": [
                 "javascript&config"
@@ -525,23 +533,13 @@
                 "this-delay"
             ]
         },
-        "this-mirror-uid": {
-            "id": "this-mirror-uid",
-            "value": "string",
-            "description": [
-                "This is used on an input element with attribute `this-autocomplete`.",
-                "It implies that the given uid variable should also contain the real uid of the received data objects.",
-                "If attribute `this-is` exists on the element, this uid variable is also used as the uid for parsed objects."
-            ],
-            "links": [
-                "this-autocomplete"
-            ],
-            "on": "form elements"
-        },
         "this-model": {
             "id": "this-model",
             "value": "string",
-            "description": "The name of the model to bind an element to",
+            "description": [
+                "The name of the model to bind an element to. This is necessary to clearly differentiate entity types from one another.",
+                "On a collection, if the attribute is not provided, the `this-id` value is assumed."
+            ],
             "links": [
                 "this-bind"
             ]
@@ -568,7 +566,7 @@
         },
         "this-not-with": {
             "id": "this-not-with",
-            "value": "string",
+            "value": "model ID",
             "description": [
                 "This indicates the container's content should not be loaded with the specified model",
                 "The value is the id of the model",
@@ -608,7 +606,7 @@
         },
         "this-paginate-next": {
             "id": "this-paginate-next",
-            "value": "string",
+            "value": "collection ID",
             "description": [
                 "Indicates that the element to show the next page on the target collection.",
                 "Value is the id of the target collection.",
@@ -622,7 +620,7 @@
         },
         "this-paginate-previous": {
             "id": "this-paginate-previous",
-            "value": "string",
+            "value": "collection ID",
             "description": [
                 "Indicates that the element to show the previous page on the target collection.",
                 "Value is the id of the target collection.",
@@ -651,7 +649,7 @@
             "id": "this-path",
             "value": "string",
             "description": [
-                "The relative path to the page file based on the config pages bast path"
+                "The relative path to the page file based on the config pages base path"
             ],
             "links": [
                 "this-goto"
@@ -694,7 +692,7 @@
         },
         "this-read": {
             "id": "this-read",
-            "value": "string",
+            "value": "url",
             "description": [
                 "Used together with `this-goto` and within a model, it indicates that the page being link would read the model within which is the current element. This is the R in CRUD.",
                 "The value then can be empty.",
@@ -714,11 +712,39 @@
             "internal": true,
             "on": "pages"
         },
+        "this-refill": {
+            "id": "this-refill",
+            "value": "expression",
+            "description": [
+                "Used on selection lists for autocomplete input elements and indicates that the expression value should be used as default data when loading form elements from a model.",
+                "Object `model` is available to the expression and holds the model from which the form is being loaded.",
+                "For this to happen, the autocomplete input element must have a `this-is` attribute whose value holds the key which holds a list of already selected ids."
+            ],
+            "links": [
+                "this-type",
+                "this-refill-url",
+                "this-is"
+            ]
+        },
+        "this-refill-url": {
+            "id": "this-refill-url",
+            "value": "url",
+            "description": [
+                "Used on selection lists for autocomplete input elements and holds the url from which the data to load as default when loading form elements from a model.",
+                "A post request is sent to the provided link with a data object having a single key `ids` which is an array of ids found in the default value for the input element.",
+                "For this to happen, the autocomplete input element must have a `this-is` attribute whose value holds the key which holds a list of already selected ids."
+            ],
+            "links": [
+                "this-type",
+                "this-refill",
+                "this-is"
+            ]
+        },
         "this-reload": {
             "id": "this-reload",
-            "value": "string",
+            "value": "collection ID | model ID",
             "description": [
-                "When clicked, the target should be reloaded. To be reloaded, `this-attributes` must be applied",
+                "When clicked, the target should be reloaded. To be reloaded, `this-attributes` must be applied.",
                 "If no value is specified, the page, layouts and all resources are reloaded"
             ],
             "on": "link elements",
@@ -740,7 +766,6 @@
         },
         "this-reload-layouts": {
             "id": "this-reload-layouts",
-            "value": "string",
             "description": "Reloads the page and loaded layouts",
             "on": "link elements",
             "links": [
@@ -774,7 +799,7 @@
         },
         "this-selection-list": {
             "id": "this-selection-list",
-            "value": "string",
+            "value": "ID",
             "description": "Holds the id of the list element that would hold selected suggestions",
             "on": "lists",
             "links": [
@@ -784,7 +809,7 @@
         },
         "this-show": {
             "id": "this-show",
-            "value": "string",
+            "value": "ID",
             "description": [
                 "Shows the target element. The value is the ID of the element.",
                 "Multiple elements can also be targeted by separating their IDs with comma"
@@ -823,7 +848,7 @@
         },
         "this-toggle": {
             "id": "this-toggle",
-            "value": "string",
+            "value": "ID",
             "description": "Toggles the display of the target element on/off. The value is the ID of the element.",
             "links": [
                 "this-show",
@@ -875,7 +900,7 @@
         },
         "this-url": {
             "id": "this-url",
-            "value": "string",
+            "value": "url",
             "description": "The url to the resource to load into the element or to send the form data to",
             "links": [
                 "this-model"
