@@ -694,7 +694,12 @@
         },
         "this-read": {
             "id": "this-read",
-            "description": "Used together with `this-goto` and within a model, it indicates that the page would read the model within which is the current element. This is the R in CRUD.",
+            "value": "string",
+            "description": [
+                "Used together with `this-goto` and within a model, it indicates that the page being link would read the model within which is the current element. This is the R in CRUD.",
+                "The value then can be empty.",
+                "However, if another model is to be read and not the one within which the link is, then the value is the url of the model and the model name must be also provided with the attribute `this-model`."
+            ],
             "links": [
                 "this-goto",
                 "this-create",
