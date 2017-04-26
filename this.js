@@ -23,7 +23,9 @@
             delete this.data[elem][key];
             return this;
         }
-    };
+    },
+            loadedPageJS = {first: {}, last: {}},
+            containedEvents = {};
     FormData.prototype.fromObject = function (object, appendArray) {
         var _this = this;
         function process(data, _key) {
@@ -943,7 +945,7 @@
                     var _this = this;
                     return this.each(function () {
                         var target = this;
-                        _this.forEach(event.split(','), function (i, v) {
+                        _this.forEach(event.replace(',', ' ').split(' '), function (i, v) {
                             target.addEventListener(v.trim(), function (e) {
                                 // get target from event
                                 var _target = e.target;
@@ -1505,6 +1507,16 @@
                     }
                 },
                 /**
+                 * Dispatches a page event for only the page
+                 * @param {String} event
+                 * @param {Object} anchor
+                 * @param {Array} params
+                 */
+                dispatchEvent: function (event, anchor, params) {
+                    return this.__.callable(containedEvents[event][this.page.attr('this-id')])
+                            .apply(anchor, params);
+                },
+                /**
                  * Does the loading
                  * @param {HTMLElement}|{_} container
                  * @param object data
@@ -1515,8 +1527,9 @@
                  */
                 doLoad: function (container, data, content, variables, isModel, level, callback) {
                     if (isModel) {
-                        content = internal.inLoop.call(this, data, null, content);
-                        content = internal.processExpressions.call(this, content, data);
+                        // @todo: remove?
+//                        content = internal.inLoop.call(this, data, null, content);
+//                        content = internal.processExpressions.call(this, content, data);
                     }
                     container = this._(container).hide();
                     var uid = container.attr('this-model-uid') ||
@@ -1792,7 +1805,7 @@
                                                 // load page model. no data provided. request anew
                                                 internal.loadModel.call(_this, this.page, function () {
                                                     internal.showPage.call(this, replaceInState);
-                                                }.bind(this), {});
+                                                }.bind(_this), {});
                                             }
                                         });
                                     }.bind(this)
@@ -2225,7 +2238,7 @@
                     if (!Object.keys(this.removedAssets).length)
                         this._('script[this-app="' + this.container.attr('this-id') + '"]')
                                 .removeAttr('this-loaded');
-                    if (elem.attr('this-load-js-first') && !elem.hasAttr('this-with-first-js'))
+                    if (elem.attr('this-load-js-first') && !loadedPageJS.first[this.page.attr('this-id')])
                     {
                         leaveUnrequired = true;
                         var jses = elem.attr('this-load-js-first').split(','),
@@ -2246,7 +2259,7 @@
                                 }
                             });
                         });
-                        elem.attr('this-with-first-js', '');
+                        loadedPageJS.first[this.page.attr('this-id')] = true;
                     }
                     // remove elem-type js files that don't belong to the elem type
                     if (!leaveUnrequired && !this.removedAssets[elemType])
@@ -2532,7 +2545,7 @@
                         data = real_data;
                     }
                     // trigger empty.response trigger if no data
-                    if (!data) {
+                    if (!data || !this.__.isObject(data, true) || !Object.keys(data).length) {
                         hidePaginationBtns();
                         container.trigger('empty.response');
                         this.__.callable(callback).call(this);
@@ -2813,105 +2826,107 @@
                  * @returns ThisApp
                  */
                 loadFormElements: function (elements, model) {
-                    if (!model)
-                        return;
-                    var _this = this;
-                    this.__.forEach(elements, function () {
-                        var __this = _this._(this),
-                                key = __this.attr('this-is');
-                        if (!key)
-                            return;
-                        var data = internal.getVariableValue.call(_this, key, model);
-                        if (!data)
-                            return;
-                        if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox')
-                        {
-                            // using attribute so that redumping content 
-                            // would still work fine
-                            if (__this.attr('value') == data || data == on)
-                                __this.attr('checked', 'checked');
-                        }
-                        else if (__this.is('select')) {
-                            __this.children().each(function () {
-                                var val = _this._(this).attr('value') || _this._(this).html().trim();
-                                if (val == data)
-                                    _this._(this).attr('selected', 'selected');
-                                else
-                                    _this._(this).removeAttr('selected');
-                            });
-                            // using attribute so that redumping content 
-                            // would still work fine
-                            __this.find('[value="' + data + '"]').attr('selected', 'selected');
-                        }
-                        else if (__this.hasAttr('this-autocomplete')) {
-                            var _dropDownList = _this.container
-                                    .find('list[this-id="' + __this.attr('this-list')
-                                            + '"],[this-type="list"][this-id="'
-                                            + __this.attr('this-list') + '"]'),
-                                    selectedListSelector = 'list[this-id="'
-                                    + _dropDownList.attr('this-selection-list')
-                                    + '"],[this-type="list"][this-id="'
-                                    + _dropDownList.attr('this-selection-list') + '"]',
-                                    _selectedList = _this.container
-                                    .find(selectedListSelector);
-                            var gotData = function (data) {
-                                var ids = [];
-                                if (data && this.__.isObject(data, true)) {
-                                    ids = internal.fillAutocompleteList.call(this, {
-                                        selector: selectedListSelector,
-                                        data: data,
-                                        emptyList: true
-                                    });
-                                }
-                                _dropDownList.attr('this-selected', ids.join(',') + ',');
-                            }.bind(_this);
-                            // refill list from provided function
-                            if (_selectedList.attr('this-refill')) {
-                                return gotData(eval(_selectedList.attr('this-refill')));
+                    if (elements.length && model) {
+                        var _this = this;
+                        this.__.forEach(elements, function () {
+                            var __this = _this._(this),
+                                    key = __this.attr('this-is');
+                            if (!key)
+                                return;
+                            var data = internal.getVariableValue.call(_this, key, model);
+                            if (!data)
+                                return;
+                            if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox')
+                            {
+                                // using attribute so that redumping content 
+                                // would still work fine
+                                if (__this.attr('value') == data || data == on)
+                                    __this.attr('checked', 'checked');
                             }
-                            // refill list from
-                            else if (_selectedList.attr('this-refill-url')) {
-                                return _this.request({
-                                    dataType: 'json',
-                                    type: 'POST',
-                                    url: _selectedList.attr('this-refill-url'),
-                                    data: {ids: data},
-                                    success: function(data){
-                                        gotData(getRealData.call(_this, data));
-                                    }
+                            else if (__this.is('select')) {
+                                __this.children().each(function () {
+                                    var val = _this._(this).attr('value') || _this._(this).html().trim();
+                                    if (val == data)
+                                        _this._(this).attr('selected', 'selected');
+                                    else
+                                        _this._(this).removeAttr('selected');
                                 });
+                                // using attribute so that redumping content 
+                                // would still work fine
+                                __this.find('[value="' + data + '"]').attr('selected', 'selected');
                             }
-                            else if (!__this.hasAttr('this-multiple')) {
-                                // ensure data is an array
-                                if (_this.__.isObject(data)) {
-                                    data = [data];
+                            else if (__this.hasAttr('this-autocomplete')) {
+                                var _dropDownList = _this.container
+                                        .find('list[this-id="' + __this.attr('this-list')
+                                                + '"],[this-type="list"][this-id="'
+                                                + __this.attr('this-list') + '"]'),
+                                        selectedListSelector = 'list[this-id="'
+                                        + _dropDownList.attr('this-selection-list')
+                                        + '"],[this-type="list"][this-id="'
+                                        + _dropDownList.attr('this-selection-list') + '"]',
+                                        _selectedList = _this.container
+                                        .find(selectedListSelector);
+                                var gotData = function (data) {
+                                    var ids = [];
+                                    if (data && this.__.isObject(data, true)) {
+                                        if (!__this.hasAttr('this-multiple')) {
+                                            // ensure data is an array
+                                            if (_this.__.isObject(data)) {
+                                                data = [data];
+                                            }
+                                            // data must be a string and therefore the uid
+                                            // create an object with the uid => the data
+                                            else {
+                                                var obj = {},
+                                                        uid = _this.config.modelUID || 'id',
+                                                        parts = uid.split('.').reverse(),
+                                                        last;
+                                                _this.__.forEach(parts, function (i, v) {
+                                                    if (!Object.keys(obj).length) {
+                                                        obj[v] = data;
+                                                    }
+                                                    else {
+                                                        obj[v] = app.__.extend(obj);
+                                                        delete obj[last];
+                                                    }
+                                                    last = v;
+                                                });
+                                                data = [obj];
+                                            }
+                                        }
+                                        ids = internal.fillAutocompleteList.call(this, {
+                                            selector: selectedListSelector,
+                                            data: data,
+                                            emptyList: true
+                                        });
+                                    }
+                                    _dropDownList.attr('this-selected', ids.join(',') + ',');
+                                }.bind(_this);
+                                // refill list from provided function
+                                if (_selectedList.attr('this-refill')) {
+                                    return gotData(eval(_selectedList.attr('this-refill')));
                                 }
-                                else {
-                                    var obj = {},
-                                            uid = _this.config.modelUID || 'id',
-                                            parts = uid.split('.').reverse(),
-                                            last;
-                                    _this.__.forEach(parts, function (i, v) {
-                                        if (!Object.keys(obj).length) {
-                                            obj[v] = data;
+                                // refill list from
+                                else if (_selectedList.attr('this-refill-url')) {
+                                    return _this.request({
+                                        dataType: 'json',
+                                        type: 'POST',
+                                        url: _selectedList.attr('this-refill-url'),
+                                        data: {ids: data},
+                                        success: function (data) {
+                                            gotData(getRealData.call(_this, data));
                                         }
-                                        else {
-                                            obj[v] = app.__.extend(obj);
-                                            delete obj[last];
-                                        }
-                                        last = v;
                                     });
-                                    data = [obj];
                                 }
+                                gotData(data);
                             }
-                            gotData(data);
-                        }
-                        else {
-                            // using attribute so that redumping content 
-                            // would still work fine
-                            __this.attr('value', data || '');
-                        }
-                    });
+                            else {
+                                // using attribute so that redumping content 
+                                // would still work fine
+                                __this.attr('value', data || '');
+                            }
+                        });
+                    }
                     return this;
                 },
                 /**
@@ -2929,25 +2944,27 @@
                     }
                     forms.each(function () {
                         var __this = _this._(this);
-                        // pass form action type from page to form if not exist on form                 
-                        if (!__this.hasAttr('this-do') && _this.page.attr('this-do'))
-                            __this.attr('this-do', _this.page.attr('this-do'));
-                        // is search form. no need loading except for search field
-                        if ((__this.attr('this-do') === 'search' ||
-                                _this.page.attr('this-do') === 'search') &&
-                                _this.page.attr('this-query')) {
-                            __this.find('[this-search]').attr('value', _this.page.attr('this-query'));
-                            return;
+                        if (__this.is('form')) {
+                            // pass form action type from page to form if not exist on form                 
+                            if (!__this.hasAttr('this-do') && _this.page.attr('this-do'))
+                                __this.attr('this-do', _this.page.attr('this-do'));
+                            // is search form. no need loading except for search field
+                            if ((__this.attr('this-do') === 'search' ||
+                                    _this.page.attr('this-do') === 'search') &&
+                                    _this.page.attr('this-query')) {
+                                __this.find('[this-search]').attr('value', _this.page.attr('this-query'));
+                                return;
+                            }
+                            // parse tar
+                            internal.doTar.call(_this, __this, true);
                         }
-                        // parse tar
-                        internal.doTar.call(_this, __this, true);
                         var mid = __this.attr('this-mid') || _this.page.attr('this-mid'),
                                 model_name = __this.attr('this-model') || _this.page.attr('this-model');
                         if (!mid)
                             return;
                         if (!model)
                             model = internal.modelFromStore.call(_this, mid, model_name);
-                        internal.loadFormElements.call(_this, Array.from(this.elements), model);
+                        internal.loadFormElements.call(_this, __this.find('[this-is]'), model);
                         __this.attr('this-loaded', '').trigger('form.loaded');
                     });
                     if (chain)
@@ -3493,6 +3510,7 @@
                     var _this = this;
                     // page was just loaded and not restored from history
                     if (!restored) {
+                        this.restored = false;
                         this.container.find('[this-inline-code]').each(function () {
                             var __this = _this._(this);
                             __this.replaceWith(_this._('<code this-code />').html(__this.html()));
@@ -3530,6 +3548,7 @@
                     else {
                         this.page.attr('this-restored', '');
                         internal.updatePage.call(this, true);
+                        this.restored = true;
                     }
                     if (this.firstPage) {
                         if (restored)
@@ -3552,16 +3571,16 @@
                     }
                     this.store('watching', this.watching);
                     this.page.trigger('page.loaded');
-                    // load required js
+                    // load required if not already loaded js
                     if (this.page.attr('this-load-js')
-                            && !this.page.hasAttr('this-with-js')) {
+                            && !loadedPageJS.last[this.page.attr('this-id')]) {
                         var jses = this.page.attr('this-load-js').split(','),
                                 removedAssets = this.removedAssets;
                         // load comma-separated css files
                         this.__.forEach(jses, function (i, js) {
                             internal.loadAsset.call(_this, 'js', js, _this.page);
                         });
-                        this.page.attr('this-with-first-js', '');
+                        loadedPageJS.last[this.page.attr('this-id')] = true;
                     }
                     this.pageIsLoaded = true;
                     return this;
@@ -3804,9 +3823,7 @@
                     this.removedAssets = {};
                     this.container.find('[this-type="layout"]')
                             .each(function () {
-                                internal.loadAssets.call(_this, _this._(this)
-                                        .removeAttr('this-with-first-js')
-                                        .removeAttr('this-with-js'));
+                                internal.loadAssets.call(_this, _this._(this));
                             });
                     delete this.pageModel;
                     // page is bound to a model
@@ -3822,9 +3839,7 @@
                             }.bind(this)
                         });
                     }
-                    internal.loadAssets.call(this, this.page
-                            .removeAttr('this-with-first-js')
-                            .removeAttr('this-with-js'), function () {
+                    internal.loadAssets.call(this, this.page, function () {
                         internal.pageLoaded.call(this, null, true);
                     }.bind(this));
                 },
@@ -4424,6 +4439,155 @@
                                                 _target.show();
                                             });
                                 })
+                                /**
+                                 * Autocomplete
+                                 */
+                                .on('keyup,keypress', '[this-autocomplete][this-list]', function (e) {
+                                    var __this = _this._(this),
+                                            min_chars = __this.attr('this-min-chars') || 3,
+                                            url = __this.attr('this-autocomplete')
+                                            || __this.attr('this-url'),
+                                            _list = _this.container
+                                            .find('[this-type="list"][this-id="'
+                                                    + __this.attr('this-list')
+                                                    + '"],list[this-id="'
+                                                    + __this.attr('this-list')
+                                                    + '"]');
+                                    // list element must exist
+                                    if (!_list.length) {
+                                        _this.error('List #' + __this.attr('this-list')
+                                                + ' not found');
+                                        return;
+                                    }
+
+                                    // do nothing if chars are less than required
+                                    if (__this.val().length < min_chars) {
+                                        var _list = _this.container
+                                                .find('[this-type="list"][this-id="'
+                                                        + __this.attr('this-list')
+                                                        + '"],list[this-id="'
+                                                        + __this.attr('this-list')
+                                                        + '"]');
+                                        _list.hide().html('');
+                                        __this.removeAttr('this-last-query');
+                                        _this.store('autocompleting', null);
+                                        clearTimeout(autocomplete_timeout);
+                                        return;
+                                    }
+                                    // block searching for same thing multiple times
+                                    else if (__this.val() === __this.attr('this-last-query')) {
+                                        // enter button pressed
+                                        if (e.keyCode === 13 && _list.children(':not([this-cache])').length) {
+                                            // select the first result from the dropdown list
+                                            _list.children(':not([this-cache]):first-child').trigger('click');
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                        }
+                                        return;
+                                    }
+                                    clearTimeout(autocomplete_timeout);
+                                    url += (url.indexOf('?') === -1) ? '?' : '&';
+                                    url += (__this.attr('this-query-key') || 'q') + '='
+                                            + __this.val();
+                                    autocomplete_timeout = setTimeout(function () {
+                                        __this.attr('this-last-query', __this.val());
+                                        _this.request({
+                                            url: url,
+                                            success: function (data) {
+                                                data = getRealData.call(_this, data);
+                                                if (!data)
+                                                    return;
+                                                if (!__this.attr('this-id'))
+                                                    __this.attr('this-id', _this.__.randomString());
+                                                _list.attr('this-autocompleting',
+                                                        __this.attr('this-id'))
+                                                        .children().attr('this-cache', '')
+                                                        .hide();
+                                                internal.fillAutocompleteList
+                                                        .call(_this, {
+                                                            selector: '[this-type="list"][this-id="'
+                                                                    + __this.attr('this-list')
+                                                                    + '"],list[this-id="'
+                                                                    + __this.attr('this-list')
+                                                                    + '"]',
+                                                            data: data,
+                                                            emptyList: true
+                                                        });
+                                                _this.store('autocompleting', data);
+                                            }
+                                        });
+                                    }, __this.attr('this-delay') || 300);
+                                })
+                                .on('click', '[this-autocompleting]>[this-key]', function ()
+                                {
+                                    var __this = _this._(this),
+                                            selectedListSelector = '[this-type="list"][this-id="'
+                                            + __this.parent().attr('this-selection-list')
+                                            + '"],list[this-id="'
+                                            + __this.parent().attr('this-selection-list')
+                                            + '"]',
+                                            _selectedList = _this.container
+                                            .find(selectedListSelector),
+                                            elem = _this.getTemplate(selectedListSelector)
+                                            .children(),
+                                            list = _this.store('autocompleting') || {},
+                                            key = __this.attr('this-key'),
+                                            index = __this.attr('this-index'),
+                                            _dropDownList = __this.parent(),
+                                            _input = _this.container
+                                            .find('[this-autocomplete][this-id="'
+                                                    + _dropDownList
+                                                    .attr('this-autocompleting') +
+                                                    '"]');
+                                    // empty selected list if nothing had
+                                    // been selected
+                                    if (!_dropDownList.attr('this-selected')) {
+                                        _selectedList.html('');
+                                    }
+                                    internal.bindToObject
+                                            .call(_this, elem, list[index] || {}, function (elem) {
+                                                elem.removeAttr('this-cache')
+                                                        .attr('this-key', key)
+                                                        .show();
+                                                _dropDownList.attr('this-selected',
+                                                        (_dropDownList.attr('this-selected') || '')
+                                                        + key + ',');
+                                                _selectedList.append(elem).show();
+                                                if (!_input.hasAttr('this-multiple')) {
+                                                    _input.hide();
+                                                    _dropDownList.hide();
+                                                }
+                                                else
+                                                    __this.remove();
+                                            });
+                                })
+                                .on('click', 'list[this-parent-list] [this-remove],'
+                                        + '[this-type="list"][this-parent-list] [this-remove]',
+                                        function () {
+                                            var __this = _this._(this).closest('[this-key]'),
+                                                    _dropDownList = _this.container
+                                                    .find('[this-type="list"][this-id="'
+                                                            + __this.parent()
+                                                            .attr('this-parent-list')
+                                                            + '"],list[this-id="'
+                                                            + __this.parent()
+                                                            .attr('this-parent-list')
+                                                            + '"]');
+                                            _dropDownList.attr('this-selected',
+                                                    _dropDownList.attr('this-selected')
+                                                    .replace(__this.attr('this-key')
+                                                            + ',', '')).show();
+                                            var _input = _this.container
+                                                    .find('[this-autocomplete][this-id="'
+                                                            + _dropDownList
+                                                            .attr('this-autocompleting') +
+                                                            '"]').show();
+                                            __this.remove();
+                                            if (_input.hasAttr('this-multiple')) {
+                                                _input.attr('this-last-query', '')
+                                                        .trigger('keyup');
+                                            }
+                                        })
                                 /*
                                  * CREATE and UPDATE events
                                  * Form submission
@@ -4437,7 +4601,7 @@
                                                     creating = __this.attr('this-do')
                                                     === 'create',
                                                     method = __this.attr('this-method')
-                                                    || creating ? 'post' : 'put';
+                                                    || (creating ? 'post' : 'put');
                                             if (!this.reportValidity()) {
                                                 __this.trigger('form.invalid.submission');
                                                 return;
@@ -4586,154 +4750,6 @@
                                         _this.loadPage(goto, replaceState);
                                     }
                                 })
-                                /**
-                                 * Autocomplete
-                                 */
-                                .on('keyup', '[this-autocomplete][this-list]', function (e) {
-                                    var __this = _this._(this),
-                                            min_chars = __this.attr('this-min-chars') || 3,
-                                            url = __this.attr('this-autocomplete')
-                                            || __this.attr('this-url'),
-                                            _list = _this.container
-                                            .find('[this-type="list"][this-id="'
-                                                    + __this.attr('this-list')
-                                                    + '"],list[this-id="'
-                                                    + __this.attr('this-list')
-                                                    + '"]');
-                                    if (!_list.length) {
-                                        _this.error('List #' + __this.attr('this-list')
-                                                + ' not found');
-                                        return;
-                                    }
-
-                                    // do nothing if chars are less than required
-                                    if (__this.val().length < min_chars) {
-                                        var _list = _this.container
-                                                .find('[this-type="list"][this-id="'
-                                                        + __this.attr('this-list')
-                                                        + '"],list[this-id="'
-                                                        + __this.attr('this-list')
-                                                        + '"]');
-                                        _list.hide().html('');
-                                        __this.removeAttr('this-last-query');
-                                        _this.store('autocompleting', null);
-                                        clearTimeout(autocomplete_timeout);
-                                        return;
-                                    }
-                                    // block searching for same thing multiple times
-                                    else if (__this.val() === __this.attr('this-last-query')) {
-                                        // enter button pressed
-                                        if (e.keyCode === 13 && _list.children(':not([this-cache])').length) {
-                                            // select the first result from the dropdown list
-                                            _list.children(':not([this-cache]):first-child').trigger('click');
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                        }
-                                        return;
-                                    }
-                                    clearTimeout(autocomplete_timeout);
-                                    url += (url.indexOf('?') === -1) ? '?' : '&';
-                                    url += (__this.attr('this-query-key') || 'q') + '='
-                                            + __this.val();
-                                    autocomplete_timeout = setTimeout(function () {
-                                        __this.attr('this-last-query', __this.val());
-                                        _this.request({
-                                            url: url,
-                                            success: function (data) {
-                                                data = getRealData.call(_this, data);
-                                                if (!data)
-                                                    return;
-                                                if (!__this.attr('this-id'))
-                                                    __this.attr('this-id', _this.__.randomString());
-                                                _list.attr('this-autocompleting',
-                                                        __this.attr('this-id'))
-                                                        .children().attr('this-cache', '')
-                                                        .hide();
-                                                internal.fillAutocompleteList
-                                                        .call(_this, {
-                                                            selector: '[this-type="list"][this-id="'
-                                                                    + __this.attr('this-list')
-                                                                    + '"],list[this-id="'
-                                                                    + __this.attr('this-list')
-                                                                    + '"]',
-                                                            data: data,
-                                                            emptyList: true
-                                                        });
-                                                _this.store('autocompleting', data);
-                                            }
-                                        });
-                                    }, __this.attr('this-delay') || 300);
-                                })
-                                .on('click', '[this-autocompleting]>[this-key]', function ()
-                                {
-                                    var __this = _this._(this),
-                                            selectedListSelector = '[this-type="list"][this-id="'
-                                            + __this.parent().attr('this-selection-list')
-                                            + '"],list[this-id="'
-                                            + __this.parent().attr('this-selection-list')
-                                            + '"]',
-                                            _selectedList = _this.container
-                                            .find(selectedListSelector),
-                                            elem = _this.getTemplate(selectedListSelector)
-                                            .children(),
-                                            list = _this.store('autocompleting') || {},
-                                            key = __this.attr('this-key'),
-                                            index = __this.attr('this-index'),
-                                            _dropDownList = __this.parent(),
-                                            _input = _this.container
-                                            .find('[this-autocomplete][this-id="'
-                                                    + _dropDownList
-                                                    .attr('this-autocompleting') +
-                                                    '"]');
-                                    // empty selected list if nothing had
-                                    // been selected
-                                    if (!_dropDownList.attr('this-selected')) {
-                                        _selectedList.html('');
-                                    }
-                                    internal.bindToObject
-                                            .call(_this, elem, list[index] || {}, function (elem) {
-                                                elem.removeAttr('this-cache')
-                                                        .attr('this-key', key)
-                                                        .show();
-                                                _dropDownList.attr('this-selected',
-                                                        (_dropDownList.attr('this-selected') || '')
-                                                        + key + ',');
-                                                _selectedList.append(elem).show();
-                                                if (!_input.hasAttr('this-multiple')) {
-                                                    _input.hide();
-                                                    _dropDownList.hide();
-                                                }
-                                                else
-                                                    __this.remove();
-                                            });
-                                })
-                                .on('click', 'list[this-parent-list] [this-remove],'
-                                        + '[this-type="list"][this-parent-list] [this-remove]',
-                                        function () {
-                                            var __this = _this._(this).closest('[this-key]'),
-                                                    _dropDownList = _this.container
-                                                    .find('[this-type="list"][this-id="'
-                                                            + __this.parent()
-                                                            .attr('this-parent-list')
-                                                            + '"],list[this-id="'
-                                                            + __this.parent()
-                                                            .attr('this-parent-list')
-                                                            + '"]');
-                                            _dropDownList.attr('this-selected',
-                                                    _dropDownList.attr('this-selected')
-                                                    .replace(__this.attr('this-key')
-                                                            + ',', '')).show();
-                                            var _input = _this.container
-                                                    .find('[this-autocomplete][this-id="'
-                                                            + _dropDownList
-                                                            .attr('this-autocompleting') +
-                                                            '"]').show();
-                                            __this.remove();
-                                            if (_input.hasAttr('this-multiple')) {
-                                                _input.attr('this-last-query', '')
-                                                        .trigger('keyup');
-                                            }
-                                        })
                                 /**
                                  * Load next set of results on a paginated collection
                                  */
@@ -5600,10 +5616,18 @@
                                 delete attr['this-type'];
                                 delete attr['this-id'];
                                 elem.attr(attr);
-                                internal.loadForms.call(this.app, elem, this.attributes);
                             }
+                            internal.loadForms.call(this.app, elem, this.attributes);
                         }.bind(this));
                         return this;
+                    },
+                    /**
+                     * Checks if the given key exists in the model
+                     * @param {string} key
+                     * @returns boolean
+                     */
+                    has: function (key) {
+                        return this.attributes[key] !== undefined;
                     },
                     /**
                      * Initailizes Model attributes, creating setters and getters for them.
@@ -5611,8 +5635,12 @@
                      * @returns {void}
                      */
                     init: function (attr) {
-                        this['get' + Filters.snakeToCamel(attr, true)] = function () {
-                            return this.attributes[attr];
+                        this['get' + Filters.snakeToCamel(attr, true)] = function (key) {
+                            var value = this.attributes[attr];
+                            if (this.app.__.isObject(value, true) && key) {
+                                return value[key];
+                            }
+                            return value;
                         };
                         this['set' + Filters.snakeToCamel(attr, true)] = function (val) {
                             this.attributes[attr] = val;
@@ -6852,8 +6880,26 @@
          */
         on: function (event, selector, callback) {
             return this.tryCatch(function () {
-                if (internal.isRunning.call(this))
-                    this.container.on(event, selector, callback);
+                if (internal.isRunning.call(this)) {
+                    if (this.page) {
+                        var evt = event.replace(/[^a-z0-9]/gi, '')
+                                + selector.replace(/[^a-z0-9]/gi, ''),
+                                pageID = this.page.attr('this-id');
+                        if (!containedEvents[evt]) {
+                            // event has not been handled at all before
+                            containedEvents[evt] = {};
+                            var _this = this;
+                            this.container.on(event, selector, function () {
+                                return internal.dispatchEvent.call(_this, evt, this, Array.from(arguments));
+                            });
+                        }
+                        if (!containedEvents[evt][pageID])
+                            containedEvents[evt][pageID] = callback;
+                    }
+                    else {
+                        this.container.on(event, selector, callback);
+                    }
+                }
                 else
                     this.events.push({
                         event: event, selector: selector,
