@@ -1463,8 +1463,17 @@
                  * @returns {Boolean}
                  */
                 canContinue: function (action, params) {
-                    var response = this.__.callable(this.beforeCallbacks[action])
-                            .apply(this, params);
+                    var response = true;
+                    // check callback of page
+                    if (this.page && this.beforeCallbacks[this.page.attr('this-id')]) {
+                        response = this.__.callable(this.beforeCallbacks[this.page.attr('this-id')][action])
+                                .apply(this, params);
+                    }
+                    // check common callback only if page callback didn't return false or doesn't exist
+                    if (response !== false && this.beforeCallbacks['___common']) {
+                        response = this.__.callable(this.beforeCallbacks['___common'][action])
+                                .apply(this, params);
+                    }
                     return response || response !== false;
                 },
                 /**
@@ -6579,10 +6588,18 @@
          */
         before: function (event, callback) {
             return this.tryCatch(function () {
-                var _this = this;
                 this.__.forEach(event.split(','), function (i, v) {
-                    _this.beforeCallbacks[v.trim()] = callback;
-                });
+                    if (this.page) {
+                        if (!this.beforeCallbacks[this.page.attr('this-id')])
+                            this.beforeCallbacks[this.page.attr('this-id')] = {};
+                        this.beforeCallbacks[this.page.attr('this-id')][v.trim()] = callback;
+                    }
+                    else {
+                        if (!this.beforeCallbacks['___common'])
+                            this.beforeCallbacks['___common'] = {};
+                        this.beforeCallbacks['___common'][v.trim()] = callback;
+                    }
+                }.bind(this));
                 return this;
             });
         },
