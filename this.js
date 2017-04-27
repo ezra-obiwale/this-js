@@ -24,6 +24,7 @@
             return this;
         }
     },
+            pageAssets = {js: {}, css: {}},
             loadedPageJS = {first: {}, last: {}},
             containedEvents = {};
     FormData.prototype.fromObject = function (object, appendArray) {
@@ -1409,9 +1410,9 @@
                  */
                 bindToObject: function (elem, object, callback) {
                     var notWiths = internal.hideNotWiths.call(this, elem);
-                    elem.find('list,[this-type="list"]').html('');
+                    internal.emptyFeatures.call(this, elem);
                     return internal.loadComponents.call(this, function () {
-                        return internal.parseData.call(this, object, elem, null, false, true, function (elem) {
+                        return internal.parseData.call(this, object, elem, false, true, function (elem) {
                             internal.showNotWiths.call(this, elem, notWiths);
                             elem.trigger('model.binded', {
                                 data: object
@@ -1530,16 +1531,10 @@
                  * @param {HTMLElement}|{_} container
                  * @param object data
                  * @param string content
-                 * @param array variables
                  * @param {boolean} isModel Indicates whether loading a model or not
                  * @returns ThisApp
                  */
-                doLoad: function (container, data, content, variables, isModel, level, callback) {
-                    if (isModel) {
-                        // @todo: remove?
-//                        content = internal.inLoop.call(this, data, null, content);
-//                        content = internal.processExpressions.call(this, content, data);
-                    }
+                doLoad: function (container, data, content, isModel, level, callback) {
                     container = this._(container).hide();
                     var uid = container.attr('this-model-uid') ||
                             container.attr('this-uid') || '',
@@ -1574,7 +1569,7 @@
                         this.__.callable(callback).call(this, container);
                     }.bind(this);
                     internal.parseData
-                            .call(this, data, content, variables, false, isModel, _callback);
+                            .call(this, data, content, false, isModel, _callback);
                     return this;
                 },
                 /**
@@ -1605,6 +1600,26 @@
                     if (!noShow && type !== 'page')
                         __this.show();
                     return __this.removeAttr('this-tar');
+                },
+                /**
+                 * Empty lists, models and collections in the given elem.
+                 * When these are being loaded, their content is gotten from the
+                 * templates.
+                 * @param {_}|{HTMLElement} elem
+                 * @param {boolean} emptyLoaded Indicates whether to empty loaded features as well
+                 * @returns {ThisApp}
+                 */
+                emptyFeatures: function (elem, emptyLoaded) {
+                    this._(elem)
+                            .find(emptyLoaded ?
+                                    'list,model,collection,[this-type="list"],[this-type="model"],[this-type="collection"]'
+                                    : 'list:not([this-loaded]),model:not([this-loaded])'
+                                    + ',collection:not([this-loaded]),[this-type="list"]:not([this-loaded])'
+                                    + ',[this-type="model"]:not([this-loaded]),[this-type="collection"]:not([this-loaded])')
+                            .each(function () {
+                                this.innerHTML = '';
+                            });
+                    return this;
                 },
                 /**
                  * Calls JS eval on the content after parsing it for variables
@@ -1915,7 +1930,7 @@
                                 }
                                 _this.addTemplate(elem);
                             }
-                            elem.find('list,[this-type="list"]').html('');
+                            internal.emptyFeatures.call(_this, elem);
                             _this.__.callable(success).call(this, elem.clone());
                         },
                         error: function (e) {
@@ -2046,20 +2061,24 @@
                  */
                 inLoop: function (current, filter, content) {
                     /* evaluates filter */
-                    if (filter && !eval(filter.trim()))
+                    if (filter && !eval(filter))
                         return;
                     content = this._('<div/>').html(content);
                     var _this = this, level = 0, matched = {};
-                    content.find('[this-each]').each(function () {
-                        var __this = _this._(this).attr('this-muted', '');
-                        __this.html(__this.html()
-                                .replace(/\{\{/g, '__obrace__')
-                                .replace(/\}\}/g, '__cbrace__')
-                                .replace(/\(\{/g, '__obrace2__')
-                                .replace(/\}\)/g, '__cbrace2__'))
-                                .find('[this-if], [this-else-if], [this-else]')
-                                .attr('this-ignore', '');
-                    });
+                    content.find('[this-each],collection,model,list'
+                            + '[this-type="collection"],[this-type="model"],[this-type="list"]')
+                            .each(function () {
+                                var __this = _this._(this);
+                                __this.html(__this.html()
+                                        .replace(/\{\{/g, '__obrace__')
+                                        .replace(/\}\}/g, '__cbrace__')
+                                        .replace(/\(\{/g, '__obrace2__')
+                                        .replace(/\}\)/g, '__cbrace2__'));
+                                if (__this.attr('this-each')) {
+                                    __this.find('[this-if], [this-else-if], [this-else]')
+                                            .attr('this-ignore', '').attr('this-muted', '');
+                                }
+                            });
                     content.find('[this-if],[this-else-if],[this-else]')
                             .each(function () {
                                 var __this = _this._(this);
@@ -2164,65 +2183,39 @@
                     name = name.trim();
                     var url = (name.indexOf('://') !== -1 && name.startsWith('//')) ?
                             name : this.config.paths[type] + name,
-                            _this = this;
-                    if (type === 'css') {
-                        var current = this.container.find('link[this-id="' + name + '"]');
-                        // if exists already, mark as current and move to next
-                        if (current.length) {
-                            current.attr('this-loaded', '');
-                            return;
-                        }
-                        // ensure url ends with .css
-                        if (!url.endsWith('.css'))
-                            url += '.css';
+                            _this = this,
+                            load = function (url) {
+                                if (type === 'js') {
+                                    eval(pageAssets['js'][url]);
+                                }
+                                else if (type === 'css') {
+                                    elem.prepend('<style type="text/css">' + pageAssets['css'][url] + '</style>');
+                                }
+                                this.__.callable(callback).call(this, pageAssets[type][url]);
+                            }.bind(this);
+
+                    // ensure url ends with .type (.js|.css|...)
+                    if (!url.endsWith('.' + type))
+                        url += '.' + type;
+                    if (!pageAssets[type])
+                        pageAssets[type] = {};
+                    if (internal.record.call(this, 'debug') || !pageAssets[type][url]) {
+                        var _url = url;
                         // request new version if debugging
                         if (internal.record.call(this, 'debug'))
                             url += '?' + Math.round(Math.random() * 99999);
-                        // create link
-                        var link = this.__.createElement(null, 'link')
-                                // add attributes
-                                .attr('type', 'text/css')
-                                .attr('rel', 'stylesheet')
-                                .attr('this-for', elem.attr('this-type'))
-                                .attr('this-loaded', '')
-                                .attr('this-id', name);
-                        this.__.callable(callback).call(this);
-                        link.attr('href', url);
-                        // prepend link to elem
-                        elem.prepend(link);
+                        this.request({
+                            dataType: type,
+                            url: url,
+                            success: function (content) {
+                                pageAssets[type][_url] = content;
+                                load(_url);
+                            }
+                        });
                     }
-                    else if (type === 'js') {
-                        var current = this._('script[this-id="' + name + '"][this-app="'
-                                + this.container.attr('this-id') + '"]');
-                        // if exists already, mark as current and move to next
-                        if (current.length) {
-                            current.attr('this-loaded', '');
-                            this.__.callable(callback).call(this);
-                            return;
-                        }
-                        // ensure url ends with .js
-                        if (!url.endsWith('.js'))
-                            url += '.js';
-                        // request new version if debugging
-                        if (internal.record.call(this, 'debug'))
-                            url += '?' + Math.round(Math.random() * 99999);
-                        // create script
-                        var script = this.__.createElement(null, 'script')
-                                // add attributes
-                                .attr('type', 'application/javascript')
-                                .attr('this-for', elem.attr('this-type'))
-                                .attr('this-loaded', '')
-                                .attr('this-app', this.container.attr('this-id'))
-                                .attr('this-id', name);
-                        // append script to body
-                        this._('body').append(script);
-                        script.items[0].onload = function () {
-                            _this.__.callable(callback).call(_this);
-                        };
-                        script.attr('src', url);
-                        return internal;
+                    else {
+                        load(url);
                     }
-                    this.__.callable(callback).call(this);
                     return internal;
                 },
                 /**
@@ -2291,8 +2284,7 @@
                  * @param {boolean} replaceState
                  * @returns {void}
                  */
-                loadCollection: function (__this, callback, data, replaceState)
-                {
+                loadCollection: function (__this, callback, data, replaceState) {
                     __this = this._(__this).attr('this-loading', '');
                     // collection must have id or model
                     if (!__this.attr('this-id') && !__this.attr('this-model')) {
@@ -2306,25 +2298,14 @@
                     if (!__this.hasAttr('this-loaded') && __this.children().length > 1) {
                         __this.innerWrap('<div/>');
                     }
-                    var _content;
-                    // cache collection if not exist in dom as unloaded
-                    if (!this.getTemplate('collection[this-id="'
+                    // get collection content
+                    var content = this.getTemplate('collection[this-id="'
                             + __this.attr('this-id') +
                             '"],[this-type="collection"][this-id="'
-                            + __this.attr('this-id') + '"]').length) {
-                        this.addTemplate(__this.clone().removeAttr('this-loaded')
-                                .removeAttr('this-loading').hide().outerHtml());
-                    }
-                    else {
-                        _content = this.getTemplate('collection[this-id="'
-                                + __this.attr('this-id') +
-                                '"],[this-type="collection"][this-id="'
-                                + __this.attr('this-id') + '"]')
-                                .children()
-                                .clone().removeAttr('this-cache').outerHtml();
-                    }
-                    var _this = this,
-                            content = _content || __this.removeAttr('this-cache').html(),
+                            + __this.attr('this-id') + '"]')
+                            .children()
+                            .clone().removeAttr('this-cache').outerHtml(),
+                            _this = this,
                             model_name = __this.attr('this-model'),
                             model_to_bind = this.container.find('model[this-id="' + model_name
                                     + '"],[this-type="model"][this-id="' + model_name
@@ -2560,9 +2541,7 @@
                         this.__.callable(callback).call(this);
                         return;
                     }
-                    // get variables in content
-                    var variables = internal.parseBrackets.call(this, '{{', '}}', content),
-                            save_as = container.attr('this-model')
+                    var save_as = container.attr('this-model')
                             || container.attr('this-id'),
                             _callback = function () {
                                 container.removeAttr('this-filter').show();
@@ -2695,8 +2674,10 @@
                                 }, filter,
                                         content.replace(/{{_index}}/g, index));
                                 // if there's no content, go to the next model
-                                if (!_content)
+                                if (!_content) {
+                                    _this.__.callable(callback).call(_this);
                                     return;
+                                }
                                 // process expressions in content
                                 _content = _this._(internal.processExpressions.call(_this,
                                         _content, {
@@ -2719,7 +2700,7 @@
                                     model[top_uid] = _id;
                                 }
                                 // continue loading
-                                internal.doLoad.call(_this, container, model, _content, variables,
+                                internal.doLoad.call(_this, container, model, _content,
                                         false, level, function () {
                                             if (!--this.collectionData) {
                                                 delete this.collectionData;
@@ -2820,7 +2801,7 @@
                         // add url to model data for parsing
                         data['_url'] = container.attr('this-url');
                         // continue loading
-                        internal.doLoad.call(this, container, data, content, variables, true, null, _callback);
+                        internal.doLoad.call(this, container, data, content, true, null, _callback);
                     }
                     // remove filter attribute and show
                     container.removeAttr('this-filter');
@@ -3096,25 +3077,10 @@
                     }
 
                     if (type !== 'page') {
-                        if (this.getTemplate(type + common_selector + ',[this-type="'
-                                + type + '"]' + common_selector).length) {
-                            // necessary in case of binding and target has already been used
-                            content = __this.html(this.getTemplate(type + common_selector
-                                    + ',[this-type="' + type + '"]' + common_selector)
-                                    .hide().html()).outerHtml();
-                        }
-                        else { // keep a copy for later use
-                            var cache = _this._(content
-                                    .replace(/\(\{/g, '__obrace2__')
-                                    .replace(/\}\)/g, '__cbrace2__'));
-                            this.addTemplate(cache.hide());
-                        }
-                    }
-
-                    if (__this.hasAttr('this-binding')) {
-                        var oUrl = __this.attr('this-url');
-                        __this.replaceWith(content);
-                        __this.attr('this-url', oUrl);
+                        // necessary in case of binding and target has already been used
+                        content = __this.html(this.getTemplate(type + common_selector
+                                + ',[this-type="' + type + '"]' + common_selector)
+                                .hide().html()).outerHtml();
                     }
 
                     this.notWiths = internal.hideNotWiths.call(this, __this);
@@ -3613,19 +3579,15 @@
                  * Parse the given data into the given content based on the given variables
                  * @param array|object data
                  * @param string|_ content
-                 * @param array variables
                  * @param string|int forCollection If parsing data for a collection model, this is the
                  * index (or id) of the model in the collection
                  * @param boolean isModel Indicates whether parsing data for a model or not
                  * @returns ThisApp
                  */
-                parseData: function (data, content, variables, forCollection, isModel, callback)
+                parseData: function (data, content, forCollection, isModel, callback)
                 {
-                    if (!variables)
-                        variables = internal.parseBrackets.call(this, '{{', '}}', this.__.isString(content) ? content : content.outerHtml());
                     var _temp, _this = this, custom = false;
                     if (this.__.isString(content)) {
-                        content = content.replace(/__obrace2__/g, '({').replace(/__cbrace2__/g, '})');
                         _temp = this._('<div/>').html(content);
                         custom = true;
                     }
@@ -3665,31 +3627,22 @@
                         __this.removeAttr('this-each');
                         _each = _temp.find('[this-each]');
                     }
-                    if (isModel) {
-                        _temp.find('collection:not([this-loaded]),'
-                                + '[this-type="collection"]:not([this-loaded])')
-                                .each(function () {
-                                    _this._(this).html(this.innerHTML
-                                            .replace(/{{/g, '__obrace__')
-                                            .replace(/}}/g, '__cbrace__')
-                                            .replace(/\({/g, '__obrace2__')
-                                            .replace(/}\)/g, '__cbrace2__'));
-                                });
-                    }
                     if (forCollection) {
                         content = internal.inLoop.call(this, {
                             index: forCollection,
                             model: data
-                        }, 'true', _temp.outerHtml());
+                        }, true, _temp.outerHtml());
                         content = internal.processExpressions.call(this, content, {
                             index: forCollection,
                             model: data
                         });
                     }
                     else {
-                        content = internal.inLoop.call(this, data, 'true', _temp.outerHtml());
+                        content = internal.inLoop.call(this, data, true, _temp.outerHtml());
                         content = internal.processExpressions.call(this, content, data);
                     }
+                    var variables = internal.parseBrackets.call(this, '{{', '}}',
+                            this.__.isString(content) ? content : content.outerHtml());
                     content = internal.fillVariables.call(this, variables, data, content);
                     _temp.replaceWith(content);
                     var done = function () {
@@ -3704,11 +3657,7 @@
                         if (collections.length) {
                             this.__proto__.modelCollections = collections.length;
                             collections.each(function () {
-                                var __this = _this._(this).html(this.innerHTML
-                                        .replace(/__obrace__/g, '{{')
-                                        .replace(/__cbrace__/g, '}}')
-                                        .replace(/__obrace2__/g, '({')
-                                        .replace(/__cbrace2__/g, '})'));
+                                var __this = _this._(this);
                                 data = internal.getVariableValue.call(_this,
                                         __this.attr('this-data'), data, true);
                                 internal.loadCollection.call(_this, __this, function () {
@@ -3996,6 +3945,7 @@
                                                 + '[this-type="list"]:not([this-loaded]),'
                                                 + '[this-type="component"]:not([this-loaded])')
                                         .hide());
+                        internal.emptyFeatures.call(this, this.container);
                         if (this.config.titleContainer)
                             this.config.titleContainer = this._(this.config.titleContainer,
                                     internal.record.call(this, 'debug'));
@@ -4956,7 +4906,7 @@
                                 else if (_this.__.isObject(__data))
                                     data = __data;
                                 internal.parseData.call(_this, data,
-                                        tmpl.outerHtml(), null, true, null,
+                                        tmpl.outerHtml(), true, null,
                                         function (tmpl) {
                                             if (!tmpl.attr('this-url'))
                                                 tmpl.attr('this-url', _collection.attr('this-url') + v);
@@ -5044,7 +4994,7 @@
                                             // put back current model's url
                                             _clone.attr('this-url', __model.attr('this-url'));
                                             internal.parseData.call(_this, data,
-                                                    _clone.outerHtml(), null, false, true, function (tmpl) {
+                                                    _clone.outerHtml(), false, true, function (tmpl) {
                                                 __model.html(tmpl.html()).show()
                                                         .attr('this-updated', v.timestamp)
                                                         .attr('this-url', tmpl.attr('this-url'));
@@ -7034,7 +6984,7 @@
                                         + _dropdownList.attr('this-selection-list')
                                         + '"]');
                         _selectedList.html('').hide();
-                        _dropdownList.removeAttr('this-selected').hide();
+                        _dropdownList.removeAttr('this-selected').html('').hide();
                         _input.val('').trigger('keyup').show();
 
                     });
