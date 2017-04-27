@@ -1353,8 +1353,18 @@
                 }
                 else if (this.isString(selector)) {
                     var _this = this.createElement(selector);
-                    if (_this.length)
+                    if (selector.trim().startsWith('<thead') || selector.trim().startsWith('<tbody')) {
+                        return this.createElement(selector, 'table');
+                    }
+                    else if (selector.trim().startsWith('<tr')) {
+                        return this.createElement(selector, 'table').children();
+                    }
+                    else if (selector.trim().startsWith('<td') || selector.trim().startsWith('<th')) {
+                        return this.createElement(selector, 'table').children().children();
+                    }
+                    else if (_this.length) {
                         return _this;
+                    }
                     this.items = Array.from(document.querySelectorAll(selector));
                 }
                 else {
@@ -2574,7 +2584,7 @@
                                 // for processing table and its descendants' templates
                                 level = 0,
                                 // the template element
-                                child = container.children().get(0),
+                                child = this._(content).get(0),
                                 // unique id key for models
                                 uid = container.attr('this-model-uid'),
                                 // the url of the collection/model
@@ -3289,11 +3299,11 @@
                     if (!data)
                         return;
                     elem = this._(elem);
-                    var child = elem.children().get(0),
-                            _this = this,
-                            level;
                     if (!content)
                         content = elem.html();
+                    var child = this._(content).get(0),
+                            _this = this,
+                            level;
                     if (child) {
                         switch (child.tagName.toLowerCase()) {
                             case "td":
@@ -6743,15 +6753,15 @@
                     elem = this.templates.children(selector);
                 if (original)
                     return elem;
-                elem = elem.clone();
+                    elem = elem.clone();
                 elem.find('[this-type="style"]').each(function () {
                     _this._(this).replaceWith('<style>' + this.innerText + '</style>');
                 });
-                return this._(elem.outerHtml()
-                        .replace(/__obrace__/g, '{{')
-                        .replace(/__cbrace__/g, '}}')
-                        .replace(/__obrace2__/g, '({')
-                        .replace(/__cbrace2__/g, '})'));
+                    return this._(elem.outerHtml()
+                            .replace(/__obrace__/g, '{{')
+                            .replace(/__cbrace__/g, '}}')
+                            .replace(/__obrace2__/g, '({')
+                            .replace(/__cbrace2__/g, '})'));
             });
         },
         /**
