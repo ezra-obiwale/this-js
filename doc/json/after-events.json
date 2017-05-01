@@ -110,7 +110,7 @@
         "empty.response": {
             "id": "empty.response",
             "description": "Triggered when the data returned by a request is empty or null",
-            "on":"models"
+            "on": "models"
         },
         "expired.collection.cache.loaded": {
             "id": "expired.collection.cache.loaded",
@@ -233,6 +233,15 @@
                 "load.content.success",
                 "load.content.error",
                 "load.content.complete"
+            ]
+        },
+        "list-option-selected": {
+            "id": "list-option-selected",
+            "description": "Triggered when a list option has been selected",
+            "on": "lists",
+            "links": [
+                "this-list",
+                "this-autocomplete"
             ]
         },
         "load.content.complete": {

@@ -32,7 +32,7 @@
         function process(data, _key) {
             __.forEach(data, function (key, value) {
                 if (_key) // parsing for object
-                    key = _key + '[' + (isNaN(key) || !appendArray ? key : '') + ']';
+                    key = _key + '[' + (__.isString(key) || !appendArray ? key : '') + ']';
                 if (__.isObject(value, true)) {
                     process(value, key);
                 }
@@ -40,6 +40,8 @@
                     _this.append(key, value);
                 }
             });
+            if (_key && data && __.isObject(data, true) && !Object.keys(data).length)
+                _this.append(_key, data);
         }
         process(object);
         return this;
@@ -90,7 +92,7 @@
     };
     function getElemType(elem) {
         return _(elem).length ?
-                (_(elem).attr('this-type') || _(elem).get(0).tagName.toLowerCase())
+                (_(elem).this('type') || _(elem).get(0).tagName.toLowerCase())
                 : null;
     }
     function getRealData(data) {
@@ -109,19 +111,19 @@
             var _a = _this._(this), href;
             if (_a.hasAttr('href') && _a.attr('href') !== '#')
                 return;
-            href = '#/' + _a.attr('this-goto');
+            href = '#/' + _a.this('goto');
             if (_a.hasAttr('this-read')) {
                 var hrf = '',
                         _model = _a.closest('[this-model]'),
                         _collection = _a.closest('[this-type="collection"],collection');
-                if (_a.attr('this-read'))
-                    hrf += _a.attr('this-read');
+                if (_a.this('read'))
+                    hrf += _a.this('read');
                 else if (_model.length) {
-                    hrf += _model.attr('this-url');
+                    hrf += _model.this('url');
                 }
 
                 if (hrf) {
-                    href += '/#/' + (_a.attr('this-model') || _model.attr('this-model')) + '/' + hrf;
+                    href += '/#/' + (_a.this('model') || _model.this('model')) + '/' + hrf;
                 }
             }
 
@@ -421,11 +423,11 @@
                         var split = callback.split('.'), func = window;
                         for (var i = 0; i < split.length; i++) {
                             if (!func[split[i]]) {
-                                return this.callable(null, true);
+                                return this.callable(null, nullable);
                             }
                             func = func[split[i]];
                         }
-                        return func === window ? this.callable(null, true) : this.callable(func);
+                        return func === window ? this.callable(null, nullable) : this.callable(func, nullable);
                     }
                     else if (!nullable) {
                         return function () { };
@@ -883,7 +885,7 @@
                  * @returns {Boolean}
                  */
                 isNumber: function (item) {
-                    return !isNaN(item);
+                    return !isNaN(item) && !this.isString(item);
                 },
                 /**
                  * Checks if the given item is a string
@@ -1134,6 +1136,12 @@
                     });
                 },
                 /**
+                 * Shortcut to removeAttr('this-*')
+                 */
+                removeThis: function (attr) {
+                    return this.removeAttr('this-' + attr);
+                },
+                /**
                  * Replaces current items with the given content
                  * @param mixed content
                  * @returns __
@@ -1211,6 +1219,12 @@
                     return this.each(function () {
                         this.innerText = content;
                     });
+                },
+                /**
+                 * Shortcut to calling attr('this-*')
+                 */
+                this: function (attr, val) {
+                    return this.attr('this-' + attr, val);
                 },
                 /**
                  * Toggles display of matched elements
@@ -1307,6 +1321,7 @@
                     this.each(function () {
                         if (value !== undefined) {
                             this.value = value;
+                            _(this).attr('value', value);
                             return;
                         }
                         val = this.value;
@@ -1380,30 +1395,42 @@
             internal = Object.create({
                 records: {},
                 /**
-                 * Binds the target to the model
-                 * @param _ _target
-                 * @param _ _model
-                 * @param boolean ignoreCache Indicates whether to ignore cache
+                 * Binds the target to the model of the given element
+                 * @param {_}|{string} _target
+                 * @param {_}|{string} _elem
                  * @returns ThisApp
                  */
-                bindToModel: function (_target, _model) {
-                    if (!_target.length || !_model.length)
+                bindToElementModel: function (_target, _elem) {
+                    _target = this._(_target);
+                    _elem = this._(_elem);
+                    if (!_target.length || !_elem.length)
                         return this;
-                    else if (!_model.attr('this-mid')) {
-                        this.error('Model to bind to does not have an id');
+                    else if (!_elem.this('mid') ||
+                            (!_elem.this('id') && !_elem.this('model'))) {
+                        this.error('Element to bind must be already bound to model.');
                         return;
                     }
-                    var model_name = _model.attr('this-model') || _model.attr('this-id'),
-                            _this = this;
+                    var model_name = _elem.this('model') || _elem.this('id'),
+                            _this = this,
+                            selector = internal.elementToSelector.call(this, _target, true),
+                            _tmpl = this.getCached(selector);
+                    if (_tmpl.length) {
+                        if (_target.this('tar'))
+                            _tmpl.this('tar', _target.this('tar'));
+                        _target = _target.replaceWith(_tmpl);
+                    }
 
                     _target = internal.doTar.call(this, _target, true);
 
                     this.collection(model_name, {
                         success: function (collection) {
-                            collection.model(_model.attr('this-mid'), {
-                                url: _model.attr('this-url'),
+                            collection.model(_elem.this('mid'), {
+                                url: _elem.this('url'),
                                 success: function (model) {
-                                    model.bind(_target);
+                                    model.bind(_target.this('model', model_name)
+                                            .this('mid', _elem.this('mid'))
+                                            .this('url', _elem.this('url'))
+                                            .this('uid', _elem.this('uid')));
                                 }
                             });
                         }
@@ -1423,6 +1450,7 @@
                     internal.emptyFeatures.call(this, elem);
                     return internal.loadComponents.call(this, function () {
                         return internal.parseData.call(this, object, elem, false, true, function (elem) {
+                            internal.loadFormElements.call(this, elem.find('[this-is]'), object);
                             internal.showNotWiths.call(this, elem, notWiths);
                             elem.trigger('model.binded', {
                                 data: object
@@ -1471,21 +1499,52 @@
                  * be continued
                  * @param {String} action
                  * @param {Array} params Parameters to pass to the callback
+                 * @param {Object} context
                  * @returns {Boolean}
                  */
-                canContinue: function (action, params) {
+                canContinue: function (action, params, context) {
                     var response = true;
                     // check callback of page
-                    if (this.page && this.beforeCallbacks[this.page.attr('this-id')]) {
-                        response = this.__.callable(this.beforeCallbacks[this.page.attr('this-id')][action])
-                                .apply(this, params);
+                    if (this.page && this.beforeCallbacks[this.page.this('id')]) {
+                        response = this.__.callable(this.beforeCallbacks[this.page.this('id')][action])
+                                .apply(context || this, params);
                     }
                     // check common callback only if page callback didn't return false or doesn't exist
                     if (response !== false && this.beforeCallbacks['___common']) {
                         response = this.__.callable(this.beforeCallbacks['___common'][action])
-                                .apply(this, params);
+                                .apply(context || this, params);
                     }
                     return response || response !== false;
+                },
+                /**
+                 * Check if container is a table's descendant tag
+                 * and properly parses it.
+                 * @param {_}|{string} container
+                 * @returns {array}
+                 */
+                checkTableContent: function (container) {
+                    container = this._(container);
+                    // for processing table and its descendants' templates
+                    var level = 0,
+                            // the template element
+                            child = container.get(0);
+                    if (child) {
+                        // process content properly
+                        switch (child.tagName.toLowerCase()) {
+                            case "td":
+                                level = 3;
+                                container = this._('<table />').html(container.outerHtml());
+                                break;
+                            case "tr":
+                                level = 2;
+                                container = this._('<table />').html(container.outerHtml());
+                                break;
+                        }
+                    }
+                    return {
+                        level: level,
+                        container: container
+                    };
                 },
                 /**
                  * Removes the given object from cache
@@ -1533,7 +1592,7 @@
                  * @param {Array} params
                  */
                 dispatchEvent: function (event, anchor, params) {
-                    return this.__.callable(containedEvents[event][this.page.attr('this-id')])
+                    return this.__.callable(containedEvents[event][this.page.this('id')])
                             .apply(anchor, params);
                 },
                 /**
@@ -1542,44 +1601,47 @@
                  * @param object data
                  * @param string content
                  * @param {boolean} isModel Indicates whether loading a model or not
+                 * @param {Function} callback
                  * @returns ThisApp
                  */
                 doLoad: function (container, data, content, isModel, level, callback) {
                     container = this._(container).hide();
-                    var uid = container.attr('this-model-uid') ||
-                            container.attr('this-uid') || '',
+                    var uid = container.this('model-uid') ||
+                            container.this('uid') || '',
                             id = internal.getUIDValue.call(this, data, uid),
-                            url = container.attr('this-url') || '',
+                            url = container.this('url') || '',
                             url_parts = url.split('?');
                     url = url_parts[0];
                     if (url && !url.endsWith('/'))
                         url += '/';
                     var _callback = function (_temp) {
+                        internal.loadFormElements
+                                .call(this, _temp.find('[this-is]'), data);
                         while (level) {
                             _temp = _temp.children();
                             level--;
                         }
                         if (!isModel) {
-                            _temp.attr('this-mid', id)
-                                    .attr('this-uid', uid)
-                                    .attr('this-type', 'model')
-                                    .attr('this-in-collection', '');
-                            if (!_temp.attr('this-url'))
-                                _temp.attr('this-url', url + id);
-                            if (container.attr('this-model'))
-                                _temp.attr('this-id', container.attr('this-model'));
+                            _temp.this('mid', id)
+                                    .this('uid', uid)
+                                    .this('type', 'model')
+                                    .this('in-collection', '');
+                            if (!_temp.this('url'))
+                                _temp.this('url', url + id);
+                            if (container.this('model'))
+                                _temp.this('id', container.this('model'));
                             container[container.hasAttr('this-prepend')
                                     ? 'prepend' : 'append'](_temp.show())
-                                    .removeAttr('this-loading');
+                                    .removeThis('loading');
                         }
                         else {
-                            container.attr('this-uid', uid).attr('this-mid', id);
+                            container.this('uid', uid).this('mid', id);
                             container.html(_temp.html()).show();
                         }
                         this.__.callable(callback).call(this, container);
                     }.bind(this);
                     internal.parseData
-                            .call(this, data, content, false, isModel, _callback);
+                            .call(this, data, isModel ? container : content, false, isModel, _callback);
                     return this;
                 },
                 /**
@@ -1591,25 +1653,42 @@
                 doTar: function (__this, noShow) {
                     __this = this._(__this);
                     var type = getElemType(__this) || '',
-                            tar = type + '#' + __this.attr('this-id');
+                            tar = type + '#' + __this.this('id');
                     if (this.tar[tar]) {
                         this.__.forEach(this.tar[tar], function (i, v) {
-                            __this.attr('this-' + i, v);
+                            __this.this('' + i, v);
                         });
                         delete this.tar[tar];
                     }
-                    if (__this.attr('this-tar')) {
-                        var tar = __this.attr('this-tar').split(';');
+                    if (__this.this('tar')) {
+                        var tar = __this.this('tar').split(';');
                         this.__.forEach(tar, function (i, v) {
                             var split = v.split(':');
                             if (split.length < 2)
                                 return;
-                            __this.attr('this-' + split[0], split[1]);
+                            __this.this('' + split[0], split[1]);
                         });
                     }
                     if (!noShow && type !== 'page')
                         __this.show();
-                    return __this.removeAttr('this-tar');
+                    return __this.removeThis('tar');
+                },
+                /**
+                 * Converts an element to selector string
+                 * @param {_} elem
+                 * @param {boolean} ignoreType
+                 * @returns {string}
+                 */
+                elementToSelector: function (elem, ignoreType) {
+                    elem = this._(elem);
+                    var selector = elem.get(0).tagName.toLowerCase();
+                    if (elem.this('id'))
+                        selector += '[this-id="' + elem.this('id') + '"]';
+                    if (!ignoreType && elem.this('type'))
+                        selector += '[this-type="' + elem.this('type') + '"]';
+                    if (elem.attr('class'))
+                        selector += '.' + elem.attr('class').replace(/\s/g, '.');
+                    return selector;
                 },
                 /**
                  * Empty lists, models and collections in the given elem.
@@ -1622,10 +1701,10 @@
                 emptyFeatures: function (elem, emptyLoaded) {
                     this._(elem)
                             .find(emptyLoaded ?
-                                    'list,model,collection,[this-type="list"],[this-type="model"],[this-type="collection"]'
+                                    'list,collection,[this-type="list"],[this-type="model"],[this-type="collection"]'
                                     : 'list:not([this-loaded]),model:not([this-loaded])'
                                     + ',collection:not([this-loaded]),[this-type="list"]:not([this-loaded])'
-                                    + ',[this-type="model"]:not([this-loaded]),[this-type="collection"]:not([this-loaded])')
+                                    + ',[this-type="collection"]:not([this-loaded])')
                             .each(function () {
                                 this.innerHTML = '';
                             });
@@ -1640,7 +1719,11 @@
                 eval: function (content, data) {
                     var variables = internal.parseBrackets.call(this, '{{', '}}', content);
                     content = internal.fillVariables.call(this, variables, data, content);
-                    return eval(content);
+                    return this.tryCatch(function () {
+                        return eval(content);
+                    }, function () {
+                        return;
+                    });
                 },
                 /**
                  * Extends the given layout
@@ -1655,25 +1738,23 @@
                     // get existing layout in container
                     _layout = this.reloadLayouts ? _() :
                             this.container.find('layout[this-id="'
-                                    + __layout.attr('this-extends')
+                                    + __layout.this('extends')
                                     + '"],[this-type="layout"][this-id="'
-                                    + __layout.attr('this-extends') + '"]');
+                                    + __layout.this('extends') + '"]');
                     // layout doesn't exist in container
                     if (!_layout.length)
                         // get from templates
-                        _layout = this.getTemplate('[this-type="layouts"] layout[this-id="'
-                                + __layout.attr('this-extends') + '"],'
-                                + '[this-type="layouts"] [this-type="layout"][this-id="'
-                                + __layout.attr('this-extends') + '"]');
+                        _layout = this.getCached('[this-type="layouts"] [this-id="'
+                                + __layout.this('extends') + '"]', 'layout');
                     // doesn't exist in templates
                     if (!_layout.length) {
                         // get from filesystem
-                        internal.fullyFromURL.call(this, 'layout', __layout.attr('this-extends'),
+                        internal.fullyFromURL.call(this, 'layout', __layout.this('extends'),
                                 function (_layout) {
-                                    __layout.removeAttr('this-extends');
-                                    _layout.removeAttr('this-url')
+                                    __layout.removeThis('extends');
+                                    _layout.removeThis('url')
                                             .find('[this-content]').html(__layout);
-                                    if (_layout.attr('this-extends'))
+                                    if (_layout.this('extends'))
                                         internal.extendLayout
                                                 .call(_this, _layout, replaceInState);
                                     else
@@ -1681,23 +1762,23 @@
                                                 .call(_this, _layout, replaceInState);
                                 },
                                 function () {
-                                    _this.error('Layout [' + __layout.attr('this-extends')
+                                    _this.error('Layout [' + __layout.this('extends')
                                             + '] not found!');
-                                    __layout.removeAttr('this-extends');
+                                    __layout.removeThis('extends');
                                     internal.finalizePageLoad.call(_this, __layout, replaceInState);
                                 });
                     }
                     else {
-                        __layout.removeAttr('this-extends');
-                        if (_layout.attr('this-url')) {
+                        __layout.removeThis('extends');
+                        if (_layout.this('url')) {
                             this.request({
-                                url: _layout.attr('this-url'),
+                                url: _layout.this('url'),
                                 success: function (data) {
-                                    _layout.removeAttr('this-url')
+                                    _layout.removeThis('url')
                                             .html(data)
                                             .find('[this-content]')
                                             .html(__layout.show());
-                                    if (_layout.attr('this-extends')) {
+                                    if (_layout.this('extends')) {
                                         internal.extendLayout.call(_this, _layout, replaceInState);
                                     }
                                     else {
@@ -1712,8 +1793,8 @@
                         }
                         else {
                             _layout.find('[this-content]')
-                                    .html(__layout.removeAttr('this-extends').show());
-                            if (_layout.attr('this-extends')) {
+                                    .html(__layout.removeThis('extends').show());
+                            if (_layout.this('extends')) {
                                 internal.extendLayout.call(this, _layout, replaceInState);
                             }
                             else {
@@ -1743,11 +1824,11 @@
                         var id = internal.getUIDValue.call(_this, v);
                         ids.push(id);
                         _list.append(_this
-                                .getTemplate(options.selector)
+                                .getCached(options.selector)
                                 .children()
-                                .removeAttr('this-cache')
-                                .attr('this-index', i)
-                                .attr('this-key', id));
+                                .removeThis('cache')
+                                .this('index', i)
+                                .this('key', id));
                         // bind object to element
                         internal.bindToObject
                                 .call(_this, _list.children('[this-key="' + id + '"]'), v,
@@ -1755,7 +1836,7 @@
                                             // avoid showing elem if already
                                             // selected
                                             var selected = _list
-                                                    .attr('this-selected') || '';
+                                                    .this('selected') || '';
                                             if (selected.indexOf(id + ',') !== -1)
                                             {
                                                 elem.remove();
@@ -1804,13 +1885,13 @@
                     else
                         this.container.html(this.page);
                     this.page = this.container
-                            .find('page[this-id="' + this.page.attr('this-id')
+                            .find('page[this-id="' + this.page.this('id')
                                     + '"]:not([this-dead]),'
                                     + '[this-type="page"][this-id="'
-                                    + this.page.attr('this-id')
+                                    + this.page.this('id')
                                     + '"]:not([this-dead])')
-                            .attr('this-current', '')
-                            .removeAttr('this-layout').hide();
+                            .this('current', '')
+                            .removeThis('layout').hide();
                     this.container.find('[this-type]:not([this-type="page"]):not(page)'
                             + ':not(layout):not([this-type="layout"])'
                             + ':not(component):not([this-type="component"])').hide();
@@ -1822,12 +1903,12 @@
                         internal.loadComponents.call(this, function () {
                             this.page = internal.doTar.call(this, this.page).hide();
                             // load page as model if attached to a model
-                            if (this.page.attr('this-url') && this.page.attr('this-model')) {
+                            if (this.page.this('url') && this.page.this('model')) {
                                 // get page model's collection
-                                this.collection(this.page.attr('this-model'), {
+                                this.collection(this.page.this('model'), {
                                     success: function (collection) {
-                                        collection.model(this.page.attr('this-mid'), {
-                                            url: this.page.attr('this-url'),
+                                        collection.model(this.page.this('mid'), {
+                                            url: this.page.this('url'),
                                             success: function (model) {
                                                 this.pageModel = model;
                                                 // load page model. data provided
@@ -1851,9 +1932,9 @@
                         }.bind(this));
                     }.bind(this);
                     // load page content from elsewhere
-                    if (this.page.attr('this-path')) {
+                    if (this.page.this('path')) {
                         this.request({
-                            url: this.page.attr('this-path'),
+                            url: this.page.this('path'),
                             success: function (data) {
                                 _this.page.html(data).show()
                                         .find('[this-type]'
@@ -1897,30 +1978,30 @@
                                     prep4Tmpl = function (elem) {
                                         elem.find('[this-type="collection"]:not([this-model]),collection:not([this-model])')
                                                 .each(function () {
-                                                    _this._(this).attr('this-model', _this._(this).attr('this-id'));
+                                                    _this._(this).this('model', _this._(this).this('id'));
                                                 });
                                         elem.find('[this-type="list"],list')
                                                 .each(function () {
                                                     var _list = _this._(this).hide();
                                                     if (_list.hasAttr('this-selection-list'))
                                                         elem.find('[this-type="list"][this-id="'
-                                                                + _list.attr('this-selection-list')
+                                                                + _list.this('selection-list')
                                                                 + '"],list[this-id="'
-                                                                + _list.attr('this-selection-list')
+                                                                + _list.this('selection-list')
                                                                 + '"]')
-                                                                .attr('this-parent-list',
-                                                                        _list.attr('this-id'));
+                                                                .this('parent-list',
+                                                                        _list.this('id'));
                                                 });
                                     };
                             // components
                             if (type === 'component') {
                                 if (elem.length > 1)
                                     elem = _this._('<div/>').html(elem);
-                                elem.attr('this-component-url', idOrPath);
+                                elem.this('component-url', idOrPath);
                                 prep4Tmpl(elem);
                                 _this.addTemplate(_this._('<div this-type="component"'
                                         + ' this-url="' + idOrPath + '" />')
-                                        .html(elem.clone().removeAttr('this-url')));
+                                        .html(elem.clone().removeThis('url')));
                             }
                             // pages and layouts
                             else {
@@ -1928,14 +2009,14 @@
                                     elem = _this._('<div this-type="' + type + '" />')
                                             .html(data);
                                 }
-                                else if (!elem.is(type) && elem.attr('this-type') !== type) {
-                                    elem.attr('this-type', type);
+                                else if (!elem.is(type) && elem.this('type') !== type) {
+                                    elem.this('type', type);
                                 }
                                 // overwrite id from idOrPath
-                                elem.attr('this-id', idOrPath.replace(/\/\\/g, '-'));
+                                elem.this('id', idOrPath.replace(/\/\\/g, '-'));
                                 if (type === 'page') {
                                     if (idOrPath.indexOf('/') !== -1)
-                                        elem.attr('this-path', idOrPath);
+                                        elem.this('path', idOrPath);
                                     prep4Tmpl(elem);
                                 }
                                 _this.addTemplate(elem);
@@ -1996,7 +2077,7 @@
                     if (!internal.isRunning.call(this))
                         return;
                     var key = internal.record.call(this, 'requestKey');
-                    delete internal.records[this.container.attr('this-id')].requestKey;
+                    delete internal.records[this.container.this('id')].requestKey;
                     return key;
                 },
                 /**
@@ -2043,20 +2124,20 @@
                 hideNotWiths: function (elem) {
                     // hold not withs
                     var _not_with = elem.find('[this-not-with="'
-                            + elem.attr('this-model') || elem.attr('this-id')
+                            + elem.this('model') || elem.this('id')
                             + '"]'),
                             cnt = 0,
                             notWiths = {};
-                    if (!elem.attr('this-id'))
-                        elem.attr('this-id', this.__.randomString());
+                    if (!elem.this('id'))
+                        elem.this('id', this.__.randomString());
                     while (_not_with.length) {
-                        var name = elem.attr('this-id') + cnt;
+                        var name = elem.this('id') + cnt;
                         notWiths[name] = _not_with.get(0);
                         this._(_not_with.get(0)).replaceWith('<div this-with="'
                                 + name + '" />');
                         // find next notWith
                         _not_with = elem.find('[this-not-with="'
-                                + elem.attr('this-id') + '"]');
+                                + elem.this('id') + '"]');
                         cnt++;
                     }
                     return notWiths;
@@ -2071,7 +2152,14 @@
                  */
                 inLoop: function (current, filter, content) {
                     /* evaluates filter */
-                    if (filter && !eval(filter))
+                    var good = this.tryCatch(function () {
+                        if (filter && !eval(filter))
+                            return false;
+                        return true;
+                    }, function () {
+                        return false;
+                    });
+                    if (!good)
                         return;
                     content = this._('<div/>').html(content);
                     var _this = this, level = 0, matched = {};
@@ -2084,9 +2172,9 @@
                                         .replace(/\}\}/g, '__cbrace__')
                                         .replace(/\(\{/g, '__obrace2__')
                                         .replace(/\}\)/g, '__cbrace2__'));
-                                if (__this.attr('this-each')) {
+                                if (__this.this('each')) {
                                     __this.find('[this-if], [this-else-if], [this-else]')
-                                            .attr('this-ignore', '').attr('this-muted', '');
+                                            .this('ignore', '').this('muted', '');
                                 }
                             });
                     content.find('[this-if],[this-else-if],[this-else]')
@@ -2094,13 +2182,13 @@
                                 var __this = _this._(this);
                                 if (__this.hasAttr('this-ignore'))
                                     return;
-                                else if (__this.attr('this-if'))
+                                else if (__this.this('if'))
                                 {
                                     try {
                                         level++;
                                         matched[level] = false;
-                                        if (eval(__this.attr('this-if').trim())) {
-                                            __this.removeAttr('this-if');
+                                        if (eval(__this.this('if').trim())) {
+                                            __this.removeThis('if');
                                             matched[level] = true;
                                         }
                                         else {
@@ -2111,22 +2199,22 @@
                                         __this.remove();
                                     }
                                     if (__this.hasAttr('this-end-if')) {
-                                        __this.removeAttr('this-end-if');
+                                        __this.removeThis('end-if');
                                         delete matched[level];
                                         level--;
                                     }
                                 }
-                                else if (__this.attr('this-else-if'))
+                                else if (__this.this('else-if'))
                                 {
                                     try {
                                         if (!__.isBoolean(matched[level])) {
                                             _this.error('Branching error: Else-if without If!');
                                             return;
                                         }
-                                        if (matched[level] || !eval(__this.attr('this-else-if').trim()))
+                                        if (matched[level] || !eval(__this.this('else-if').trim()))
                                             __this.remove();
                                         else {
-                                            __this.removeAttr('this-else-if');
+                                            __this.removeThis('else-if');
                                             matched[level] = true;
                                         }
                                     }
@@ -2134,7 +2222,7 @@
                                         __this.remove();
                                     }
                                     if (__this.hasAttr('this-end-if')) {
-                                        __this.removeAttr('this-end-if');
+                                        __this.removeThis('end-if');
                                         delete matched[level];
                                         level--;
                                     }
@@ -2148,19 +2236,19 @@
                                         if (matched[level])
                                             __this.remove();
                                         else {
-                                            __this.removeAttr('this-else');
+                                            __this.removeThis('else');
                                         }
                                     }
                                     catch (e) {
                                         __this.remove();
                                     }
                                     if (__this.hasAttr('this-end-if'))
-                                        __this.removeAttr('this-end-if');
+                                        __this.removeThis('end-if');
                                     delete matched[level];
                                     level--;
                                 }
                             });
-                    content.find('[this-ignore]').removeAttr('this-ignore');
+                    content.find('[this-ignore]').removeThis('ignore');
                     return content.html();
                 },
                 /**
@@ -2170,7 +2258,7 @@
                  * @returns booean
                  */
                 is: function (type, container) {
-                    return this._(container).attr('this-type') === type || this._(container).is(type);
+                    return this._(container).this('type') === type || this._(container).is(type);
                 },
                 /**
                  * Check if an app is running
@@ -2210,16 +2298,14 @@
                     if (!pageAssets[type])
                         pageAssets[type] = {};
                     if (internal.record.call(this, 'debug') || !pageAssets[type][url]) {
-                        var _url = url;
-                        // request new version if debugging
-                        if (internal.record.call(this, 'debug'))
-                            url += '?' + Math.round(Math.random() * 99999);
                         this.request({
                             dataType: type,
                             url: url,
                             success: function (content) {
-                                pageAssets[type][_url] = content;
-                                load(_url);
+                                pageAssets[type][url] = content;
+                            },
+                            complete: function () {
+                                load(url);
                             }
                         });
                     }
@@ -2237,23 +2323,23 @@
                     var _this = this,
                             elemType = getElemType(elem) || '',
                             leaveUnrequired;
-                    if (elem.attr('this-load-css') && !elem.hasAttr('this-with-css')) {
+                    if (elem.this('load-css') && !elem.hasAttr('this-with-css')) {
                         // load comma-separated css files
-                        this.__.forEach(elem.attr('this-load-css').split(','),
+                        this.__.forEach(elem.this('load-css').split(','),
                                 function (i, css) {
                                     internal.loadAsset.call(_this, 'css', css, elem);
                                 });
-                        elem.attr('this-with-css', '').removeAttr('this-load-css');
+                        elem.this('with-css', '').removeThis('load-css');
                     }
 
                     // mark all scripts as old by removing attribute `this-loaded`
                     if (!Object.keys(this.removedAssets).length)
-                        this._('script[this-app="' + this.container.attr('this-id') + '"]')
-                                .removeAttr('this-loaded');
-                    if (elem.attr('this-load-js-first') && !loadedPageJS.first[this.page.attr('this-id')])
+                        this._('script[this-app="' + this.container.this('id') + '"]')
+                                .removeThis('loaded');
+                    if (elem.this('load-js-first') && !loadedPageJS.first[this.page.this('id')])
                     {
                         leaveUnrequired = true;
-                        var jses = elem.attr('this-load-js-first').split(','),
+                        var jses = elem.this('load-js-first').split(','),
                                 removedAssets = this.removedAssets[elemType];
                         // load comma-separated css files
                         this.__.forEach(jses, function (i, js) {
@@ -2263,7 +2349,7 @@
                                     // remove elem-type css and js files that don't belong to
                                     // the elem type
                                     if (!removedAssets)
-                                        _this._('script[this-app="' + _this.container.attr('this-id')
+                                        _this._('script[this-app="' + _this.container.this('id')
                                                 + '"][this-for="' + elemType + '"]:not([this-loaded])')
                                                 .remove();
                                     // call callback function
@@ -2271,11 +2357,11 @@
                                 }
                             });
                         });
-                        loadedPageJS.first[this.page.attr('this-id')] = true;
+                        loadedPageJS.first[this.page.this('id')] = true;
                     }
                     // remove elem-type js files that don't belong to the elem type
                     if (!leaveUnrequired && !this.removedAssets[elemType])
-                        this._('script[this-app="' + this.container.attr('this-id')
+                        this._('script[this-app="' + this.container.this('id')
                                 + '"][this-for="' + elemType + '"]:not([this-loaded])')
                                 .remove();
                     // indicate that unrequired assets have been removed to avoid removal of currently
@@ -2295,59 +2381,58 @@
                  * @returns {void}
                  */
                 loadCollection: function (__this, callback, data, replaceState) {
-                    __this = this._(__this).attr('this-loading', '');
-                    // collection must have id or model
-                    if (!__this.attr('this-id') && !__this.attr('this-model')) {
-                        __this.removeAttr('this-loading');
+                    __this = this._(__this).this('loading', '');
+                    // collection must have id
+                    if (!__this.this('id')) {
+                        __this.removeThis('loading');
                         this.__.callback(callback).call(this);
                         return;
                     }
-                    if (!__this.attr('this-model'))
-                        __this.attr('this-model', __this.attr('this-id'));
+                    if (!__this.this('model'))
+                        __this.this('model', __this.this('id'));
                     // ensure collection content is grouped together
                     if (!__this.hasAttr('this-loaded') && __this.children().length > 1) {
                         __this.innerWrap('<div/>');
                     }
                     // get collection content
-                    var content = this.getTemplate('collection[this-id="'
-                            + __this.attr('this-id') +
-                            '"],[this-type="collection"][this-id="'
-                            + __this.attr('this-id') + '"]')
+                    var content = this.getCached('[this-id="'
+                            + __this.this('id') +
+                            '"]', 'collection')
                             .children()
-                            .clone().removeAttr('this-cache').outerHtml(),
+                            .clone().removeThis('cache').outerHtml(),
                             _this = this,
-                            model_name = __this.attr('this-model'),
+                            model_name = __this.this('model'),
                             model_to_bind = this.container.find('model[this-id="' + model_name
                                     + '"],[this-type="model"][this-id="' + model_name
                                     + '"]');
                     __this = internal.doTar.call(this, __this, true);
                     if (!__this.hasAttr('this-paginate') ||
-                            !__this.children(':first-child').attr('this-mid')) {
+                            !__this.children(':first-child').this('mid')) {
                         __this.html('');
                     }
                     if (model_name && model_to_bind.length)
-                        model_to_bind.attr('this-bind', true);
+                        model_to_bind.this('bind', true);
                     var requestData = {}, save = true, success, error;
-                    if (_this.page.attr('this-query')) {
-                        requestData['query'] = _this.page.attr('this-query');
+                    if (_this.page.this('query')) {
+                        requestData['query'] = _this.page.this('query');
                         /* don't save search response requestData */
                         save = false;
                     }
-                    if (__this.attr('this-search'))
-                        requestData['keys'] = __this.attr('this-search');
+                    if (__this.this('search'))
+                        requestData['keys'] = __this.this('search');
                     // paginate collection
                     if (__this.hasAttr('this-paginate')) {
                         // update pagination
-                        if (!__this.attr('this-pagination-page')) {
-                            __this.attr('this-pagination-page', 0);
+                        if (!__this.this('pagination-page')) {
+                            __this.this('pagination-page', 0);
                         }
                         // add request data with pagination info
-                        if (__this.attr('this-pagination-page') !== undefined) {
-                            requestData['page'] = parseInt(__this.attr('this-pagination-page')) + 1;
-                            __this.attr('this-pagination-page', requestData['page']);
+                        if (__this.this('pagination-page') !== undefined) {
+                            requestData['page'] = parseInt(__this.this('pagination-page')) + 1;
+                            __this.this('pagination-page', requestData['page']);
                             // add limit
-                            if (__this.attr('this-paginate')) {
-                                requestData['limit'] = __this.attr('this-paginate');
+                            if (__this.this('paginate')) {
+                                requestData['limit'] = __this.this('paginate');
                             }
                             else if (this.config.pagination && this.config.pagination.limit) {
                                 requestData['limit'] = this.config.pagination.limit;
@@ -2357,7 +2442,7 @@
                     // callbacks for request
                     success = function (data, uid, handled) {
                         if (uid)
-                            __this.attr('this-model-uid', uid);
+                            __this.this('model-uid', uid);
                         if (handled) {
                             _this.__.callable(callback).call(_this, data);
                             return;
@@ -2365,19 +2450,20 @@
                         internal.loadData
                                 .call(_this, __this, data, content, false, save,
                                         function (elem) {
-                                            if (elem)
-                                                elem.attr('this-loaded', '')
-                                                        .removeAttr('this-loading')
+                                            if (elem) {
+                                                elem.this('loaded', '')
+                                                        .removeThis('loading')
                                                         .trigger('collection.loaded');
+                                            }
                                             this.__.callable(callback).call(this, data);
                                         }.bind(_this));
                     },
                             error = function () {
                                 // revert pagination page to former page count
-                                if (__this.attr('this-pagination-page') !== undefined) {
-                                    __this.attr('this-pagination-page', parseInt(__this.attr('this-pagination-page')) - 1);
+                                if (__this.this('pagination-page') !== undefined) {
+                                    __this.this('pagination-page', parseInt(__this.this('pagination-page')) - 1);
                                 }
-                                __this.removeAttr('this-loading');
+                                __this.removeThis('loading');
                                 _this.__.callable(callback).call(_this);
                             };
                     internal.loadOrRequestData.call(this, {
@@ -2427,16 +2513,14 @@
                     var _this = this;
                     // component does not exist
                     if (!component || !this._(component).length) {
-                        if (__this.attr('this-url')) {
+                        if (__this.this('url')) {
                             var cached = this
-                                    .getTemplate('component[this-url="' + __this.attr('this-url') + '"],'
-                                            + '[this-type="component"][this-url="'
-                                            + __this.attr('this-url') + '"]');
+                                    .getCached('[this-url="' + __this.this('url') + '"]', 'component');
                             if (cached.length)
                                 internal.loadComponent.call(this, __this, callback, cached.children().clone().show());
                             else {
                                 internal.fullyFromURL
-                                        .call(_this, 'component', __this.attr('this-url'),
+                                        .call(_this, 'component', __this.this('url'),
                                                 function (data) {
                                                     internal.loadComponent
                                                             .call(_this, __this, callback, _this._(data)
@@ -2448,11 +2532,8 @@
                             }
                         }
                         else {
-                            component = this.getTemplate('component[this-id="'
-                                    + __this.attr('this-component') + '"],'
-                                    + '[this-type="component"][this-id="'
-                                    + __this.attr('this-component')
-                                    + '"]');
+                            component = this.getCached('[this-id="'
+                                    + __this.this('component') + '"]', 'component');
                             if (!component.length) {
                                 this.__.callable(callback).call(this);
                             }
@@ -2462,8 +2543,8 @@
                         return internal;
                     }
                     component = this._(component).clone();
-                    if (component.is('component') || component.attr('this-type') === 'component')
-                        component.removeAttr('this-url');
+                    if (component.is('component') || component.this('type') === 'component')
+                        component.removeThis('url');
 
                     // load component
                     __this.replaceWith(component.show()).trigger('component.loaded');
@@ -2507,9 +2588,9 @@
                         if (container.hasAttr('this-paginate')) {
                             // next button
                             var selector = '[this-paginate-next="'
-                                    + container.attr('this-id')
+                                    + container.this('id')
                                     + '"],[this-paginate-previous="'
-                                    + container.attr('this-id') + '"]',
+                                    + container.this('id') + '"]',
                                     selector2 = '[this-paginate-next=""],[this-paginate-previous=""]';
                             setTimeout(function () {
                                 // hide pagination button selector 
@@ -2518,7 +2599,7 @@
                                 container.siblings(selector2).hide();
                             }.bind(this));
                             // reset page index to previous
-                            container.attr('this-pagination-page', parseInt(container.attr('this-pagination-page')) - 1);
+                            container.this('pagination-page', parseInt(container.this('pagination-page')) - 1);
                         }
                     }.bind(this);
                     // trigger invalid.response trigger if no data
@@ -2551,18 +2632,17 @@
                         this.__.callable(callback).call(this);
                         return;
                     }
-                    var save_as = container.attr('this-model')
-                            || container.attr('this-id'),
+                    var save_as = container.this('model')
+                            || container.this('id'),
                             _callback = function () {
-                                container.removeAttr('this-filter').show();
+                                container.removeThis('filter').show();
                                 if (container.hasAttr('this-static')) {
-                                    var id = container.attr('this-id'),
+                                    var id = container.this('id'),
                                             type = getElemType(container);
                                     // replace template with the loaded element
-                                    this.getTemplate(type + '[this-id="' + id
+                                    this.replaceCached(type + '[this-id="' + id
                                             + '"],[this-type="' + type + '"][this-id="'
-                                            + id + '"]', true)
-                                            .replaceWith(container.attr('this-loaded', '').clone());
+                                            + id + '"]', container.this('loaded', ''));
                                 }
                                 this.__.callable(callback).apply(this, Array.from(arguments));
                             }.bind(this);
@@ -2570,7 +2650,7 @@
                     if (this.__.isArray(data) || isModel === false) {
                         // check if can continue with rendering
                         var __data = internal.canContinue
-                                .call(this, 'collection.render', [data, container]);
+                                .call(this, 'collection.render', [data], container.get(0));
                         // rendering canceled
                         if (!__data) {
                             return this;
@@ -2580,48 +2660,34 @@
                             data = __data;
                         var _this = this,
                                 // filter for the collection
-                                filter = container.attr('this-filter'),
-                                // for processing table and its descendants' templates
-                                level = 0,
-                                // the template element
-                                child = this._(content).get(0),
+                                filter = container.this('filter'),
                                 // unique id key for models
-                                uid = container.attr('this-model-uid'),
+                                uid = container.this('model-uid'),
                                 // the url of the collection/model
-                                url = container.attr('this-url');
-                        if (child) {
-                            // process content properly
-                            switch (child.tagName.toLowerCase()) {
-                                case "td":
-                                    level = 3;
-                                    content = _this._('<table />').html(content).outerHtml();
-                                    break;
-                                case "tr":
-                                    level = 2;
-                                    content = _this._('<table />').html(content).outerHtml();
-                                    break;
-                            }
-                        }
+                                url = container.this('url'),
+                                tab_cont = internal.checkTableContent.call(this, content),
+                                level = tab_cont.level,
+                                content = tab_cont.container.outerHtml();
                         this.collectionData = Object.keys(this.cacheTargets || data).length;
                         var done = function () {
                             // was paginating
                             if (container.hasAttr('this-paginate')) {
                                 // next button
                                 var selector = '[this-paginate-next="'
-                                        + container.attr('this-id')
+                                        + container.this('id')
                                         + '"]',
                                         selector2 = '[this-paginate-next=""]';
                                 // overwrite is on
                                 if ((container.hasAttr('this-paginate-overwrite')
-                                        && container.attr('this-paginate-overwrite') === 'true')
+                                        && container.this('paginate-overwrite') === 'true')
                                         || (!container.hasAttr('this-paginate-overwrite')
                                                 && this.config.pagination
                                                 && this.config.pagination.overwrite)
                                         // and current page is the first
-                                        && container.attr('this-pagination-page') === 1) {
+                                        && container.this('pagination-page') === 1) {
                                     // hide previous button too
                                     selector += ',[this-paginate-previous="'
-                                            + container.attr('this-id') + '"]';
+                                            + container.this('id') + '"]';
                                     selector2 += ',[this-paginate-previous=""]';
                                 }
                                 // hide pagination button selector 
@@ -2630,7 +2696,7 @@
                                 container.siblings(selector2).hide();
 
                                 // reset page index to previous
-                                container.attr('this-pagination-page', parseInt(container.attr('this-pagination-page')) - 1);
+                                container.this('pagination-page', parseInt(container.this('pagination-page')) - 1);
                             }
                         }.bind(this);
                         // data is not empty
@@ -2638,7 +2704,7 @@
                             // inline overwrite command exist
                             if (container.hasAttr('this-paginate-overwrite')) {
                                 // empty collection element if true
-                                if (container.attr('this-paginate-overwrite') === 'true') {
+                                if (container.this('paginate-overwrite') === 'true') {
                                     container.html('');
                                 }
                             }
@@ -2647,7 +2713,13 @@
                                 container.html('');
                             }
                             // the indices of the all models in collection
-                            var indices = [];
+                            var indices = [],
+                                    doneLoading = function () {
+                                        if (!--this.collectionData) {
+                                            delete this.collectionData;
+                                            this.__.callable(_callback).call(this, container);
+                                        }
+                                    }.bind(this);
                             // needed for subsequent pagination attempts
                             this.__.forEach(this.cacheTargets || data, function (_index, _model) {
                                 var index, model;
@@ -2659,6 +2731,9 @@
                                     model = _model;
                                     index = internal.getUIDValue.call(_this, _model);
                                 }
+                                var _tmpl = _this._(content),
+                                        __data = internal.canContinue
+                                        .call(_this, 'collection.model.render', [model, container.get(0)], _tmpl.get(0));
                                 // remove model if already exists in collection element
                                 container.children('[this-mid="' + index + '"]').remove();
                                 // get id from model with uid
@@ -2670,19 +2745,25 @@
                                     // set model into data to save. use id if available,
                                     // or else index
                                     if (container.hasAttr('this-paginate')) {
-                                        _data.data[id || index] = _this.__.extend(model, {__page: container.attr('this-pagination-page')});
+                                        _data.data[id || index] = _this.__.extend(model, {__page: container.this('pagination-page')});
                                     }
                                     else {
                                         _data.data[id || index] = model;
                                     }
-
                                 }
+
+                                if (!__data) {
+                                    doneLoading();
+                                    return;
+                                }
+                                else if (_this.__.isObject(__data))
+                                    model = __data;
                                 // process content as being in a loop
                                 var _content = internal.inLoop.call(_this, {
                                     index: index,
                                     model: model
                                 }, filter,
-                                        content.replace(/{{_index}}/g, index));
+                                        _tmpl.outerHtml().replace(/{{_index}}/g, index));
                                 // if there's no content, go to the next model
                                 if (!_content) {
                                     _this.__.callable(callback).call(_this);
@@ -2711,38 +2792,33 @@
                                 }
                                 // continue loading
                                 internal.doLoad.call(_this, container, model, _content,
-                                        false, level, function () {
-                                            if (!--this.collectionData) {
-                                                delete this.collectionData;
-                                                this.__.callable(_callback).call(this, container);
-                                            }
-                                        }.bind(_this));
+                                        false, level, doneLoading);
                             });
                             delete this.cacheTargets;
 
-                            var pageIndex = container.attr('this-pagination-page');
+                            var pageIndex = container.this('pagination-page');
                             if (pageIndex !== undefined) {
                                 // first page loaded
                                 if (pageIndex == 1) {
                                     // hide previous button
                                     this.container.find('[this-paginate-previous="'
-                                            + container.attr('this-id') + '"]').hide();
+                                            + container.this('id') + '"]').hide();
                                     container.siblings('[this-paginate-previous=""]').hide();
                                 }
                                 // overwrite is one
                                 else if ((container.hasAttr('this-paginate-overwrite')
-                                        && container.attr('this-paginate-overwrite') === 'true')
+                                        && container.this('paginate-overwrite') === 'true')
                                         || (!container.hasAttr('this-paginate-overwrite')
                                                 && this.config.pagination
                                                 && this.config.pagination.overwrite)) {
                                     // show previous button
                                     this.container.find('[this-paginate-previous="'
-                                            + container.attr('this-id') + '"]').show();
+                                            + container.this('id') + '"]').show();
                                     container.siblings('[this-paginate-previous=""]').show();
                                 }
                                 // show next button
                                 this.container.find('[this-paginate-next="'
-                                        + container.attr('this-id') + '"]').show();
+                                        + container.this('id') + '"]').show();
                                 container.siblings('[this-paginate-next=""]').show();
                             }
                             // if saving data is allowed
@@ -2759,8 +2835,8 @@
                             }
                             // mark pagination done if length of last result is not
                             // equal to the expected limit
-                            if ((container.attr('this-paginate') && indices.length != container.attr('this-paginate'))
-                                    || (!container.attr('this-paginate') && this.config.pagination
+                            if ((container.this('paginate') && indices.length != container.this('paginate'))
+                                    || (!container.this('paginate') && this.config.pagination
                                             && this.config.pagination.limit && indices.length != this.config.pagination.limit)) {
                                 done();
                             }
@@ -2774,9 +2850,9 @@
                         }
                         if (container.hasAttr('this-paginate')) {
                             this.container.find('[this-paginate-next="'
-                                    + container.attr('this-id')
+                                    + container.this('id')
                                     + '"],[this-paginate-previous="'
-                                    + container.attr('this-id') + '"]')
+                                    + container.this('id') + '"]')
                                     .removeAttr('disabled');
                             container.siblings('[this-paginate-next=""],[this-paginate-previous=""]')
                                     .removeAttr('disabled');
@@ -2786,7 +2862,7 @@
                     else if (data && isModel) {
                         // check if can continue rendering
                         var __data = internal.canContinue
-                                .call(this, 'model.render', [data, container]);
+                                .call(this, 'model.render', [data], container.get(0));
                         // rendering canceled
                         if (!__data) {
                             return this;
@@ -2797,24 +2873,24 @@
                         // saving is allowed
                         if (save !== false) {
                             var id = internal.getUIDValue
-                                    .call(this, data, container.attr('this-uid'));
+                                    .call(this, data, container.this('uid'));
                             // store data under its uid
                             _data.data[id] = data;
                             // get url without the model id
                             // split into array by /
-                            var _url = container.attr('this-url').split('/');
+                            var _url = container.this('url').split('/');
                             // remove the last value
                             this.__.removeArrayIndex(_url, _url.length - 1);
                             // save the url
                             _data.url = _url.join('/') + '/';
                         }
                         // add url to model data for parsing
-                        data['_url'] = container.attr('this-url');
+                        data['_url'] = container.this('url');
                         // continue loading
                         internal.doLoad.call(this, container, data, content, true, null, _callback);
                     }
                     // remove filter attribute and show
-                    container.removeAttr('this-filter');
+                    container.removeThis('filter');
                     if (save !== false)
                         internal.cache.call(this, 'model', save_as, _data, true);
                     return this;
@@ -2830,12 +2906,13 @@
                         var _this = this;
                         this.__.forEach(elements, function () {
                             var __this = _this._(this),
-                                    key = __this.attr('this-is');
+                                    key = __this.this('is');
                             if (!key)
                                 return;
                             var data = internal.getVariableValue.call(_this, key, model);
                             if (!data)
                                 return;
+                            __this.removeThis('is');
                             if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox')
                             {
                                 // using attribute so that redumping content 
@@ -2857,13 +2934,13 @@
                             }
                             else if (__this.hasAttr('this-autocomplete')) {
                                 var _dropDownList = _this.container
-                                        .find('list[this-id="' + __this.attr('this-list')
+                                        .find('list[this-id="' + __this.this('list')
                                                 + '"],[this-type="list"][this-id="'
-                                                + __this.attr('this-list') + '"]'),
+                                                + __this.this('list') + '"]'),
                                         selectedListSelector = 'list[this-id="'
-                                        + _dropDownList.attr('this-selection-list')
+                                        + _dropDownList.this('selection-list')
                                         + '"],[this-type="list"][this-id="'
-                                        + _dropDownList.attr('this-selection-list') + '"]',
+                                        + _dropDownList.this('selection-list') + '"]',
                                         _selectedList = _this.container
                                         .find(selectedListSelector);
                                 var gotData = function (data) {
@@ -2900,18 +2977,19 @@
                                             emptyList: true
                                         });
                                     }
-                                    _dropDownList.attr('this-selected', ids.join(',') + ',');
+                                    _dropDownList.this('selected', ids.join(',') + ',');
                                 }.bind(_this);
                                 // refill list from provided function
-                                if (_selectedList.attr('this-refill')) {
-                                    return gotData(eval(_selectedList.attr('this-refill')));
+                                if (_selectedList.this('refill')) {
+                                    return gotData(_this.__.callable(_selectedList.this('refill'))
+                                            .call(this, data));
                                 }
                                 // refill list from
-                                else if (_selectedList.attr('this-refill-url')) {
+                                else if (_selectedList.this('refill-url')) {
                                     return _this.request({
                                         dataType: 'json',
                                         type: 'POST',
-                                        url: _selectedList.attr('this-refill-url'),
+                                        url: _selectedList.this('refill-url'),
                                         data: {ids: data},
                                         success: function (data) {
                                             gotData(getRealData.call(_this, data));
@@ -2932,7 +3010,7 @@
                 /**
                  * Loads all forms
                  * @param {_} forms Required if to load specific forms
-                 * @param object model May be supplied if loading specific forms
+                 * @param {Object} model Data to load into the forms
                  * @returns {ThisApp}
                  */
                 loadForms: function (forms, model, replaceState, chain) {
@@ -2946,26 +3024,26 @@
                         var __this = _this._(this);
                         if (__this.is('form')) {
                             // pass form action type from page to form if not exist on form                 
-                            if (!__this.hasAttr('this-do') && _this.page.attr('this-do'))
-                                __this.attr('this-do', _this.page.attr('this-do'));
+                            if (!__this.hasAttr('this-do') && _this.page.this('do'))
+                                __this.this('do', _this.page.this('do'));
                             // is search form. no need loading except for search field
-                            if ((__this.attr('this-do') === 'search' ||
-                                    _this.page.attr('this-do') === 'search') &&
-                                    _this.page.attr('this-query')) {
-                                __this.find('[this-search]').attr('value', _this.page.attr('this-query'));
+                            if ((__this.this('do') === 'search' ||
+                                    _this.page.this('do') === 'search') &&
+                                    _this.page.this('query')) {
+                                __this.find('[this-search]').attr('value', _this.page.this('query'));
                                 return;
                             }
                             // parse tar
                             internal.doTar.call(_this, __this, true);
                         }
-                        var mid = __this.attr('this-mid') || _this.page.attr('this-mid'),
-                                model_name = __this.attr('this-model') || _this.page.attr('this-model');
+                        var mid = __this.this('mid') || _this.page.this('mid'),
+                                model_name = __this.this('model') || _this.page.this('model');
                         if (!mid)
                             return;
                         if (!model)
                             model = internal.modelFromStore.call(_this, mid, model_name);
                         internal.loadFormElements.call(_this, __this.find('[this-is]'), model);
-                        __this.attr('this-loaded', '').trigger('form.loaded');
+                        __this.this('loaded', '').trigger('form.loaded');
                     });
                     if (chain)
                         internal.pageLoaded.call(this, replaceState);
@@ -2978,8 +3056,8 @@
                  */
                 loadLayouts: function (replaceInState) {
                     var _layout = _(), _this = this;
-                    if (this.config.layout || this.page.attr('this-layout')) {
-                        var layout = this.page.attr('this-layout') || this.config.layout;
+                    if (this.config.layout || this.page.this('layout')) {
+                        var layout = this.page.this('layout') || this.config.layout;
                         // get existing layout in container if not asked to reload layouts
                         _layout = this.reloadLayouts ? _layout :
                                 this.container.find('layout[this-id="' + layout
@@ -2988,17 +3066,15 @@
                         // layout does not exist in container
                         if (!_layout.length) {
                             // get layout template
-                            _layout = this.getTemplate('layout[this-id="'
-                                    + layout + '"],'
-                                    + '[this-type="layout"][this-id="'
-                                    + layout + '"]').attr('this-loaded', '');
+                            _layout = this.getCached('[this-id="' + layout + '"]', 'layout')
+                                    .this('loaded', '');
                             // layout doesn't exist
                             if (!_layout.length) {
                                 internal.fullyFromURL.call(this, 'layout', layout,
                                         function (_layout) {
-                                            _layout.removeAttr('this-url')
+                                            _layout.removeThis('url')
                                                     .find('[this-content]').html(_this.page);
-                                            if (_layout.attr('this-extends'))
+                                            if (_layout.this('extends'))
                                                 internal.extendLayout
                                                         .call(_this, _layout, replaceInState);
                                             else {
@@ -3014,15 +3090,15 @@
                                         });
                             }
                             else {
-                                if (_layout.attr('this-url')) {
+                                if (_layout.this('url')) {
                                     this.request({
-                                        url: _layout.attr('this-url'),
+                                        url: _layout.this('url'),
                                         success: function (data) {
-                                            _layout.removeAttr('this-url')
+                                            _layout.removeThis('url')
                                                     .html(data)
                                                     .find('[this-content]')
                                                     .html(_this.page);
-                                            if (_layout.attr('this-extends'))
+                                            if (_layout.this('extends'))
                                                 internal.extendLayout.call(_this, _layout,
                                                         replaceInState);
                                             else {
@@ -3040,7 +3116,7 @@
                                 }
                                 else {
                                     _layout.find('[this-content]').html(_this.page);
-                                    if (_layout.attr('this-extends'))
+                                    if (_layout.this('extends'))
                                         internal.extendLayout.call(this, _layout, replaceInState);
                                     else {
                                         internal.finalizePageLoad.call(this, _layout, replaceInState);
@@ -3073,26 +3149,24 @@
                             _this = this,
                             type = getElemType(__this),
                             common_selector = '';
-                    __this.attr('this-loading', '')
+                    __this.this('loading', '')
                             .find('collection,[this-type="collection"]')
-                            .attr('this-loading', '');
-                    if (__this.attr('this-id'))
-                        common_selector += '[this-id="' + __this.attr('this-id') + '"]';
-                    else if (__this.attr('this-model'))
-                        common_selector += '[this-model="' + __this.attr('this-model') + '"]';
+                            .this('loading', '');
+                    if (__this.this('id'))
+                        common_selector += '[this-id="' + __this.this('id') + '"]';
+                    else if (__this.this('model'))
+                        common_selector += '[this-model="' + __this.this('model') + '"]';
                     __this = internal.doTar.call(this, __this, true);
-                    if (!data && !__this.attr('this-url')) {
+                    if (!data && !__this.this('url')) {
                         this.__.callable(callback).call(this);
                         return;
                     }
 
                     if (type !== 'page') {
                         // necessary in case of binding and target has already been used
-                        content = __this.html(this.getTemplate(type + common_selector
-                                + ',[this-type="' + type + '"]' + common_selector)
+                        content = __this.html(this.getCached(common_selector, type)
                                 .hide().html()).outerHtml();
                     }
-
                     this.notWiths = internal.hideNotWiths.call(this, __this);
                     if (Object.keys(this.notWiths).length) {
                         content = __this.outerHtml();
@@ -3106,16 +3180,17 @@
                                 // only save the data if not loading page
                                 type !== 'page',
                                 function (elem) {
-                                    if (elem)
-                                        elem.attr('this-loaded', '')
-                                                .removeAttr('this-loading')
+                                    if (elem) {
+                                        elem.this('loaded', '')
+                                                .removeThis('loading')
                                                 .trigger('model.loaded')
                                                 .show();
+                                    }
                                     this.__.callable(callback).call(this, data);
                                 }.bind(_this));
                     },
                             error = function () {
-                                __this.removeAttr('this-loading');
+                                __this.removeThis('loading');
                                 _this.__.callable(callback).call(_this);
                             };
                     internal.loadOrRequestData.call(this, {
@@ -3160,9 +3235,9 @@
                     var _this = this,
                             isCollection = internal.is.call(this, 'collection', config.elem),
                             type = isCollection ? 'collection' : 'model',
-                            ignore = _this.page.attr('this-ignore-cache') || '',
+                            ignore = _this.page.this('ignore-cache') || '',
                             cached = internal.cache.call(_this, 'model',
-                                    config.elem.attr('this-model') || config.elem.attr('this-id')),
+                                    config.elem.this('model') || config.elem.this('id')),
                             cache = cached && cached.length ? cached.data : null,
                             cache_uid = cached && cached.uid ? cached.uid : null,
                             cache_expired = cached && ((cached.expires && cached.expires < Date.now())
@@ -3170,7 +3245,7 @@
                             fromCache = false;
                     // get model cache
                     if (!isCollection && cache)
-                        cache = cache[config.elem.attr('this-mid')];
+                        cache = cache[config.elem.this('mid')];
 
                     // check pagination page data exists in cached data for collection
                     if (isCollection && config.elem.hasAttr('this-paginate') &&
@@ -3178,12 +3253,12 @@
                             cached) {
                         if ((!cached.pagination
                                 // or paginaion exists but the page meta doesn't exist yet
-                                || cached.pagination[config.elem.attr('this-pagination-page')] === undefined
+                                || cached.pagination[config.elem.this('pagination-page')] === undefined
                                 // or paginaion exists and page meta exists but limit has changed
-                                || cached.pagination[config.elem.attr('this-pagination-page')].length !== config.requestData.limit))
+                                || cached.pagination[config.elem.this('pagination-page')].length !== config.requestData.limit))
                             cache = null;
                         else
-                            this.cacheTargets = cached.pagination[config.elem.attr('this-pagination-page')];
+                            this.cacheTargets = cached.pagination[config.elem.this('pagination-page')];
                     }
 
                     var success = function () {
@@ -3194,21 +3269,21 @@
                     }.bind(this);
 
                     // if no data is provided and collection has url 
-                    if (!config.data && config.elem.attr('this-url')
+                    if (!config.data && config.elem.this('url')
                             // and no cache or cache exists but is expired
                             && (!cache || (cache && cache_expired))
                             && !_this.__.contains(ignore, type + '#'
-                                    + config.elem.attr('this-id'))
+                                    + config.elem.this('id'))
                             // and transport exists and is online
                             && this.dataTransport && this.transporterOnline) {
                         if (!config.elem.hasAttr('this-no-updates') && this.watchCallback)
                             internal.watch.call(this, config.elem);
-                        config.elem.removeAttr('this-no-updates');
+                        config.elem.removeThis('no-updates');
                         this.__.callable(this.dataTransport)
                                 .call(this, {
                                     action: 'read',
-                                    id: config.elem.attr('this-mid'),
-                                    url: config.elem.attr('this-url'),
+                                    id: config.elem.this('mid'),
+                                    url: config.elem.this('url'),
                                     isCollection: isCollection,
                                     data: config.requestData,
                                     success: success,
@@ -3253,18 +3328,16 @@
                                                 elem.trigger(type + '.cache.loaded');
                                             }
                                             // mark as loaded and trigger event
-                                            elem.removeAttr('this-loading').attr('this-loaded', '');
+                                            elem.removeThis('loading').this('loaded', '');
                                         }
-                                        setTimeout(function () {
-                                            config.success.call(this, config.data, null, true);
-                                        }.bind(this));
+                                        this.__.callable(success).call(this, config.data, null, true);
                                     }.bind(this));
                         }
                         // use default request method
-                        else if (config.elem.attr('this-url')) {
+                        else if (config.elem.this('url')) {
                             _this.request({
                                 type: _this.config.crud.methods.read,
-                                url: config.elem.attr('this-url'),
+                                url: config.elem.this('url'),
                                 success: success,
                                 error: config.error,
                                 data: config.requestData
@@ -3316,7 +3389,7 @@
                                 break;
                         }
                     }
-                    content = '<div>' + this._(content).removeAttr('this-cache').show().outerHtml() + '</div>';
+                    content = '<div>' + this._(content).removeThis('cache').show().outerHtml() + '</div>';
                     this.__.forEach(data, function (key, value) {
                         var __data = {
                             key: key,
@@ -3342,16 +3415,16 @@
                                 _content.find('[this-each="value.' + i + '"]')
                                         .each(function () {
                                             var __this = _this._(this),
-                                                    __content = __this.removeAttr('this-muted')
+                                                    __content = __this.removeThis('muted')
                                                     .html()
                                                     .replace(/__obrace__/g, '{{')
                                                     .replace(/__cbrace__/g, '}}')
                                                     .replace(/__obrace2__/g, '({')
                                                     .replace(/__cbrace2__/g, '})'),
-                                                    __filter = __this.attr('this-filter');
+                                                    __filter = __this.this('filter');
                                             __this.html('');
                                             internal.loop.call(_this, v, this, __filter, __content);
-                                            __this.removeAttr('this-each').removeAttr('this-filter');
+                                            __this.removeThis('each').removeThis('filter');
                                         });
                             });
                         }
@@ -3411,7 +3484,7 @@
                         pageId: page
                     });
                     if (this.__.isString(this.notFound)) {
-                        page = this.getTemplate(internal.selector.call(this, this.notFound
+                        page = this.getCached(internal.selector.call(this, this.notFound
                                 .startsWith('page#') ? this.notFound : 'page#' + this.notFound));
                         if (!page.length) {
                             return this.error('Page [' + this.notFound + '] also not found');
@@ -3432,17 +3505,15 @@
                 pageFound: function (page, replaceInState) {
                     if (internal.is.call(this, 'page', page)) {
                         if (!internal.canContinue
-                                .call(this, 'page.load', [page.items[0]])) {
+                                .call(this, 'page.load', [], page.get(0))) {
                             return this;
                         }
                         if (this.page) {
-                            this.oldPage = this.page.attr('this-dead', '')
+                            this.oldPage = this.page.this('dead', '')
                                     .trigger('page.leave');
-                            if (this.oldPage.attr('this-id') === page.attr('this-id'))
+                            if (this.oldPage.this('id') === page.this('id'))
                                 replaceInState = true;
                         }
-                        if (this.store('last_page') === page.attr('this-id'))
-                            replaceInState = true;
                         this.page = page.clone().show();
                         this.params = this._params;
                         delete this._params;
@@ -3450,7 +3521,7 @@
                     }
                     else {
                         delete this._params;
-                        this.error('Load page failed: ' + page.attr('this-id'));
+                        this.error('Load page failed: ' + page.this('id'));
                         page.trigger('page.load.failed');
                     }
                 },
@@ -3514,27 +3585,23 @@
                                         .replace(v, '&lt;' + v.substr(1, v.length - 2) + '&gt;');
                             });
                             content = content.replace(/\n/g, '<br/>').replace(/\s/g, '&nbsp;');
-                            __this.html(content).removeAttr('this-code');
+                            __this.html(content).removeThis('code');
                         });
-                        this.container
-                                .html(internal.processExpressions.call(this, this.container.html(),
-                                        null, true));
-                        this.page = this.container.find('page[this-id="' + this.page.attr('this-id')
-                                + '"]:not([this-dead]), [this-type="page"][this-id="'
-                                + this.page.attr('this-id') + '"]:not([this-dead])');
                         if (this.notWiths) {
                             internal.showNotWiths.call(this, this.page, this.notWiths);
                             delete this.notWiths;
                         }
                         this.page.find('[this-hidden]').hide();
+                        this.page.find('[this-type="template"]').remove();
                         internal.saveState.call(this, replaceState);
                     }
                     // page was restored from history
                     else {
-                        this.page.attr('this-restored', '');
+                        this.page.this('restored', '');
                         internal.updatePage.call(this, true);
                         this.restored = true;
                     }
+
                     if (this.firstPage) {
                         if (restored)
                             // watch collections and models on current page
@@ -3557,15 +3624,15 @@
                     this.store('watching', this.watching);
                     this.page.trigger('page.loaded');
                     // load required if not already loaded js
-                    if (this.page.attr('this-load-js')
-                            && !loadedPageJS.last[this.page.attr('this-id')]) {
-                        var jses = this.page.attr('this-load-js').split(','),
+                    if (this.page.this('load-js')
+                            && !loadedPageJS.last[this.page.this('id')]) {
+                        var jses = this.page.this('load-js').split(','),
                                 removedAssets = this.removedAssets;
                         // load comma-separated css files
                         this.__.forEach(jses, function (i, js) {
                             internal.loadAsset.call(_this, 'js', js, _this.page);
                         });
-                        loadedPageJS.last[this.page.attr('this-id')] = true;
+                        loadedPageJS.last[this.page.this('id')] = true;
                     }
                     this.pageIsLoaded = true;
                     return this;
@@ -3588,33 +3655,38 @@
                 /**
                  * Parse the given data into the given content based on the given variables
                  * @param array|object data
-                 * @param string|_ content
+                 * @param {_}|HTMLElement container
                  * @param string|int forCollection If parsing data for a collection model, this is the
                  * index (or id) of the model in the collection
                  * @param boolean isModel Indicates whether parsing data for a model or not
                  * @returns ThisApp
                  */
-                parseData: function (data, content, forCollection, isModel, callback)
+                parseData: function (data, container, forCollection, isModel, callback)
                 {
-                    var _temp, _this = this, custom = false;
-                    if (this.__.isString(content)) {
-                        _temp = this._('<div/>').html(content);
+                    var _this = this, custom = false, tab_cont, level;
+                    if (this.__.isString(container)) {
+                        container = this._('<div/>').html(container);
                         custom = true;
                     }
                     else {
-                        _temp = content;
+                        container = this._(container);
+                        // for processing table and its descendants' templates
+                        tab_cont = internal.checkTableContent.call(this, container);
+                        container = tab_cont.container;
+                        level = tab_cont.level;
                     }
-                    var _each = _temp.find('[this-each]');
+
+                    var _each = container.find('[this-each]');
                     while (_each.length) {
                         var __this = _each.next(),
-                                each = __this.attr('this-each').trim(),
+                                each = __this.this('each').trim(),
                                 _data = internal.getVariableValue.call(_this, each, data, false),
-                                filter = __this.attr('this-filter'),
-                                content = __this.removeAttr('this-muted')
+                                filter = __this.this('filter'),
+                                content = __this.removeThis('muted')
                                 .html()
                                 .replace(/__obrace__/g, '{{').replace(/__cbrace__/g, '}}')
                                 .replace(/__obrace2__/g, '({').replace(/__cbrace2__/g, '})');
-                        __this.removeAttr('this-filter').html('');
+                        __this.removeThis('filter').html('');
                         // this-each is not a model key
                         if (!_data) {
                             // do each on a variable value
@@ -3634,42 +3706,46 @@
                         if (_this.__.isObject(_data, true)) {
                             internal.loop.call(_this, _data, __this, filter, content);
                         }
-                        __this.removeAttr('this-each');
-                        _each = _temp.find('[this-each]');
+                        __this.removeThis('each');
+                        _each = container.find('[this-each]');
                     }
                     if (forCollection) {
                         content = internal.inLoop.call(this, {
                             index: forCollection,
                             model: data
-                        }, true, _temp.outerHtml());
+                        }, true, container.outerHtml());
                         content = internal.processExpressions.call(this, content, {
                             index: forCollection,
                             model: data
                         });
                     }
                     else {
-                        content = internal.inLoop.call(this, data, true, _temp.outerHtml());
+                        content = internal.inLoop.call(this, data, true, container.outerHtml());
                         content = internal.processExpressions.call(this, content, data);
                     }
                     var variables = internal.parseBrackets.call(this, '{{', '}}',
                             this.__.isString(content) ? content : content.outerHtml());
                     content = internal.fillVariables.call(this, variables, data, content);
-                    _temp.replaceWith(content);
+                    container.replaceWith(content);
                     var done = function () {
                         if (custom)
-                            _temp = _temp.children();
-                        _temp.find('[this-muted]').removeAttr('this-muted');
-                        this.__.callable(callback).call(this, _temp);
+                            container = container.children();
+                        container.find('[this-muted]').removeThis('muted');
+                        while (level) {
+                            container = container.children();
+                            level--;
+                        }
+                        this.__.callable(callback).call(this, container);
                     }.bind(this);
                     if (isModel) {
-                        var collections = _temp.find('collection:not([this-loaded]),'
+                        var collections = container.find('collection:not([this-loaded]),'
                                 + '[this-type="collection"]:not([this-loaded])');
                         if (collections.length) {
                             this.__proto__.modelCollections = collections.length;
                             collections.each(function () {
                                 var __this = _this._(this);
                                 data = internal.getVariableValue.call(_this,
-                                        __this.attr('this-data'), data, true);
+                                        __this.this('data'), data, true);
                                 internal.loadCollection.call(_this, __this, function () {
                                     if (!--this.__proto__.modelCollections) {
                                         delete this.__proto__.modelCollections;
@@ -3713,10 +3789,10 @@
                 record: function (key, value) {
                     // set a record
                     if (key && value !== undefined && this.container) {
-                        internal.records[this.container.attr('this-id')][key] = value;
+                        internal.records[this.container.this('id')][key] = value;
                         return this;
                     }
-                    var records = this.container ? internal.records[this.container.attr('this-id')] : null;
+                    var records = this.container ? internal.records[this.container.this('id')] : null;
                     return records && key ? records[key] : records;
                 },
                 /**
@@ -3752,8 +3828,8 @@
                                     + ',textarea,select,[this-resettable]')
                             .each(function () {
                                 var __this = _this._(this);
-                                if (__this.attr('this-resettable')) {
-                                    _this.__.forEach(__this.attr('this-resettable').split(';'), function (i, v) {
+                                if (__this.this('resettable')) {
+                                    _this.__.forEach(__this.this('resettable').split(';'), function (i, v) {
                                         var part = v.split(':');
                                         __this.attr(part[0], part[1]);
                                     });
@@ -3784,7 +3860,7 @@
                     this.container.html(state.content);
                     this.page = this.container.find('page[this-id="' + state.id
                             + '"],[this-type="page"][this-id="'
-                            + state.id + '"]').removeAttr('this-dead');
+                            + state.id + '"]').removeThis('dead');
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(state.title);
                     this.store('last_page', state.url);
@@ -3795,11 +3871,11 @@
                             });
                     delete this.pageModel;
                     // page is bound to a model
-                    if (this.page.attr('this-mid')) {
+                    if (this.page.this('mid')) {
                         // save page model for later use in the app
-                        this.collection(this.page.attr('this-model'), {
+                        this.collection(this.page.this('model'), {
                             success: function (collection) {
-                                collection.model(this.page.attr('this-mid'), {
+                                collection.model(this.page.this('mid'), {
                                     success: function (model) {
                                         this.pageModel = model;
                                     }.bind(this)
@@ -3820,15 +3896,15 @@
                     var action = 'pushState';
                     if (replace || this.firstPage)
                         action = 'replaceState';
-                    var url = '#/' + (this.page.attr('this-path') || this.page.attr('this-id'));
+                    var url = '#/' + this.page.this('id');
                     if (this.params.length)
                         url += '/#/' + this.params.join('/');
                     history[action]({
-                        id: this.page.attr('this-id'),
-                        title: this.page.attr('this-title'),
+                        id: this.page.this('id'),
+                        title: this.page.this('title'),
                         content: this.container.html(),
                         url: url
-                    }, this.page.attr('this-title'), url);
+                    }, this.page.this('title'), url);
                     this.store('last_page', url);
                     return this;
                 },
@@ -3898,15 +3974,15 @@
                                         _this.loadPage(last_page);
                                     }
                                     else if (_this.config.startWith) {
-                                        if (this.getTemplate('page[this-id="'
+                                        if (this.getCached('[this-id="'
                                                 + _this.config.startWith
-                                                + '"]').length)
+                                                + '"]', 'page').length)
                                             _this.loadPage(_this.config.startWith);
                                     }
                                     else {
                                         var startWith = _this._('[this-default-page]');
                                         if (startWith.length)
-                                            _this.loadPage(startWith.attr('this-id'));
+                                            _this.loadPage(startWith.this('id'));
                                     }
                                 }
                             };
@@ -3917,10 +3993,10 @@
                         // use the body tag if no container is set
                         if (!this.container.length)
                             this.container = this._('body');
-                        else if (!this.container.attr('this-id'))
-                            this.container.attr('this-id', __.randomString());
+                        else if (!this.container.this('id'))
+                            this.container.this('id', __.randomString());
                         // setup record for this app
-                        internal.records[this.container.attr('this-id')] = {
+                        internal.records[this.container.this('id')] = {
                             running: true,
                             secureAPI: this.secap || function () {},
                             uploader: this.setup || null
@@ -3933,14 +4009,14 @@
                         this.container.find('[this-loaded] [this-type], [this-loaded] page,'
                                 + '[this-loaded] layout, [this-loaded] component,'
                                 + '[this-loaded] model, [this-loaded] collection')
-                                .attr('this-loaded', '');
+                                .this('loaded', '');
                         // create templates container if not exists
                         if (!this._('[this-type="templates"][this-app="' +
-                                this.container.attr('this-id') + '"]').length)
+                                this.container.this('id') + '"]').length)
                             this._('body').append('<div this-type="templates" this-app="' +
-                                    this.container.attr('this-id') + '" style="display:none"/>');
+                                    this.container.this('id') + '" style="display:none"/>');
                         this.templates = this._('[this-type="templates"][this-app="' +
-                                this.container.attr('this-id') + '"]')
+                                this.container.this('id') + '"]')
                                 // put all unloaded element into appropriat template section
                                 .html(
                                         // hide all types not loaded (pages, models, collections, layouts,
@@ -3953,8 +4029,11 @@
                                                 + '[this-type="collection"]:not([this-loaded]),'
                                                 + '[this-type="layout"]:not([this-loaded]),'
                                                 + '[this-type="list"]:not([this-loaded]),'
-                                                + '[this-type="component"]:not([this-loaded])')
+                                                + '[this-type="component"]:not([this-loaded])'
+                                                + '[this-paginate-next],[this-paginate-previous]')
                                         .hide());
+                        // remove templates
+                        this.container.find('[this-type="template"]').remove();
                         internal.emptyFeatures.call(this, this.container);
                         if (this.config.titleContainer)
                             this.config.titleContainer = this._(this.config.titleContainer,
@@ -3977,15 +4056,15 @@
                                                 return;
                                             }
                                             // If reload has no value
-                                            else if (!__this.attr('this-reload')) {
+                                            else if (!__this.this('reload')) {
                                                 // reload the page and all resources
                                                 _this.reload(true);
                                                 return;
                                             }
                                             // reload value: collection| 
-                                            var reload = __this.attr('this-reload'),
+                                            var reload = __this.this('reload'),
                                                     // template to reload
-                                                    toReload = _this.getTemplate(internal.selector
+                                                    toReload = _this.getCached(internal.selector
                                                             .call(_this, reload)),
                                                     // target to reload
                                                     _reload = _this.container.find(internal.selector
@@ -3994,8 +4073,8 @@
                                                 _this.error('Reload target not found');
                                                 return;
                                             }
-                                            if (__this.attr('this-attributes'))
-                                                _this.__.forEach(__this.attr('this-attributes').split(';'),
+                                            if (__this.this('attributes'))
+                                                _this.__.forEach(__this.this('attributes').split(';'),
                                                         function (i, v) {
                                                             var attr = v.split(':'),
                                                                     name = _this.__.removeArrayIndex(attr, 0);
@@ -4032,15 +4111,15 @@
                                     var __this = _this._(this),
                                             _model = __this
                                             .closest('model,[this-type="model"],[this-model][this-binding]'),
-                                            model_id = __this.attr('this-model-id') ||
-                                            _model.attr('this-mid'),
-                                            model_name = __this.attr('this-model') ||
-                                            _model.attr('this-model') || _model.attr('this-id'),
-                                            url = __this.attr('this-read')
-                                            || _model.attr('this-url')
+                                            model_id = __this.this('model-id') ||
+                                            _model.this('mid'),
+                                            model_name = __this.this('model') ||
+                                            _model.this('model') || _model.this('id'),
+                                            url = __this.this('read')
+                                            || _model.this('url')
                                             || '#',
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto')),
+                                                    __this.this('goto')),
                                             // necessary in case goto is a url and not an id
                                             pageId = goto.replace(/\/\\/g, '-');
                                     // keep attributes for page
@@ -4050,7 +4129,7 @@
                                         model: model_name
                                     };
                                     _this.tar['page#' + pageId]['mid'] = model_id;
-                                    __this.attr('this-goto', goto + '/#/' + model_name + '/' + url);
+                                    __this.this('goto', goto + '/#/' + model_name + '/' + url);
                                 })
                                 /*
                                  * UPDATE event
@@ -4066,14 +4145,14 @@
                                 .on('click', '[this-goto][this-update]', function () {
                                     var __this = _this._(this),
                                             model = __this.closest('model,[this-type="model"]'),
-                                            model_id = __this.attr('this-model-id') ||
-                                            model.attr('this-mid'),
-                                            model_name = __this.attr('this-model')
-                                            || model.attr('this-id'),
-                                            url = __this.attr('this-update')
-                                            || model.attr('this-url') || '#',
+                                            model_id = __this.this('model-id') ||
+                                            model.this('mid'),
+                                            model_name = __this.this('model')
+                                            || model.this('id'),
+                                            url = __this.this('update')
+                                            || model.this('url') || '#',
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto')),
+                                                    __this.this('goto')),
                                             // necessary in case goto is a url and not an id
                                             pageId = goto.replace(/\/\\/g, '-');
                                     _this.tar['page#' + pageId] = {
@@ -4082,12 +4161,12 @@
                                         action: url,
                                         model: model_name
                                     };
-                                    if (__this.attr('this-model-uid'))
+                                    if (__this.this('model-uid'))
                                         _this.tar['page#' + pageId]['model-uid'] =
-                                                __this.attr('this-model-uid');
-                                    else if (model.attr('this-uid'))
+                                                __this.this('model-uid');
+                                    else if (model.this('uid'))
                                         _this.tar['page#' + pageId]['model-uid'] = model
-                                                .attr('this-uid');
+                                                .this('uid');
                                 })
                                 /*
                                  * CREATE event
@@ -4101,21 +4180,21 @@
                                  */
                                 .on('click', '[this-goto][this-create]', function () {
                                     var __this = _this._(this),
-                                            url = __this.attr('this-create') || '#';
+                                            url = __this.this('create') || '#';
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto')),
+                                            __this.this('goto')),
                                             // necessary in case goto is a url and not an id
                                             pageId = goto.replace(/\/\\/g, '-');
                                     _this.tar['page#' + pageId] = {
                                         "do": "create",
                                         action: url
                                     };
-                                    if (__this.attr('this-model'))
+                                    if (__this.this('model'))
                                         _this.tar['page#' + pageId]['model'] = __this
-                                                .attr('this-model');
-                                    if (__this.attr('this-model-uid'))
+                                                .this('model');
+                                    if (__this.this('model-uid'))
                                         _this.tar['page#' + pageId]['model-uid'] = __this
-                                                .attr('this-model-uid');
+                                                .this('model-uid');
                                 })
                                 /*
                                  * CREATE event
@@ -4131,22 +4210,22 @@
                                 {
                                     var __this = _this._(this),
                                             selector = 'form[this-id="'
-                                            + __this.attr('this-form') + '"]',
+                                            + __this.this('form') + '"]',
                                             _target = _this.container.find(selector)
                                             .removeAttr([
                                                 "this-binding", "this-mid", "this-uid",
                                                 "this-url"
                                             ]),
-                                            _tmpl = _this.getTemplate(selector),
+                                            _tmpl = _this.getCached(selector),
                                             common_selector = '',
                                             type = getElemType(_target);
                                     _target.html(_tmpl.html());
                                     internal.bindToObject.call(_this, _target, {}, function (elem) {
                                         elem.attr({
                                             "this-do": "create",
-                                            "this-action": __this.attr('this-create'),
-                                            "this-model": __this.attr('this-model') || '',
-                                            "this-model-uid": __this.attr('this-model-uid') || '',
+                                            "this-action": __this.this('create'),
+                                            "this-model": __this.this('model') || '',
+                                            "this-model-uid": __this.this('model-uid') || '',
                                             "this-binding": ""
                                         }).show();
                                         internal.resetForm.call(this, elem.get(0));
@@ -4167,13 +4246,13 @@
                                 {
                                     var __this = _this._(this),
                                             _model = __this.closest('model,[this-type="model"]'),
-                                            url = __this.attr('this-delete')
-                                            || _model.attr('this-url') || '#',
-                                            model_name = __this.attr('this-model')
-                                            || _model.attr('this-id'),
-                                            uid = _model.attr('this-uid'),
+                                            url = __this.this('delete')
+                                            || _model.this('url') || '#',
+                                            model_name = __this.this('model')
+                                            || _model.this('id'),
+                                            uid = _model.this('uid'),
                                             goto = internal.pageIDFromLink.call(this,
-                                                    __this.attr('this-goto')),
+                                                    __this.this('goto')),
                                             // necessary in case goto is a url and not an id
                                             pageId = goto.replace(/\/\\/g, '-');
                                     _this.tar['page#' + pageId] = {
@@ -4183,8 +4262,8 @@
                                     };
                                     if (_model) {
                                         _this.tar['page#' + pageId]['model'] = model_name;
-                                        __this.attr('this-goto', goto + '/#/' +
-                                                (_model.attr('this-mid') || __this.attr('this-model-id')));
+                                        __this.this('goto', goto + '/#/' +
+                                                (_model.this('mid') || __this.this('model-id')));
                                     }
                                 })
                                 /*
@@ -4197,21 +4276,21 @@
                                 .on('click', '[this-goto]', function (e) {
                                     e.preventDefault();
                                     var __this = _this._(this);
-                                    if (!__this.attr('this-goto'))
+                                    if (!__this.this('goto'))
                                         return;
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.attr('this-goto')),
+                                            __this.this('goto')),
                                             // necessary in case goto is a url and not an id
                                             pageId = goto.replace(/\/\\/g, '-');
                                     if (!_this.tar['page#' + pageId])
                                         _this.tar['page#' + pageId] = {};
-                                    if (__this.attr('this-page-title'))
+                                    if (__this.this('page-title'))
                                         _this.tar['page#' + pageId]['title'] =
-                                                __this.attr('this-page-title');
-                                    if (__this.attr('this-ignore-cache'))
+                                                __this.this('page-title');
+                                    if (__this.this('ignore-cache'))
                                         _this.tar['page#' + pageId]['ignore-cache'] =
-                                                __this.attr('this-ignore-cache');
-                                    _this.loadPage(__this.attr('this-goto'));
+                                                __this.this('ignore-cache');
+                                    _this.loadPage(__this.this('goto'));
                                     e.stop = true;
                                 })
                                 /*
@@ -4221,7 +4300,7 @@
                                 .on('click', '[this-bind]', function (e) {
                                     e.preventDefault();
                                     var __this = _this._(this),
-                                            bind = __this.attr('this-bind'),
+                                            bind = __this.this('bind'),
                                             _model = __this.closest('model,'
                                                     + '[this-type="model"],'
                                                     + '[this-model]');
@@ -4231,39 +4310,39 @@
                                             .call(_this, bind, ':not([this-in-collection])'));
                                     if (!_target.length)
                                         return;
-                                    _target.attr('this-model', _model.attr('this-model')
-                                            || _model.attr('this-id'))
-                                            .attr('this-binding', '')
-                                            .attr('this-uid', _model.attr('this-uid') || '')
-                                            .attr('this-url', _model.attr('this-url') || '')
-                                            .removeAttr('this-action');
+                                    _target.this('model', _model.this('model')
+                                            || _model.this('id'))
+                                            .this('binding', '')
+                                            .this('uid', _model.this('uid') || '')
+                                            .this('url', _model.this('url') || '')
+                                            .removeThis('action');
                                     if (__this.hasAttr('this-read')) {
                                         _this.container.find('[this-model="'
-                                                + (_model.attr('this-model')
-                                                        || _model.attr('this-id'))
+                                                + (_model.this('model')
+                                                        || _model.this('id'))
                                                 + '"][this-binding]').hide();
-                                        if (__this.attr('this-read'))
-                                            _target.attr('this-url',
-                                                    __this.attr('this-read'));
-                                        _target.removeAttr('this-do');
+                                        if (__this.this('read'))
+                                            _target.this('url',
+                                                    __this.this('read'));
+                                        _target.removeThis('do');
                                     }
                                     else if (__this.hasAttr('this-update')) {
-                                        _target.attr('this-tar', 'do:update');
-                                        if (__this.attr('this-update'))
-                                            _target.attr('this-url',
-                                                    __this.attr('this-update'));
+                                        _target.this('tar', 'do:update');
+                                        if (__this.this('update'))
+                                            _target.this('url',
+                                                    __this.this('update'));
                                     }
                                     else if (__this.hasAttr('this-delete')) {
-                                        _target.attr('this-tar', 'do:delete');
-                                        if (__this.attr('this-delete'))
-                                            _target.attr('this-url',
-                                                    __this.attr('this-delete'));
-                                        __this.attr('this-treated', '');
+                                        _target.this('tar', 'do:delete');
+                                        if (__this.this('delete'))
+                                            _target.this('url',
+                                                    __this.this('delete'));
+                                        __this.this('treated', '');
                                         setTimeout(function () {
-                                            __this.removeAttr('this-treated');
+                                            __this.removeThis('treated');
                                         });
                                     }
-                                    internal.bindToModel.call(_this, _target, _model);
+                                    internal.bindToElementModel.call(_this, _target, _model);
                                 })
                                 /*
                                  * DELETE event
@@ -4286,22 +4365,22 @@
                                     var _model = __this.closest('model,[this-type="model"],'
                                             + '[this-model]'),
                                             _do = __this.closest('[this-do="delete"]'),
-                                            model_url = __this.attr('this-delete') ||
-                                            _model.attr('this-url') ||
-                                            _do.attr('this-action'),
-                                            model_id = _model.attr('this-mid') ||
-                                            _do.attr('this-mid');
+                                            model_url = __this.this('delete') ||
+                                            _model.this('url') ||
+                                            _do.this('action'),
+                                            model_id = _model.this('mid') ||
+                                            _do.this('mid');
                                     if (!internal.canContinue
                                             .call(_this, 'model.delete',
-                                                    [_model.get(0)])) {
+                                                    [], _model.get(0))) {
                                         return;
                                     }
-                                    _this.collection(__this.attr('this-model') ||
-                                            _model.attr('this-model') ||
-                                            _model.attr('this-id') ||
-                                            _do.attr('this-model'), {
-                                        uid: _model.attr('this-uid') ||
-                                                _do.attr('this-uid'),
+                                    _this.collection(__this.this('model') ||
+                                            _model.this('model') ||
+                                            _model.this('id') ||
+                                            _do.this('model'), {
+                                        uid: _model.this('uid') ||
+                                                _do.this('uid'),
                                         success: function (collection) {
                                             collection.model(model_id, {
                                                 url: model_url,
@@ -4312,13 +4391,13 @@
                                                             if ((crudStatus &&
                                                                     data[crudStatus.key] === crudStatus.successValue)
                                                                     || !crudStatus) {
-                                                                if (_this.page.attr('this-do') === 'delete'
-                                                                        || _model.attr('this-type') === 'page')
+                                                                if (_this.page.this('do') === 'delete'
+                                                                        || _model.this('type') === 'page')
                                                                     _this.back();
                                                                 else {
                                                                     _this.container.find('[this-model="'
-                                                                            + (_model.attr('this-model')
-                                                                                    || _model.attr('this-id'))
+                                                                            + (_model.this('model')
+                                                                                    || _model.this('id'))
                                                                             + '"][this-binding]').hide();
                                                                 }
                                                                 data = getRealData.call(_this, data);
@@ -4359,7 +4438,7 @@
                                 .on('click', '[this-toggle]', function (e) {
                                     e.preventDefault();
                                     _this.container.find(internal.selector.call(_this,
-                                            _this._(this).attr('this-toggle'))).toggle();
+                                            _this._(this).this('toggle'))).toggle();
                                 })
                                 /*
                                  * Hides target elements
@@ -4367,7 +4446,7 @@
                                 .on('click', '[this-hide]', function (e) {
                                     e.preventDefault();
                                     _this.__.forEach(_this._(this)
-                                            .attr('this-hide').split(','), function (i, v) {
+                                            .this('hide').split(','), function (i, v) {
                                         _this.container.find(internal.selector.call(_this,
                                                 v.trim())).hide();
                                     });
@@ -4378,30 +4457,30 @@
                                 .on('click', '[this-show]', function (e) {
                                     e.preventDefault();
                                     var __this = _this._(this);
-                                    _this.__.forEach(__this.attr('this-show').split(','),
+                                    _this.__.forEach(__this.this('show').split(','),
                                             function (i, v) {
                                                 var _target = _this.container
                                                         .find(internal.selector.call(_this,
                                                                 v.trim()));
-                                                if (__this.attr('this-create')) {
+                                                if (__this.this('create')) {
                                                     var form = _target.is('form[this-model="'
-                                                            + __this.attr('this-model')
+                                                            + __this.this('model')
                                                             + '"]') ? _target :
                                                             _target.find('form[this-model="'
                                                                     + __this
-                                                                    .attr('this-model')
+                                                                    .this('model')
                                                                     + '"]');
                                                     if (form.length) {
-                                                        form.attr('this-do', 'create')
-                                                                .attr('this-url',
+                                                        form.this('do', 'create')
+                                                                .this('url',
                                                                         __this
-                                                                        .attr('this-create'))
-                                                                .attr('this-binding', '');
-                                                        if (__this.attr('this-model-uid'))
-                                                            form.attr('this-model-uid',
+                                                                        .this('create'))
+                                                                .this('binding', '');
+                                                        if (__this.this('model-uid'))
+                                                            form.this('model-uid',
                                                                     __this
-                                                                    .attr('this-model-uid'));
-                                                        form.removeAttr('this-mid');
+                                                                    .this('model-uid'));
+                                                        form.removeThis('mid');
                                                         internal.resetForm.call(_this, form.get(0));
                                                     }
                                                 }
@@ -4413,18 +4492,18 @@
                                  */
                                 .on('keyup,keypress', '[this-autocomplete][this-list]', function (e) {
                                     var __this = _this._(this),
-                                            min_chars = __this.attr('this-min-chars') || 3,
-                                            url = __this.attr('this-autocomplete')
-                                            || __this.attr('this-url'),
+                                            min_chars = __this.this('min-chars') || 3,
+                                            url = __this.this('autocomplete')
+                                            || __this.this('url'),
                                             _list = _this.container
                                             .find('[this-type="list"][this-id="'
-                                                    + __this.attr('this-list')
+                                                    + __this.this('list')
                                                     + '"],list[this-id="'
-                                                    + __this.attr('this-list')
+                                                    + __this.this('list')
                                                     + '"]');
                                     // list element must exist
                                     if (!_list.length) {
-                                        _this.error('List #' + __this.attr('this-list')
+                                        _this.error('List #' + __this.this('list')
                                                 + ' not found');
                                         return;
                                     }
@@ -4433,18 +4512,18 @@
                                     if (__this.val().length < min_chars) {
                                         var _list = _this.container
                                                 .find('[this-type="list"][this-id="'
-                                                        + __this.attr('this-list')
+                                                        + __this.this('list')
                                                         + '"],list[this-id="'
-                                                        + __this.attr('this-list')
+                                                        + __this.this('list')
                                                         + '"]');
                                         _list.hide().html('');
-                                        __this.removeAttr('this-last-query');
+                                        __this.removeThis('last-query');
                                         _this.store('autocompleting', null);
                                         clearTimeout(autocomplete_timeout);
                                         return;
                                     }
                                     // block searching for same thing multiple times
-                                    else if (__this.val() === __this.attr('this-last-query')) {
+                                    else if (__this.val() === __this.this('last-query')) {
                                         // enter button pressed
                                         if (e.keyCode === 13 && _list.children(':not([this-cache])').length) {
                                             // select the first result from the dropdown list
@@ -4456,28 +4535,28 @@
                                     }
                                     clearTimeout(autocomplete_timeout);
                                     url += (url.indexOf('?') === -1) ? '?' : '&';
-                                    url += (__this.attr('this-query-key') || 'q') + '='
+                                    url += (__this.this('query-key') || 'q') + '='
                                             + __this.val();
                                     autocomplete_timeout = setTimeout(function () {
-                                        __this.attr('this-last-query', __this.val());
+                                        __this.this('last-query', __this.val());
                                         _this.request({
                                             url: url,
                                             success: function (data) {
                                                 data = getRealData.call(_this, data);
                                                 if (!data)
                                                     return;
-                                                if (!__this.attr('this-id'))
-                                                    __this.attr('this-id', _this.__.randomString());
-                                                _list.attr('this-autocompleting',
-                                                        __this.attr('this-id'))
-                                                        .children().attr('this-cache', '')
+                                                if (!__this.this('id'))
+                                                    __this.this('id', _this.__.randomString());
+                                                _list.this('autocompleting',
+                                                        __this.this('id'))
+                                                        .children().this('cache', '')
                                                         .hide();
                                                 internal.fillAutocompleteList
                                                         .call(_this, {
                                                             selector: '[this-type="list"][this-id="'
-                                                                    + __this.attr('this-list')
+                                                                    + __this.this('list')
                                                                     + '"],list[this-id="'
-                                                                    + __this.attr('this-list')
+                                                                    + __this.this('list')
                                                                     + '"]',
                                                             data: data,
                                                             emptyList: true
@@ -4485,43 +4564,49 @@
                                                 _this.store('autocompleting', data);
                                             }
                                         });
-                                    }, __this.attr('this-delay') || 300);
+                                    }, __this.this('delay') || 300);
                                 })
                                 .on('click', '[this-autocompleting]>[this-key]', function ()
                                 {
                                     var __this = _this._(this),
                                             selectedListSelector = '[this-type="list"][this-id="'
-                                            + __this.parent().attr('this-selection-list')
+                                            + __this.parent().this('selection-list')
                                             + '"],list[this-id="'
-                                            + __this.parent().attr('this-selection-list')
+                                            + __this.parent().this('selection-list')
                                             + '"]',
                                             _selectedList = _this.container
                                             .find(selectedListSelector),
-                                            elem = _this.getTemplate(selectedListSelector)
+                                            elem = _this.getCached(selectedListSelector)
                                             .children(),
                                             list = _this.store('autocompleting') || {},
-                                            key = __this.attr('this-key'),
-                                            index = __this.attr('this-index'),
+                                            key = __this.this('key'),
+                                            index = __this.this('index'),
                                             _dropDownList = __this.parent(),
                                             _input = _this.container
                                             .find('[this-autocomplete][this-id="'
                                                     + _dropDownList
-                                                    .attr('this-autocompleting') +
+                                                    .this('autocompleting') +
                                                     '"]');
+                                    var data = list[index] || {};
                                     // empty selected list if nothing had
                                     // been selected
-                                    if (!_dropDownList.attr('this-selected')) {
+                                    if (!_dropDownList.this('selected')) {
                                         _selectedList.html('');
                                     }
                                     internal.bindToObject
-                                            .call(_this, elem, list[index] || {}, function (elem) {
-                                                elem.removeAttr('this-cache')
-                                                        .attr('this-key', key)
+                                            .call(_this, elem, data, function (elem) {
+                                                elem.removeThis('cache')
+                                                        .this('key', key)
                                                         .show();
-                                                _dropDownList.attr('this-selected',
-                                                        (_dropDownList.attr('this-selected') || '')
+                                                _dropDownList.this('selected',
+                                                        (_dropDownList.this('selected') || '')
                                                         + key + ',');
                                                 _selectedList.append(elem).show();
+                                                __this.trigger('list.option.selected', {
+                                                    data: data,
+                                                    selection: elem.get(0),
+                                                    autocompleteInput: _input.get(0)
+                                                });
                                                 if (!_input.hasAttr('this-multiple')) {
                                                     _input.hide();
                                                     _dropDownList.hide();
@@ -4537,23 +4622,23 @@
                                                     _dropDownList = _this.container
                                                     .find('[this-type="list"][this-id="'
                                                             + __this.parent()
-                                                            .attr('this-parent-list')
+                                                            .this('parent-list')
                                                             + '"],list[this-id="'
                                                             + __this.parent()
-                                                            .attr('this-parent-list')
+                                                            .this('parent-list')
                                                             + '"]');
-                                            _dropDownList.attr('this-selected',
-                                                    _dropDownList.attr('this-selected')
-                                                    .replace(__this.attr('this-key')
+                                            _dropDownList.this('selected',
+                                                    _dropDownList.this('selected')
+                                                    .replace(__this.this('key')
                                                             + ',', '')).show();
                                             var _input = _this.container
                                                     .find('[this-autocomplete][this-id="'
                                                             + _dropDownList
-                                                            .attr('this-autocompleting') +
+                                                            .this('autocompleting') +
                                                             '"]').show();
                                             __this.remove();
                                             if (_input.hasAttr('this-multiple')) {
-                                                _input.attr('this-last-query', '')
+                                                _input.this('last-query', '')
                                                         .trigger('keyup');
                                             }
                                         })
@@ -4567,9 +4652,9 @@
                                         function (e) {
                                             e.preventDefault();
                                             var __this = _this._(this),
-                                                    creating = __this.attr('this-do')
+                                                    creating = __this.this('do')
                                                     === 'create',
-                                                    method = __this.attr('this-method')
+                                                    method = __this.this('method')
                                                     || (creating ? 'post' : 'put');
                                             if (!this.reportValidity()) {
                                                 __this.trigger('form.invalid.submission');
@@ -4577,21 +4662,21 @@
                                             }
                                             __this.trigger('form.valid.submission');
                                             var id = null;
-                                            if (__this.attr('this-mid'))
-                                                id = __this.attr('this-mid');
-                                            _this.collection(__this.attr('this-model') ||
-                                                    _this.page.attr('this-model'), {
+                                            if (__this.this('mid'))
+                                                id = __this.this('mid');
+                                            _this.collection(__this.this('model') ||
+                                                    _this.page.this('model'), {
                                                 success: function (collection) {
-                                                    collection.model(id, {
+                                                    collection.model(null, {
                                                         success: function (_model) {
-                                                            if (_model.attributes)
-                                                                delete _model.attributes.__page;
+                                                            _model.id = id;
                                                             _model.save({
                                                                 form: __this.get(0),
-                                                                url: __this.attr('this-url') ||
-                                                                        __this.attr('this-action') ||
-                                                                        _this.page.attr('this-url') ||
-                                                                        _this.page.attr('this-action'),
+                                                                url: __this.this('url') ||
+                                                                        __this.this('action') ||
+                                                                        _this.page.this('url') ||
+                                                                        _this.page.this('action'),
+                                                                ignoreDOM: __this.hasAttr('this-ignore-dom'),
                                                                 method: method,
                                                                 success: function (data) {
                                                                     var model = getRealData.call(_this, data),
@@ -4649,11 +4734,53 @@
                                                                             });
                                                                 }
                                                             });
+                                                        },
+                                                        error: function () {
+                                                            alert('eror')
                                                         }
                                                     });
                                                 }
                                             });
                                         })
+                                .on('submit', 'form[this-handle-submit]:not([this-do])', function (e) {
+                                    e.preventDefault();
+                                    var _form = _this._(this);
+                                    if (!this.reportValidity()) {
+                                        _form.trigger('form.invalid.submission');
+                                        return;
+                                    }
+                                    _form.trigger('form.valid.submission');
+                                    var fd = new FormData(this);
+                                    var data = internal.canContinue
+                                            .call(_this, 'form.send', [], this);
+                                    if (!data) {
+                                        return;
+                                    }
+                                    else if (_this.__.isObject(data))
+                                        fd.fromObject(data);
+                                    _this.request({
+                                        url: _form.attr('action'),
+                                        type: _form.attr('method'),
+                                        dataType: _form.this('response-type'),
+                                        data: fd,
+                                        success: function (data) {
+                                            _form.trigger('form.submission.success', {
+                                                response: this,
+                                                responseData: data
+                                            });
+                                        },
+                                        error: function () {
+                                            _form.trigger('form.submission.error', {
+                                                response: this
+                                            });
+                                        },
+                                        complete: function () {
+                                            _form.trigger('form.submission.complete', {
+                                                response: this
+                                            });
+                                        }
+                                    });
+                                })
                                 /*
                                  * Search Event
                                  * Form submissiom 
@@ -4662,21 +4789,21 @@
                                     e.preventDefault();
                                     var _form = _this._(this),
                                             _search = _form.find('[this-search]');
-                                    if (!_search.attr('this-search')) {
+                                    if (!_search.this('search')) {
                                         _this.error('Invalid search target');
                                         return;
                                     }
-                                    var exp = _search.attr('this-search').split(':'),
+                                    var exp = _search.this('search').split(':'),
                                             selector = 'collection[this-id="' + exp[0]
                                             + '"],[this-type="collection"][this-id="' + exp[0] + '"]',
                                             keys = exp[1],
-                                            page = _form.attr('this-type') === 'page' ?
+                                            page = _form.this('type') === 'page' ?
                                             _form : _form.closest('page,[this-type="page"]'),
-                                            goto = _form.attr('goto') || page.attr('this-id'),
+                                            goto = _form.attr('goto') || page.this('id'),
                                             filter = '', _collection,
                                             /* same page and query. don't duplicate state */
-                                            replaceState = _this.page.attr('this-id') === goto &&
-                                            _this.page.attr('this-query') === _search.val().trim();
+                                            replaceState = _this.page.this('id') === goto &&
+                                            _this.page.this('query') === _search.val().trim();
                                     if (keys)
                                         keys = keys.split(',');
                                     _this.__.forEach(keys, function (i, key) {
@@ -4686,12 +4813,12 @@
                                                 + '),filters.lcase("' + _search.val() + '"))';
                                     });
                                     // reload only the collection
-                                    if (_form.attr('this-reload')) {
+                                    if (_form.this('reload')) {
                                         _collection = page.find(internal.selector.call(_this,
-                                                _form.attr('this-reload')));
-                                        _collection.attr('this-filter', filter).attr('this-search',
+                                                _form.this('reload')));
+                                        _collection.this('filter', filter).this('search',
                                                 keys.join(','));
-                                        page.attr('this-query', _search.val().trim());
+                                        page.this('query', _search.val().trim());
                                         internal.loadCollection.call(_this, _collection, null, null, replaceState);
                                     }
                                     // load a page and the collection in it
@@ -4699,22 +4826,21 @@
                                         var _goto = internal.pageIDFromLink.call(this, goto),
                                                 // necessary in case _goto is a url and not an id
                                                 pageId = _goto.replace(/\/\\/g, '-'),
-                                                _page = _this.getTemplate('page[this-id="'
-                                                        + _goto + '"],[this-type="page"][this-id="'
-                                                        + _goto + '"]'),
+                                                _page = _this.getCached('[this-id="'
+                                                        + _goto + '"]', 'page'),
                                                 _component = _page.find('[this-component="'
                                                         + exp[0] + '"]');
-                                        _component.attr('this-filter', 'collection#' + exp[0] + ':'
-                                                + filter).attr('this-search', 'collection#'
+                                        _component.this('filter', 'collection#' + exp[0] + ':'
+                                                + filter).this('search', 'collection#'
                                                 + exp[0] + ':' + keys.join(','));
                                         _this.tar['page#' + pageId] = {
                                             query: _search.val().trim()
                                         };
-                                        if (_search.attr('this-ignore-cache'))
+                                        if (_search.this('ignore-cache'))
                                             _this.tar['page#' + pageId]['ignore-cache'] =
-                                                    _search.attr('this-ignore-cache');
+                                                    _search.this('ignore-cache');
                                         _collection = _page.find(selector);
-                                        _collection.attr('this-filter', filter).attr('this-search',
+                                        _collection.this('filter', filter).this('search',
                                                 keys.join(','));
                                         _this.loadPage(goto, replaceState);
                                     }
@@ -4727,14 +4853,14 @@
                                     var __this = _this._(this),
                                             _collection;
                                     // collection not specified. Target sibling collection
-                                    if (!__this.attr('this-paginate-next'))
+                                    if (!__this.this('paginate-next'))
                                         _collection = __this.siblings('collection,[this-type="collection"]');
                                     // collection is specified. get it
                                     else
                                         _collection = _this.container.find('collection[this-id="'
-                                                + __this.attr('this-paginate-next')
+                                                + __this.this('paginate-next')
                                                 + '"],[this-type="collection"][this-id="'
-                                                + __this.attr('this-paginate-next') + '"]');
+                                                + __this.this('paginate-next') + '"]');
                                     // collection must have attribute `this-paginate`
                                     if (!_collection.hasAttr('this-paginate'))
                                         return;
@@ -4753,26 +4879,29 @@
                                     var __this = _this._(this),
                                             _collection;
                                     // collection not specified. Target sibling collection
-                                    if (!__this.attr('this-paginate-previous'))
+                                    if (!__this.this('paginate-previous'))
                                         _collection = __this.siblings('collection,[this-type="collection"]');
                                     // collection is specified. get it
                                     else
                                         _collection = _this.container.find('collection[this-id="'
-                                                + __this.attr('this-paginate-previous')
+                                                + __this.this('paginate-previous')
                                                 + '"],[this-type="collection"][this-id="'
-                                                + __this.attr('this-paginate-previous') + '"]');
+                                                + __this.this('paginate-previous') + '"]');
                                     // if page is 0, can't before to previous anymore
-                                    if (_collection.attr('this-pagination-page') == 0
+                                    if (_collection.this('pagination-page') == 0
                                             // collection must have attribute `this-paginate`
                                             || !_collection.hasAttr('this-paginate'))
                                         return;
                                     __this.attr('disabled', 'disabled');
                                     // reduce page by 2
-                                    _collection.attr('this-pagination-page', parseInt(_collection.attr('this-pagination-page')) - 2);
+                                    _collection.this('pagination-page', parseInt(_collection.this('pagination-page')) - 2);
                                     // load collection
                                     _this.load(_collection, function () {
                                         updateLinks.call(this);
                                     }.bind(_this));
+                                })
+                                .on('click', '[this-clear-page-cache]', function () {
+                                    _this.clearPageCache(_this._(this).this('clear-page-cache') === 'true');
                                 });
 
                         this.when('page.loaded', 'page', function () {
@@ -4840,13 +4969,13 @@
                     var transit = this.__.callable(this.config.transition, true),
                             wait, _this = this;
                     if (transit)
-                        wait = transit.call(null, this.oldPage.removeAttr('this-current'),
+                        wait = transit.call(null, this.oldPage.removeThis('current'),
                                 this.page, this.config.transitionOptions);
                     else if (this.__.isString(this.config.transition)) {
                         if (!Transitions[this.config.transition])
                             this.config.transition = 'switch';
                         wait = Transitions[this.config.transition](this.oldPage
-                                .removeAttr('this-current'),
+                                .removeThis('current'),
                                 this.page, this.config.transitionOptions);
                     }
                     setTimeout(function () {
@@ -4855,7 +4984,23 @@
                         delete this.oldPage;
                     }.bind(this), this.__.isNumber(wait) ? wait : 0);
                     if (this.config.titleContainer)
-                        this.config.titleContainer.html(this.page.attr('this-title'));
+                        this.config.titleContainer.html(this.page.this('title'));
+                    var features = [];
+                    this.container.find('model,[this-type="model"],collection,[this-type="collection"]')
+                            .each(function (i) {
+                                features.push(this);
+                                _this._(this).replaceWith('<div this-feature="' + i + '" />');
+                            });
+                    var content = internal.inLoop.call(this, {}, true, this.container.html());
+                    content = internal.processExpressions.call(this, content, {});
+                    this.container.html(content);
+                    this.__.forEach(features, function (i, v) {
+                        _this.container.find('[this-feature="' + i + '"]')
+                                .replaceWith(v);
+                    });
+                    this.page = this.container.find('page[this-id="' + this.page.this('id')
+                            + '"]:not([this-dead]), [this-type="page"][this-id="'
+                            + this.page.this('id') + '"]:not([this-dead])');
                     // load models
                     internal.loadModels.call(this, replaceInState, true);
                 },
@@ -4901,30 +5046,30 @@
                             var __collection = collection[model_name],
                                     uid = __collection.uid || '';
                             _this.__.forEach(arr, function (i, v) {
-                                var tmpl = _this.getTemplate('collection[this-id="'
-                                        + _collection.attr('this-id')
-                                        + '"],[this-type="collection"][this-id="'
-                                        + _collection.attr('this-id') + '"]').children(),
-                                        action = _collection.attr('this-prepend-new') ?
+                                var tmpl = _this.getCached('[this-id="'
+                                        + _collection.this('id')
+                                        + '"]', 'collection').children(),
+                                        action = _collection.this('prepend-new') ?
                                         'prepend' : 'append',
                                         data = __collection.data[v],
                                         __data = internal.canContinue
-                                        .call(_this, 'collection.model.render', [data, tmpl]);
+                                        .call(_this, 'collection.model.render', [data, _collection.get(0)], tmpl.get(0));
                                 if (!__data) {
                                     return;
                                 }
                                 else if (_this.__.isObject(__data))
                                     data = __data;
                                 internal.parseData.call(_this, data,
-                                        tmpl.outerHtml(), true, null,
+                                        tmpl, true, null,
                                         function (tmpl) {
-                                            if (!tmpl.attr('this-url'))
-                                                tmpl.attr('this-url', _collection.attr('this-url') + v);
-                                            _collection[action](tmpl.attr('this-mid', v)
-                                                    .attr('this-uid', uid)
-                                                    .attr('this-type', 'model')
-                                                    .attr('this-id', model_name)
-                                                    .attr('this-in-collection', '')
+                                            if (!tmpl.this('url'))
+                                                tmpl.this('url', _collection.this('url') + v);
+                                            internal.loadFormElements.call(this, tmpl.find('[this-is]'), data);
+                                            _collection[action](tmpl.this('mid', v)
+                                                    .this('uid', uid)
+                                                    .this('type', 'model')
+                                                    .this('id', model_name)
+                                                    .this('in-collection', '')
                                                     .outerHtml()).show();
                                             this.__.removeArrayIndex(arr, i);
                                         }.bind(_this));
@@ -4947,16 +5092,21 @@
                             if (!_model.length)
                                 return;
                             _this.__.forEach(arr, function (id, v) {
+                                // update page model if part of update models
+                                if (_this.pageModel && _this.pageModel.name === model_name
+                                        && _this.pageModel.id === id) {
+                                    _this.pageModel.attributes = _this.__.extend(_this.pageModel.attributes, v);
+                                }
                                 _model.filter(function () {
                                     var __model = _this._(this);
                                     // if model id is the updated id
-                                    return (__model.attr('this-mid') == id
+                                    return (__model.this('mid') == id
                                             // not updated before
                                             && (!__model.hasAttr('this-updated')
                                                     // or updated before
                                                     || (__model.hasAttr('this-updated')
                                                             // but has newer update
-                                                            && parseInt(__model.attr('this-updated')) < v.timestamp)));
+                                                            && parseInt(__model.this('updated')) < v.timestamp)));
                                 })
                                         .each(function () {
                                             var __model = _this._(this),
@@ -4964,22 +5114,23 @@
                                             if (__model.hasAttr('this-in-collection')) {
                                                 in_collection = true;
                                                 var _collection = __model.parent();
-                                                _clone = _this.getTemplate('collection[this-id="'
-                                                        + _collection.attr('this-id')
-                                                        + '"],[this-type="collection"][this-id="'
-                                                        + _collection.attr('this-id') + '"]').children();
+                                                _clone = _this.getCached('[this-id="'
+                                                        + _collection.this('id')
+                                                        + '"]', 'collection').children();
                                             }
                                             else {
-                                                _clone = _this.getTemplate('model[this-id="'
-                                                        + __model.attr('this-id')
-                                                        + '"],[this-type="collection"][this-id="'
-                                                        + __model.attr('this-id') + '"]');
+                                                _clone = _this.getCached('[this-id="'
+                                                        + __model.this('id')
+                                                        + '"]', 'model');
                                             }
+
                                             var data = v.data,
                                                     __data = internal.canContinue
                                                     .call(_this, in_collection ?
                                                             'collection.model.render'
-                                                            : 'model.render', [data, _clone]);
+                                                            : 'model.render',
+                                                            in_collection ? [data, _model.parent()] : [data],
+                                                            _clone);
                                             if (!__data) {
                                                 return;
                                             }
@@ -4992,9 +5143,9 @@
                                                         var _cl_col = _this._(this),
                                                                 // loaded collection
                                                                 selector = 'collection[this-id="'
-                                                                + _cl_col.attr('this-id') + '"],'
+                                                                + _cl_col.this('id') + '"],'
                                                                 + '[this-type="collection"][this-id="'
-                                                                + _cl_col.attr('this-id') + '"]',
+                                                                + _cl_col.this('id') + '"]',
                                                                 _rl_col = _model.find(selector);
                                                         if (_rl_col.length)
                                                             _cl_col.replaceWith(_rl_col.clone());
@@ -5002,13 +5153,14 @@
                                                             _cl_col.remove();
                                                     });
                                             // put back current model's url
-                                            _clone.attr('this-url', __model.attr('this-url'));
+                                            _clone.this('url', __model.this('url'));
                                             internal.parseData.call(_this, data,
-                                                    _clone.outerHtml(), false, true, function (tmpl) {
-                                                __model.html(tmpl.html()).show()
-                                                        .attr('this-updated', v.timestamp)
-                                                        .attr('this-url', tmpl.attr('this-url'));
-                                            });
+                                                    _clone, false, true, function (tmpl) {
+                                                        internal.loadFormElements.call(_this, tmpl.find('[this-is]'), data);
+                                                        __model.html(tmpl.html()).show()
+                                                                .this('updated', v.timestamp)
+                                                                .this('url', tmpl.this('url'));
+                                                    });
                                         });
                             });
                             if (in_collection)
@@ -5037,15 +5189,15 @@
                                         // delete page model read from another 
                                         // page's collection
                                         if (!__model.hasAttr('this-binding')
-                                                && _this.page.attr('this-reading')
+                                                && _this.page.this('reading')
                                                 && _models.length === 1) {
                                             touched.back = true;
                                             return false;
                                         }
                                         // deleting binded model
                                         else {
-                                            __model.removeAttr('this-url')
-                                                    .removeAttr('this-mid');
+                                            __model.removeThis('url')
+                                                    .removeThis('mid');
                                         }
                                     }
                                 });
@@ -5076,8 +5228,6 @@
                     if (touched.back)
                         return this.back();
                     else if (touched.created || touched.updated || touched.deleted) {
-                        if (touched.updated)
-                            internal.loadForms.call(this);
                         internal.saveState.call(this, true);
                     }
                 },
@@ -5088,17 +5238,17 @@
                  */
                 watch: function (elem) {
                     elem = this._(elem);
-                    if (!elem.attr('this-id') || this.watching[elem.attr('this-id')]
-                            || !elem.attr('this-url'))
+                    if (!elem.this('id') || this.watching[elem.this('id')]
+                            || !elem.this('url'))
                         return this;
                     var isCollection = internal.is.call(this, 'collection', elem),
-                            model_name = elem.attr('this-model') || elem.attr('this-id');
-                    this.watching[elem.attr('this-id')] = {
+                            model_name = elem.this('model') || elem.this('id');
+                    this.watching[elem.this('id')] = {
                         type: isCollection ? 'collection' : 'model',
-                        url: elem.attr('this-url'),
-                        mid: elem.attr('this-mid')
+                        url: elem.this('url'),
+                        mid: elem.this('mid')
                     };
-                    this.__.callable(this.watchCallback)(elem.attr('this-url'),
+                    this.__.callable(this.watchCallback)(elem.this('url'),
                             function (resp) {
                                 // save model to collection
                                 var action = this.store(resp.event) || {};
@@ -5106,8 +5256,8 @@
                                     case 'created':
                                         internal.modelToStore
                                                 .call(this, model_name, resp.id, resp.data,
-                                                        elem.attr('this-uid') ||
-                                                        elem.attr('this-model-uid'));
+                                                        elem.this('uid') ||
+                                                        elem.this('model-uid'));
                                         if (!action[model_name])
                                             action[model_name] = [];
                                         /* Remove model uid if exists to avoid duplicates */
@@ -5117,19 +5267,19 @@
                                     case 'updated':
                                         var data = resp.data, id = resp.id;
                                         // if update model, id is model attribute. Update real model
-                                        if (!isCollection && elem.attr('this-mid')) {
+                                        if (!isCollection && elem.this('mid')) {
                                             var id = internal.getUIDValue
-                                                    .call(this, data, elem.attr('this-uid'));
+                                                    .call(this, data, elem.this('uid'));
                                             delete data[id];
                                             var _data = {};
                                             _data[id] = data;
                                             data = _data;
-                                            id = elem.attr('this-mid');
+                                            id = elem.this('mid');
                                         }
                                         data = internal.modelToStore
                                                 .call(this, model_name, id, data,
-                                                        elem.attr('this-uid') ||
-                                                        elem.attr('this-model-uid'));
+                                                        elem.this('uid') ||
+                                                        elem.this('model-uid'));
                                         if (!action[model_name])
                                             action[model_name] = {};
                                         action[model_name][id] = {
@@ -5169,11 +5319,11 @@
                  * @param {function} funcB Do this if first failed
                  * @returns {string}|{array}
                  */
-                __: function (str, options, funcA, funcB) {
+                __factory: function (str, options, funcA, funcB) {
                     if (__.isArray(str)) {
                         var arr = [], _this = this;
                         __.forEach(str, function (i, v) {
-                            arr.push(_this.__(v, options, funcA, funcB));
+                            arr.push(_this.__factory(v, options, funcA, funcB));
                         });
                         return arr;
                     }
@@ -5367,7 +5517,7 @@
                  * @returns {String}|{array}
                  */
                 replace: function (str, options) {
-                    return this.__(str, options,
+                    return this.__factory(str, options,
                             function (str, search, replace) {
                                 search = search.replace(/_/g, '-u-');
                                 str = str.replace(/_/g, '-u-');
@@ -5416,7 +5566,7 @@
                  * @param {string} separator
                  * @returns {Array}                  */
                 split: function (str, separator) {
-                    return this.__(str, separator, function (str, separator) {
+                    return this.__factory(str, separator, function (str, separator) {
                         return str.split(separator);
                     });
                 },
@@ -5554,16 +5704,14 @@
                         if (!elem.length)
                             return;
                         if (this.id)
-                            elem.attr('this-mid', this.id);
+                            elem.this('mid', this.id);
                         if (this.uid)
-                            elem.attr('this-uid', this.uid);
+                            elem.this('uid', this.uid);
                         if (this.url)
-                            elem.attr('this-url', this.url);
+                            elem.this('url', this.url);
                         var type = getElemType(elem),
-                                selector = type + '[this-id="' + elem.attr('this-id')
-                                + '"],[this-type="' + type + '"][this-id="'
-                                + elem.attr('this-id') + '"]',
-                                _template = this.app.getTemplate(selector);
+                                _template = this.app
+                                .getCached('[this-id="' + elem.this('id') + '"]', type);
                         if (_template.length)
                             elem.html(_template.html());
                         internal.bindToObject.call(this.app, elem, this.attributes || {}, function (elem) {
@@ -5572,11 +5720,12 @@
                                 "this-type": "model",
                                 "this-uid": this.uid,
                                 "this-mid": this.id,
-                                "this-url": this.url
+                                "this-url": this.url,
+                                "this-model": this.name
                             };
                             if (!elem.is('form')) {
                                 elem.attr(attr);
-                                elem.find('form[this-loaded]').remove();
+//                                elem.find('form[this-loaded]').remove();
                                 var _elem = elem.find('form');
                                 if (_elem.length)
                                     elem = _elem;
@@ -5586,7 +5735,6 @@
                                 delete attr['this-id'];
                                 elem.attr(attr);
                             }
-                            internal.loadForms.call(this.app, elem, this.attributes);
                         }.bind(this));
                         return this;
                     },
@@ -5653,8 +5801,8 @@
                                             + this.name + '"]',
                                             _collection = this.app.container
                                             .find(selector),
-                                            cache = this.app.getTemplate(selector)
-                                            .children().attr('this-type', 'model');
+                                            cache = this.app.getCached(selector)
+                                            .children().this('type', 'model');
                                     // go through all pagination metas
                                     while (collection.pagination[page]) {
                                         if (!removed) {
@@ -5668,17 +5816,18 @@
                                                 var last = collection.pagination[page].shift();
                                                 if (!appended) {
                                                     if (!_collection.children('[this-mid="' + last + '"]').length && collection.data[last]) {
-                                                        internal.bindToObject.call(this.app, cache, collection.data[last] || {}, function (elem) {
-                                                            elem.attr({
-                                                                "this-id": this.name,
-                                                                "this-in-collection": "",
-                                                                "this-type": "model",
-                                                                "this-url": this.url.replace(this.id, last),
-                                                                "this-mid": last,
-                                                                "this-uid": this.uid
-                                                            }).show();
-                                                            _collection.append(elem);
-                                                        }.bind(this));
+                                                        internal.bindToObject.call(this.app, cache, collection.data[last] || {},
+                                                                function (elem) {
+                                                                    elem.attr({
+                                                                        "this-id": this.name,
+                                                                        "this-in-collection": "",
+                                                                        "this-type": "model",
+                                                                        "this-url": this.url.replace(this.id, last),
+                                                                        "this-mid": last,
+                                                                        "this-uid": this.uid
+                                                                    }).show();
+                                                                    _collection.append(elem);
+                                                                }.bind(this));
                                                         appended = true;
                                                     }
                                                 }
@@ -5695,7 +5844,7 @@
                                     // collection listing is empty
                                     if (!_collection.children(':not([this-cache])').length) {
                                         // reload collection for current page
-                                        this.app.load(_collection.attr('this-pagination-page', parseInt(_collection.attr('this-pagination-page')) - 1));
+                                        this.app.load(_collection.this('pagination-page', parseInt(_collection.this('pagination-page')) - 1));
                                     }
                                 }
                             }
@@ -5776,12 +5925,16 @@
                             _this.app.error('Cannot save an unnamed model.');
                             return false;
                         }
-
                         config = this.app.__.extend({}, config);
-                        data = config.data || {};
+                        var data = this.attributes;
+                        if (data) {
+                            delete data._url;
+                            delete data.__page;
+                        }
+                        data = config.data || data || {};
                         var _data = internal.canContinue
                                 .call(this.app, this.id ? 'model.update' : 'model.create',
-                                        [config.form, data]);
+                                        [data], config.form);
                         if (false === _data) {
                             return;
                         }
@@ -5793,6 +5946,8 @@
                                 // and no form
                                 && !config.form) {
                             this.app.error('No data or form to save');
+                            this.app.__.callable(config.error).call(this.app);
+                            this.app.__.callable(config.complete).call(this.app);
                             return false;
                         }
 
@@ -5829,31 +5984,33 @@
                                                                 .find('collection[this-model="'
                                                                         + _this.name + '"],[this-type="collection"][this-model="'
                                                                         + _this.name + '"]').hasAttr('this-paginate'));
-                                                var _action = _this.id ? 'updated' : 'created',
-                                                        action = _this.app.store(_action) || {};
-                                                // saved existing model for dom update
-                                                if (_this.id) {
-                                                    if (!action[_this.name])
-                                                        action[_this.name] = {};
-                                                    action[_this.name][_this.id] = {
-                                                        data: model,
-                                                        timestamp: Date.now()
-                                                    };
+                                                if (!config.ignoreDOM) {
+                                                    var _action = _this.id ? 'updated' : 'created',
+                                                            action = _this.app.store(_action) || {};
+                                                    // saved existing model for dom update
+                                                    if (_this.id) {
+                                                        if (!action[_this.name])
+                                                            action[_this.name] = {};
+                                                        action[_this.name][_this.id] = {
+                                                            data: model,
+                                                            timestamp: Date.now()
+                                                        };
+                                                    }
+                                                    // saved new model for dom update
+                                                    else {
+                                                        _this.id = id;
+                                                        // update the url
+                                                        _this.url += _this.id;
+                                                        if (!action[_this.name])
+                                                            action[_this.name] = [];
+                                                        // Remove model uid if exists to avoid duplicates
+                                                        _this.app.__
+                                                                .removeArrayValue(action[_this.name],
+                                                                        _this.id, true);
+                                                        action[_this.name].push(_this.id);
+                                                    }
+                                                    _this.app.store(_action, action);
                                                 }
-                                                // saved new model for dom update
-                                                else {
-                                                    _this.id = id;
-                                                    // update the url
-                                                    _this.url += _this.id;
-                                                    if (!action[_this.name])
-                                                        action[_this.name] = [];
-                                                    // Remove model uid if exists to avoid duplicates
-                                                    _this.app.__
-                                                            .removeArrayValue(action[_this.name],
-                                                                    _this.id, true);
-                                                    action[_this.name].push(_this.id);
-                                                }
-                                                _this.app.store(_action, action);
                                                 // update current page 
                                                 internal.updatePage.call(_this.app);
                                             }
@@ -5996,11 +6153,11 @@
                             return;
                         }
                         elem = this.app._(elem);
-                        elem.attr('this-model', this.name);
+                        elem.this('model', this.name);
                         if (this.uid)
-                            elem.attr('this-model-uid', this.uid);
+                            elem.this('model-uid', this.uid);
                         if (this.url)
-                            elem.attr('this-url', this.url);
+                            elem.this('url', this.url);
                         internal.loadCollection.call(this.app, elem);
                         return this;
                     },
@@ -6092,12 +6249,12 @@
                      * @returns {Model}
                      */
                     model: function (model_id, options) {
+                        var _this = this, url,
+                                options = this.app.__.extend({
+                                    success: function (model) {},
+                                    error: function (e) {}
+                                }, options);
                         if (model_id) {
-                            var _this = this, url,
-                                    options = this.app.__.extend({
-                                        success: function (model) {},
-                                        error: function (e) {}
-                                    }, options);
                             if (options.url) {
                                 url = options.url;
                             }
@@ -6533,7 +6690,7 @@
                     return this.home(true);
                 }
                 else if (internal.canContinue
-                        .call(this, 'page.leave', [this.page.items[0]])) {
+                        .call(this, 'page.leave', [], this.page.get(0))) {
                     history.back();
                 }
                 return this;
@@ -6550,9 +6707,9 @@
             return this.tryCatch(function () {
                 this.__.forEach(event.split(','), function (i, v) {
                     if (this.page) {
-                        if (!this.beforeCallbacks[this.page.attr('this-id')])
-                            this.beforeCallbacks[this.page.attr('this-id')] = {};
-                        this.beforeCallbacks[this.page.attr('this-id')][v.trim()] = callback;
+                        if (!this.beforeCallbacks[this.page.this('id')])
+                            this.beforeCallbacks[this.page.this('id')] = {};
+                        this.beforeCallbacks[this.page.this('id')][v.trim()] = callback;
                     }
                     else {
                         if (!this.beforeCallbacks['___common'])
@@ -6562,6 +6719,51 @@
                 }.bind(this));
                 return this;
             });
+        },
+        /**
+         * Binds an element to an object
+         * @param {_}|{HTMLElement} elem
+         * @param {Object} object
+         * @param {Funtion} callback
+         */
+        bindToObject: function (elem, object, callback) {
+            return internal.bindToObject.call(this, elem, object, callback);
+        },
+        /**
+         * Clears the cache of all models and collections on the current page
+         * @param {boolean} reload Indicates that the elements attached to these
+         * models and collections should be reloaded
+         * @returns {ThisApp}
+         */
+        clearPageCache: function (reload) {
+            var cleared = {},
+                    _this = this,
+                    did_page = false;
+            this.container.find('[this-model],model:not([this-in-collection]),'
+                    + '[this-type="model"]:not([this-in-collection])')
+                    .each(function () {
+                        var __this = _this._(this),
+                                name = __this.this('model') || __this.this('id');
+                        _this.collection(name, {
+                            success: function (collection) {
+                                collection.clearCache();
+                                if (__this.this('type') === 'page') {
+                                    did_page = true;
+                                    return;
+                                }
+                                // reload element if page's model collection has
+                                // not been cleared. Otherwise, don't. Reloading
+                                // page would take care of that.
+                                if (reload && !did_page) {
+                                    _this.load(__this);
+                                }
+                            }
+                        });
+                    });
+            // cleared page's model collection: reload page
+            if (did_page && reload) {
+                this.reload();
+            }
         },
         /**
          * Fetches a collection of model
@@ -6625,7 +6827,7 @@
                     if (!_collection.length)
                         _collection = this._('<collection this-model="'
                                 + model_name + '" this-url="' + config.url + '" />');
-                    _collection.attr('this-no-updates', '');
+                    _collection.this('no-updates', '');
                     var _this = this;
                     this.request({
                         url: _collection,
@@ -6655,8 +6857,8 @@
                                     new Collection(data, {
                                         name: model_name,
                                         app: _this,
-                                        uid: config.uid || _collection.attr('this-model-uid') || uid,
-                                        url: config.url || _collection.attr('this-url')
+                                        uid: config.uid || _collection.this('model-uid') || uid,
+                                        url: config.url || _collection.this('url')
                                     }));
                         },
                         error: config.error
@@ -6692,7 +6894,7 @@
                 if (e && this.__.isObject(e) && e['preventDefault'])
                     e.preventDefault();
                 if (!internal.canContinue
-                        .call(this, 'page.leave', [this.page.items[0]])) {
+                        .call(this, 'page.leave', [], this.page.items[0])) {
                     return this;
                 }
                 history.forward();
@@ -6719,30 +6921,45 @@
             return internal.getRequestKey.call(this);
         },
         /**
-         * Fetches a clone of the required elements from the template collection
+         * Fetches a clone of the required elements from the cache collection
          * @param {string} selector
-         * @param {booelan} Indicates that the original element should be returned
-         * and not a clone
+         * @param {string} type The type of element to get. This is the value of
+         * the `this-type` of the target element. The attribute is created and 
+         * appended to the selector.
          * @returns {_}
          */
-        getTemplate: function (selector, original) {
+        getCached: function (selector, type) {
             return this.tryCatch(function () {
                 var _this = this,
                         elem = this._();
+                if (type) {
+                    var seltr = '';
+                    this.__.forEach(selector.split(','), function (i, v) {
+                        if (seltr)
+                            seltr += ',';
+                        var parts = v.split(' '), sel = '';
+                        v = parts.pop();
+                        if (parts.length)
+                            sel += parts.join(' ') + ' ';
+                        seltr += sel + v + '[this-type="' + type + '"],' + sel + type + v;
+                    });
+                    selector = seltr;
+                }
+                // check in page cache first
                 if (this.page) {
                     if (!selector) {
-                        selector = 'page[this-id="' + this.page.attr('this-id')
+                        selector = 'page[this-id="' + this.page.this('id')
                                 + '"],[this-type="page"][this-id="'
-                                + this.page.attr('this-id') + '"]';
+                                + this.page.this('id') + '"]';
                     }
                     var selectr = '';
                     this.__.forEach(selector.split(','), function (i, v) {
                         if (selectr)
                             selectr += ',';
                         selectr += 'page[this-id="'
-                                + _this.page.attr('this-id') + '"] ' + v
+                                + _this.page.this('id') + '"] ' + v
                                 + ',[this-type="page"][this-id="'
-                                + _this.page.attr('this-id') + '"] ' + v;
+                                + _this.page.this('id') + '"] ' + v;
                     });
                     elem = this.templates.find(selectr);
                     if (!elem.length)
@@ -6751,17 +6968,17 @@
                 }
                 if (!elem.length)
                     elem = this.templates.children(selector);
-                if (original)
-                    return elem;
-                    elem = elem.clone();
+                elem = elem.clone();
+                if (elem.this('type') === 'template')
+                    elem.removeThis('type');
                 elem.find('[this-type="style"]').each(function () {
                     _this._(this).replaceWith('<style>' + this.innerText + '</style>');
                 });
-                    return this._(elem.outerHtml()
-                            .replace(/__obrace__/g, '{{')
-                            .replace(/__cbrace__/g, '}}')
-                            .replace(/__obrace2__/g, '({')
-                            .replace(/__cbrace2__/g, '})'));
+                return this._(elem.outerHtml()
+                        .replace(/__obrace__/g, '{{')
+                        .replace(/__cbrace__/g, '}}')
+                        .replace(/__obrace2__/g, '({')
+                        .replace(/__cbrace2__/g, '})'));
             });
         },
         /**
@@ -6776,7 +6993,7 @@
                         this.container
                         .find('page[this-default-page]:not([this-current]):not([this-dead]),'
                                 + '[this-type="pages"] [this-default-page]')
-                        .attr('this-id'), replaceState);
+                        .this('id'), replaceState);
                 return this;
             });
         },
@@ -6815,15 +7032,12 @@
                         && !this.firstPage))
                     return this;
                 if (this.page && !internal.canContinue
-                        .call(this, 'page.leave', [this.page.items[0]])) {
+                        .call(this, 'page.leave', [], this.page.items[0])) {
                     return this;
                 }
                 this.oldPage = _();
                 pageIDorPath = internal.pageIDFromLink.call(this, pageIDorPath);
-                var newPage = this.getTemplate('page[this-id="' + pageIDorPath + '"],'
-                        + 'page[this-path="' + pageIDorPath + '"],'
-                        + '[this-type="page"][this-path="' + pageIDorPath + '"],'
-                        + '[this-type="page"][this-id="' + pageIDorPath + '"]');
+                var newPage = this.getCached('[this-id="' + pageIDorPath + '"]', 'page');
                 if (newPage.length > 1) {
                     this.error('Target page matches multiple pages!');
                     return this;
@@ -6861,7 +7075,7 @@
                     if (this.page) {
                         var evt = event.replace(/[^a-z0-9]/gi, '')
                                 + selector.replace(/[^a-z0-9]/gi, ''),
-                                pageID = this.page.attr('this-id');
+                                pageID = this.page.this('id');
                         if (!containedEvents[evt]) {
                             // event has not been handled at all before
                             containedEvents[evt] = {};
@@ -6914,15 +7128,35 @@
          */
         reload: function (resources, layouts) {
             return this.tryCatch(function () {
+                var last_page = this.store('last_page');
                 this.store('last_page', null);
                 if (resources)
                     location.reload();
                 else {
                     this.reloadLayouts = layouts || false;
-                    this.loadPage(location.hash.substr(2), true);
+                    if (this.page.hasAttr('this-reading')) {
+                        // keep attributes for page
+                        this.tar['page#' + this.page.this('id')] = {
+                            reading: '',
+                            url: this.page.this('url'),
+                            model: this.page.this('model'),
+                            mid: this.page.this('mid')
+                        };
+                    }
+                    this.loadPage(last_page, true);
                 }
                 return this;
             });
+        },
+        /**
+         * Replaces cached elements with the given elem
+         * @param {String} selector
+         * @param {_}|{HTMLElement| elem
+         * @returns {ThisApp}
+         */
+        replaceCached: function (selector, elem) {
+            this.templates.find(selector).replaceWith(this._(elem).clone());
+            return this;
         },
         /**
          * Sends an AJAX request
@@ -6953,7 +7187,7 @@
                     return this;
                 }
                 else if (this.__.isObject(url)) {
-                    url = url.attr('this-url');
+                    url = url.this('url');
                 }
                 if (!url.startsWith('./') && !url.startsWith('../') && url.indexOf('://') === -1) {
                     url = this.config.baseURL + url;
@@ -6985,16 +7219,16 @@
                     });
                     this.container.find(selector).each(function () {
                         var _input = _(this),
-                                _dropdownList = _this.container.find('[this-id="' + _input.attr('this-list')
-                                        + '"][this-type="list"],list[this-id="' + _input.attr('this-list')
+                                _dropdownList = _this.container.find('[this-id="' + _input.this('list')
+                                        + '"][this-type="list"],list[this-id="' + _input.this('list')
                                         + '"]'),
                                 _selectedList = _this.container.find('[this-id="'
-                                        + _dropdownList.attr('this-selection-list')
+                                        + _dropdownList.this('selection-list')
                                         + '"][this-type="list"],list[this-id="'
-                                        + _dropdownList.attr('this-selection-list')
+                                        + _dropdownList.this('selection-list')
                                         + '"]');
                         _selectedList.html('').hide();
-                        _dropdownList.removeAttr('this-selected').html('').hide();
+                        _dropdownList.removeThis('selected').html('').hide();
                         _input.val('').trigger('keyup').show();
 
                     });
@@ -7187,9 +7421,9 @@
             else {
                 this.loadPage((hash && hash !== '#' && hash !== '#/') ? hash :
                         this.config.startWith ||
-                        this.getTemplate('page[this-default-page],'
+                        this.getCached('page[this-default-page],'
                                 + '[this-type="pages"] [this-default-page]')
-                        .attr('this-id'));
+                        .this('id'));
             }
             return this;
         },

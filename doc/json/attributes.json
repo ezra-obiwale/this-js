@@ -74,6 +74,14 @@
             "description": "Indicates a cached element",
             "internal": true
         },
+        "this-clear-page-cache": {
+            "id": "this-clear-page-cache",
+            "value": "boolean",
+            "description": [
+                "Triggers `ThisApp.clearPageCache`.",
+                "If value is `TRUE`, the current page is also reloaded after all cache has been cleared."
+            ]
+        },
         "this-code": {
             "description": "Indicates that the content should be parsed as code by replacing < with &amp;lt; and > with &amp;gt;",
             "links": [
@@ -179,7 +187,13 @@
         },
         "this-do": {
             "id": "this-do",
-            "value": "create|read|update|delete|search",
+            "value": [
+                "create",
+                "read",
+                "update",
+                "delete",
+                "search"
+            ],
             "description": [
                 "If applied on pages, it indicates the CRUD action that the page is expected to perform. This shouldn't be done manually as it is generated based on the link clicked",
                 "If applied on form and value is `search`, the form becomes a search form and expects an input field with attribute `this-search`"
@@ -319,7 +333,11 @@
         },
         "this-goto": {
             "id": "this-goto",
-            "value": "id|name|path",
+            "value": [
+                "id",
+                "name",
+                "path"
+            ],
             "description": [
                 "Holds the id of, name of, or path to, the page to load when the element is clicked."
             ],
@@ -328,6 +346,17 @@
                 "this-read",
                 "this-update",
                 "this-delete"
+            ]
+        },
+        "this-handle-submit": {
+            "id": "this-handle-submit",
+            "description": [
+                "Used on forms that are not bound to any model, it indicates that the submission should be handled via ajax with the appropriate form events triggered."
+            ],
+            "on": "forms",
+            "links": [
+                "this-ignore-submit",
+                "this-do"
             ]
         },
         "this-hidden": {
@@ -398,12 +427,22 @@
             ],
             "on": "link elements"
         },
+        "this-ignore-dom": {
+            "id": "this-ignore-dom",
+            "description": "Indicates that the model element in the dom should not be updated on successful create or update.",
+            "links": [
+                "this-create",
+                "this-update"
+            ],
+            "on": "forms"
+        },
         "this-ignore-submit": {
             "id": "this-ignore-submit",
             "description": "Indicates that the form should not be processed when submitted",
             "links": [
                 "this-create",
-                "this-update"
+                "this-update",
+                "this-handle-submit"
             ],
             "on": "forms"
         },
@@ -437,7 +476,10 @@
         },
         "this-key": {
             "id": "this-key",
-            "value": "string, integer",
+            "value": [
+                "string",
+                "integer"
+            ],
             "description": [
                 "This holds the unique key that identifies each suggested item when autcompleting. This is usually the uid of the model applied to the suggestion item from the array list gotten from the server"
             ],
@@ -742,7 +784,10 @@
         },
         "this-reload": {
             "id": "this-reload",
-            "value": "collection ID | model ID",
+            "value": [
+                "collection ID",
+                "model ID"
+            ],
             "description": [
                 "When clicked, the target should be reloaded. To be reloaded, `this-attributes` must be applied.",
                 "If no value is specified, the page, layouts and all resources are reloaded"
@@ -865,6 +910,7 @@
                 "component",
                 "layout",
                 "list",
+                "template",
                 "..."
             ],
             "description": "Indicates the type of container an element is",
