@@ -388,6 +388,17 @@
                 "this-type"
             ]
         },
+        "this-id-key": {
+            "id": "this-id-key",
+            "value": "string",
+            "description": [
+                "The name of the model key which serves as the unique identifier. Every element with `this-model` should have one.",
+                "If none is specified, `id` is assumed"
+            ],
+            "links": [
+                "this-model"
+            ]
+        },
         "this-if": {
             "id": "this-if",
             "value": "Expression",
@@ -586,18 +597,6 @@
                 "this-bind"
             ]
         },
-        "this-model-uid": {
-            "id": "this-model-uid",
-            "value": "string",
-            "description": [
-                "The name of the model key which serves as the unique identifier. Every element with `this-model` should have one.",
-                "If none is specified, `id` is assumed"
-            ],
-            "links": [
-                "this-uid",
-                "this-model"
-            ]
-        },
         "this-multiple": {
             "id": "this-multiple",
             "description": "This indicates that multiple suggestions can be selected instead of the default one",
@@ -723,6 +722,15 @@
             "internal": true,
             "on": "pages"
         },
+        "this-query-fields": {
+            "id": "this-query-fields",
+            "value": "string",
+            "description": "A comma-separated list of model fields/keys to perform query on",
+            "on": "input",
+            "links": [
+                "this-autcomplete"
+            ]
+        },
         "this-query-key": {
             "id": "this-query-key",
             "value": "string",
@@ -756,10 +764,10 @@
         },
         "this-refill": {
             "id": "this-refill",
-            "value": "expression",
+            "value": "function",
             "description": [
-                "Used on selection lists for autocomplete input elements and indicates that the expression value should be used as default data when loading form elements from a model.",
-                "Object `model` is available to the expression and holds the model from which the form is being loaded.",
+                "Used on selection lists for autocomplete input elements and contains the name of the function to call to get the data to process from..",
+                "The first parameter is the data gotten from the model while the second parameter is the function to call with the refined data after processing.",
                 "For this to happen, the autocomplete input element must have a `this-is` attribute whose value holds the key which holds a list of already selected ids."
             ],
             "links": [
@@ -827,7 +835,8 @@
                 "Value can be a semi-colon separated string of attribute:value to be set when resetting the form.",
                 "For example, on an image, the value may be 'src:/path/to/default/image.jpg;class:default",
                 "If value is empty, it is treated like other forms and the `value` attribute is set to empty"
-            ]
+            ],
+            "on": "img"
         },
         "this-search": {
             "id": "this-search",
@@ -864,6 +873,15 @@
                 "this-toggle"
             ],
             "on": "link elements"
+        },
+        "this-sort-fields": {
+            "id": "this-sort-fields",
+            "value": "string",
+            "description": "An inline-style-pattern string of model keys to direction e.g. `firstName:asc;lastName:desc`",
+            "on": "input",
+            "links": [
+                "this-autocomplete"
+            ]
         },
         "this-static": {
             "id": "this-static",
@@ -934,15 +952,6 @@
                 "this-delete"
             ],
             "on": "link elements"
-        },
-        "this-uid": {
-            "id": "this-uid",
-            "value": "string",
-            "description": "The name of the model key which serves as the unique identifier. This is only found on model elements",
-            "links": [
-                "this-model"
-            ],
-            "on": "models"
         },
         "this-url": {
             "id": "this-url",
