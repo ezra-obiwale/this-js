@@ -253,7 +253,7 @@
                 : null;
     }
     function getRealData(data) {
-        // use dataKey if available
+// use dataKey if available
         if (this.config.dataKey) {
             return data[this.config.dataKey];
         }
@@ -1549,7 +1549,6 @@
              * Internal (hidden) methods
              */
             internal = Object.create({
-                hiddenFeatures: [],
                 records: {},
                 /**
                  * Binds the target to the model of the given element
@@ -1606,7 +1605,6 @@
                  */
                 bindToObject: function (elem, object, callback) {
                     var notWiths = internal.hideNotWiths.call(this, elem);
-                    internal.emptyFeatures.call(this, elem);
                     return internal.loadComponents.call(this, function () {
                         return internal.parseData.call(this, object, elem, false, true, function (elem) {
                             internal.loadFormElements.call(this, elem.find('[this-is]'), object);
@@ -1715,17 +1713,18 @@
                  * @param Tracks the remaining components to be loaded befoe callback should be called
                  */
                 componentLoaded: function (components, callback, remaining) {
-                    if (!remaining)
-                        this.__.callable(callback).call(this);
-                    else {
-                        var _this = this;
-                        internal.loadComponent
-                                .call(this, components.get(components.length - remaining),
-                                        function () {
-                                            remaining--;
-                                            internal.componentLoaded.call(_this, components, callback, remaining);
-                                        });
+                    if (!remaining) {
+                        components = this.container.find('[this-component]');
+                        remaining = components.length;
+                        if (!remaining)
+                            return this.__.callable(callback).call(this);
                     }
+                    internal.loadComponent
+                            .call(this, components.get(components.length - remaining),
+                                    function () {
+                                        remaining--;
+                                        internal.componentLoaded.call(this, components, callback, remaining);
+                                    }.bind(this));
                 },
                 /**
                  * Dispatches a page event for only the page
@@ -1946,47 +1945,56 @@
                  * @param {string} selector
                  * @param {object} data
                  * @param {string} uid
-                 * @param {boolean} emptyList Indicates whether to empty the list
-                 * before filling
                  * @returns {array} Array of ids added to the list
                  */
                 fillAutocompleteList: function (options) {
-                    var _list = this.container.find(options.selector),
-                            _this = this,
+                    var _this = this,
                             ids = [];
-                    if (options.emptyList)
-                        _list.html('');
                     // loop through data
                     this.__.forEach(options.data, function (i, v) {
+                        // filter list
+                        if (options.filter) {
+                            var kontinue,
+                                    current = {
+                                        index: i,
+                                        model: v
+                                    };
+                            try {
+                                kontinue = eval(options.filter);
+                            }
+                            catch (e) {
+                            }
+                            if (!kontinue)
+                                return;
+                        }
                         // get unique id value
                         var id = internal.getUIDValue.call(_this, v);
+                        // don't render elem if already selected
+                        var selected = options.list
+                                .this('selected') || '';
+                        if (selected.indexOf(id + ',') !== -1) {
+                            return;
+                        }
                         ids.push(id);
-                        _list.append(_this
-                                .getCached(options.selector)
+                        options.list.append(_this
+                                .getCached('[this-type="list"][this-id="'
+                                        + options.list.this('id') + '"],list[this-id="'
+                                        + options.list.this('id') + '"]')
                                 .children()
                                 .removeThis('cache')
                                 .this('index', i)
                                 .this('key', id));
                         // bind object to element
                         internal.bindToObject
-                                .call(_this, _list.children('[this-key="' + id + '"]'), v,
+                                .call(_this, options.list.children('[this-key="' + id + '"]'), v,
                                         function (elem) {
-                                            // avoid showing elem if already
-                                            // selected
-                                            var selected = _list
-                                                    .this('selected') || '';
-                                            if (selected.indexOf(id + ',') !== -1)
-                                            {
-                                                elem.remove();
-                                                return;
-                                            }
                                             elem.show();
                                         });
                     });
-                    if (_list.children(':not([this-cache])').length)
-                        _list.show();
+                    if (options.list.children(':not([this-cache])').length)
+                        options.list.show();
                     else
-                        _list.hide();
+                        options.list.hide();
                     return ids;
                 },
                 /**
@@ -2057,7 +2065,7 @@
                                                     internal.showPage.call(this, replaceInState);
                                                 }.bind(this), model.attributes || {});
                                             }.bind(this),
-                                            error: function (e) {
+                                            error: function () {
                                                 // load page model. no data provided. request anew
                                                 internal.loadModel.call(_this, this.page, function () {
                                                     internal.showPage.call(this, replaceInState);
@@ -2117,7 +2125,10 @@
                         success: function (data) {
                             var elem = _this.__.createElement(data),
                                     prep4Tmpl = function (elem) {
-                                        elem.find('[this-type="collection"]:not([this-model]),collection:not([this-model])')
+                                        var content = internal.removeComments.call(_this, elem.html());
+                                        elem.html(content);
+                                        elem.find('[this-type="collection"]:not([this-model]),'
+                                                + 'collection:not([this-model])')
                                                 .each(function () {
                                                     _this._(this).this('model', _this._(this).this('id'));
                                                 });
@@ -2141,17 +2152,31 @@
                                                                 .this('parent-list',
                                                                         _list.this('id'));
                                                 });
-
-                                    };
+                                        elem.find('img[src]').each(function () {
+                                            var __this = _this._(this);
+                                            if (!__this.attr('src'))
+                                                return;
+                                            __this.attr('this-src', __this.attr('src'))
+                                                    .removeAttr('src');
+                                        });
+                                    },
+                                    done = function () {
+                                        _this.__.callable(success).call(this, elem.clone());
+                                    }.bind(this);
                             // components
                             if (type === 'component') {
                                 if (elem.length > 1 || (elem.hasThis('type') && elem.this('type') !== 'component'))
                                     elem = _this._('<div/>').html(elem);
                                 elem.this('component-url', idOrPath);
                                 prep4Tmpl(elem);
-                                _this.addToCache(_this._('<div this-type="component"'
-                                        + ' this-url="' + idOrPath + '" />')
-                                        .html(elem.clone().removeThis('url')));
+                                internal.loadCollections.call(_this,
+                                        function () {
+                                            _this.addToCache(_this._('<div this-type="component"'
+                                                    + ' this-url="' + idOrPath + '" />')
+                                                    .html(elem.clone().removeThis('url')));
+                                            done();
+                                        }, elem.find('[this-type="collection"][this-static],'
+                                        + 'collection[this-static]'));
                             }
                             // pages and layouts
                             else {
@@ -2173,9 +2198,8 @@
                                     prep4Tmpl(elem);
                                 }
                                 _this.addToCache(elem);
+                                done();
                             }
-                            internal.emptyFeatures.call(_this, elem);
-                            _this.__.callable(success).call(this, elem.clone());
                         },
                         error: function (e) {
                             _this.__.callable(error).call(this, e);
@@ -2194,7 +2218,7 @@
                     return key;
                 },
                 /**
-                 * Fetches all the comments in the content denoted by {*...*}
+                 * Fetches all the comments in the content denoted by {:...:}
                  * @param {string} content
                  * @returns {Array}
                  */
@@ -2272,7 +2296,8 @@
                             var exp = v.split(':'), filter = _this.__.removeArrayIndex(exp, 0);
                             if (Filters[filter])
                                 value = Filters[filter](value, exp.join(':'));
-                            if (!value) /* stop filtering if no value exists anymore */
+                            if (!value)
+                                /* stop filtering if no value exists anymore */
                                 return false;
                         });
                     if (!value && value != 0)
@@ -2285,14 +2310,13 @@
                 hideNotWiths: function (elem) {
                     // hold not withs
                     var _not_with = elem.find('[this-not-with="'
-                            + elem.this('model') || elem.this('id')
-                            + '"]'),
+                            + elem.this('id') + '"]'),
                             cnt = 0,
                             notWiths = {};
                     if (!elem.this('id'))
                         elem.this('id', this.__.randomString());
                     while (_not_with.length) {
-                        var name = elem.this('id') + cnt;
+                        var name = elem.this('id') + '-' + cnt;
                         notWiths[name] = _not_with.get(0);
                         this._(_not_with.get(0)).replaceWith('<div this-with="'
                                 + name + '" />');
@@ -2343,8 +2367,7 @@
                                 var __this = _this._(this);
                                 if (__this.hasThis('ignore'))
                                     return;
-                                else if (__this.this('if'))
-                                {
+                                else if (__this.this('if')) {
                                     try {
                                         level++;
                                         matched[level] = false;
@@ -2365,8 +2388,7 @@
                                         level--;
                                     }
                                 }
-                                else if (__this.this('else-if'))
-                                {
+                                else if (__this.this('else-if')) {
                                     try {
                                         if (!__.isBoolean(matched[level])) {
                                             _this.error('Branching error: Else-if without If!');
@@ -2496,8 +2518,7 @@
                     if (!Object.keys(this.removedAssets).length)
                         this._('script[this-app="' + this.container.this('id') + '"]')
                                 .removeThis('loaded');
-                    if (elem.this('load-js-first') && !loadedPageJS.first[this.page.this('id')])
-                    {
+                    if (elem.this('load-js-first') && !loadedPageJS.first[this.page.this('id')]) {
                         leaveUnrequired = true;
                         var jses = elem.this('load-js-first').split(','),
                                 removedAssets = this.removedAssets[elemType];
@@ -2642,21 +2663,30 @@
                  * @param boolean replaceState
                  * @returns ThisApp
                  */
-                loadCollections: function (replaceState, chain) {
-                    var _this = this;
-                    var collections = this.container.find('collection:not([this-loaded])'
-                            + ':not([this-data]):not([this-loading]),'
-                            + '[this-type="collection"]:not([this-loaded])'
-                            + ':not([this-data]):not([this-loading])'),
-                            length = collections.length;
-                    if (chain && !length)
-                        internal.loadForms.call(this, null, null, replaceState, chain);
+                loadCollections: function (callback, collections, replaceState) {
+                    var _this = this,
+                            chain = collections === null,
+                            collections = collections || this.container.find('collection:not([this-loaded])'
+                                    + ':not([this-data]):not([this-loading]),'
+                                    + '[this-type="collection"]:not([this-loaded])'
+                                    + ':not([this-data]):not([this-loading])'),
+                            length = collections.length,
+                            done = function () {
+                                if (chain) {
+                                    internal.loadForms.call(this, null, null, replaceState, chain);
+                                }
+                                else {
+                                    _this.__.callable(callback).call(_this);
+                                }
+                            }.bind(this);
+                    if (!length)
+                        done();
                     else
                         collections.each(function () {
                             internal.loadCollection.call(_this, this, function () {
                                 length--;
-                                if (chain && !length) {
-                                    internal.loadForms.call(this, null, null, replaceState, chain);
+                                if (!length) {
+                                    done();
                                 }
                             }.bind(_this), null, replaceState);
                         });
@@ -2779,9 +2809,11 @@
                     // get expiration if set and data from dataKey if specified
                     if (this.config.dataKey) {
                         // set data expiration timestamp too.
-                        if (!isNaN(data.expires)) // expiration is a number. Must be milliseconds
+                        if (!isNaN(data.expires))
+                            // expiration is a number. Must be milliseconds
                             _data.expires = new Date().setMilliseconds(1000 * data.expires);
-                        else if (this.__.isString(data.expires)) // expiration is a string. Must be date
+                        else if (this.__.isString(data.expires))
+                            // expiration is a string. Must be date
                             _data.expires = new Date(data.expires).getTime();
                         data = real_data;
                     }
@@ -3030,7 +3062,7 @@
                         if (save !== false) {
                             var id = internal.getUIDValue
                                     .call(this, data, container.this('id-key'));
-                            internal.store.call(save_as).save(data, id);
+                            internal.store.call(this, save_as).save(data, id);
                         }
                         // add url to model data for parsing
                         data['_url'] = container.this('url');
@@ -3062,8 +3094,7 @@
                                 data = internal.getUIDValue.call(_this, data);
                             }
                             __this.removeThis('is');
-                            if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox')
-                            {
+                            if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox') {
                                 // using attribute so that redumping content 
                                 // would still work fine
                                 if (__this.attr('value') == data || data == on)
@@ -3086,12 +3117,12 @@
                                         .find('list[this-id="' + __this.this('list')
                                                 + '"],[this-type="list"][this-id="'
                                                 + __this.this('list') + '"]'),
-                                        selectedListSelector = 'list[this-id="'
-                                        + _dropDownList.this('selection-list')
-                                        + '"],[this-type="list"][this-id="'
-                                        + _dropDownList.this('selection-list') + '"]',
                                         _selectedList = _this.container
-                                        .find(selectedListSelector);
+                                        .find('list[this-id="'
+                                                + _dropDownList.this('selection-list')
+                                                + '"],[this-type="list"][this-id="'
+                                                + _dropDownList.this('selection-list')
+                                                + '"]');
                                 var gotData = function (data) {
                                     var ids = [];
                                     if (data) {
@@ -3110,9 +3141,8 @@
                                             __this.hide();
                                         }
                                         ids = internal.fillAutocompleteList.call(this, {
-                                            selector: selectedListSelector,
-                                            data: data,
-                                            emptyList: true
+                                            list: _selectedList.html(''),
+                                            data: data
                                         });
                                     }
                                     _dropDownList.this('selected', ids.join(',') + ',');
@@ -3284,7 +3314,6 @@
                  */
                 loadModel: function (target, callback, data, replaceState) {
                     var __this = this._(target),
-                            content = __this.hide().outerHtml(),
                             _this = this,
                             type = getElemType(__this),
                             common_selector = '';
@@ -3303,44 +3332,54 @@
 
                     if (type !== 'page') {
                         // necessary in case of binding and target has already been used
-                        content = __this.html(this.getCached(common_selector, type)
-                                .hide().html()).outerHtml();
+                        __this.html(this.getCached(common_selector, type).hide()
+                                .html());
                     }
-                    this.notWiths = internal.hideNotWiths.call(this, __this);
-                    if (Object.keys(this.notWiths).length) {
-                        content = __this.outerHtml();
-                    }
-                    var success = function (data, uid, handled) {
-                        __this.removeThis('loading');
-                        if (handled) {
-                            _this.__.callable(callback).call(_this);
-                            return;
+                    function loadedComponents(content) {
+                        this.notWiths = internal.hideNotWiths.call(this, __this);
+                        if (Object.keys(this.notWiths).length) {
+                            content = __this.outerHtml();
                         }
-                        internal.loadData.call(_this, __this, data, content, true,
-                                // only save the data if not loading page
-                                type !== 'page',
-                                function (elem) {
-                                    if (elem) {
-                                        elem.this('loaded', '')
-                                                .removeThis('loading')
-                                                .trigger('model.loaded')
-                                                .show();
-                                    }
-                                    this.__.callable(callback).call(this, data);
-                                }.bind(_this));
-                    },
-                            error = function () {
-                                __this.removeThis('loading');
+                        var success = function (data, uid, handled) {
+                            __this.removeThis('loading');
+                            if (handled) {
                                 _this.__.callable(callback).call(_this);
-                            };
-                    internal.loadOrRequestData.call(this, {
-                        elem: __this,
-                        content: content,
-                        data: data,
-                        success: success,
-                        error: error,
-                        replaceState: replaceState
-                    });
+                                return;
+                            }
+                            internal.loadData.call(_this, __this, data, content, true,
+                                    // only save the data if not loading page
+                                    type !== 'page',
+                                    function (elem) {
+                                        if (elem) {
+                                            elem.this('loaded', '')
+                                                    .removeThis('loading')
+                                                    .trigger('model.loaded')
+                                                    .show();
+                                        }
+                                        this.__.callable(callback).call(this, data);
+                                    }.bind(_this));
+                        },
+                                error = function () {
+                                    __this.removeThis('loading');
+                                    _this.__.callable(callback).call(_this);
+                                };
+                        if (data) {
+                            success(data);
+                        }
+                        else {
+                            internal.loadOrRequestData.call(this, {
+                                elem: __this,
+                                content: content,
+                                data: data,
+                                success: success,
+                                error: error,
+                                replaceState: replaceState
+                            });
+                        }
+                    }
+                    internal.loadComponents.call(this, function () {
+                        loadedComponents.call(_this, __this.outerHtml());
+                    }, __this.find('[this-component]'));
                     return __this;
                 },
                 /**
@@ -3355,13 +3394,16 @@
                                     + '[this-type="model"]:not([this-in-collection])'),
                             length = models.length;
                     if (chain && !length)
-                        internal.loadCollections.call(this, replaceState, chain);
+                        internal.loadCollections.call(this, null, null, replaceState);
                     models.each(function () {
-                        internal.loadModel.call(_this, this, function () {
-                            length--;
-                            if (chain && !length)
-                                internal.loadCollections.call(this, replaceState, chain);
-                        }.bind(_this), {}, replaceState);
+                        internal.loadModel.call(_this, this,
+                                function () {
+                                    length--;
+                                    if (chain && !length) {
+                                        internal.loadCollections.call(this, null, null, replaceState);
+                                    }
+                                }.bind(_this),
+                                {}, replaceState);
                     });
                     return this;
                 },
@@ -3469,18 +3511,18 @@
                                             + config.elem.this('id'))
                                     // or elem itself says ignore cache
                                     || config.elem.hasThis('ignore-cache'))) {
+                        var type;
+                        try {
+                            type = _this.config.crud.methods.read;
+                        }
+                        catch (e) {
+                            type = 'get';
+                        }
                         // Data transport exists
                         if (this.dataTransport) {
                             if (!config.elem.hasThis('no-updates') && this.watchCallback)
                                 internal.watch.call(this, config.elem);
                             config.elem.removeThis('no-updates');
-                            var type;
-                            try {
-                                type = _this.config.crud.methods.read;
-                            }
-                            catch (e) {
-                                type = 'get';
-                            }
                             return this.__.callable(this.dataTransport)
                                     .call(this, {
                                         elem: config.elem,
@@ -3736,6 +3778,7 @@
                     // page was just loaded and not restored from history
                     if (!restored) {
                         this.restored = false;
+                        internal.renderSrc.call(this, this.container);
                         this.container.find('[this-inline-code]').each(function () {
                             var __this = _this._(this);
                             __this.replaceWith(_this._('<code this-code />').html(__this.html()));
@@ -3821,8 +3864,7 @@
                  * @param boolean isModel Indicates whether parsing data for a model or not
                  * @returns ThisApp
                  */
-                parseData: function (data, container, forCollection, isModel, callback)
-                {
+                parseData: function (data, container, forCollection, isModel, callback) {
                     var _this = this, custom = false, tab_cont, level;
                     if (this.__.isString(container)) {
                         container = this._('<div/>').html(container);
@@ -3835,7 +3877,6 @@
                         container = tab_cont.container;
                         level = tab_cont.level;
                     }
-                    internal.toggleFeatures.call(this, container);
                     var _each = container.find('[this-each]');
                     while (_each.length) {
                         var __this = _each.next(),
@@ -3888,7 +3929,6 @@
                     content = internal.fillVariables.call(this, variables, data, content);
                     container.replaceWith(content);
                     var done = function () {
-                        internal.toggleFeatures.call(this, container, true);
                         if (custom)
                             container = container.children();
                         container.find('[this-muted]').removeThis('muted');
@@ -3896,6 +3936,7 @@
                             container = container.children();
                             level--;
                         }
+                        internal.renderSrc.call(this, container);
                         this.__.callable(callback).call(this, container);
                     }.bind(this);
                     if (isModel) {
@@ -3927,8 +3968,7 @@
                  * @param {object} current Object available to expressions
                  * @returns {mixed}
                  */
-                processExpressions: function (content, current, model, removeUnresolved)
-                {
+                processExpressions: function (content, current, model, removeUnresolved) {
                     var _this = this,
                             exps = internal.getExpressions.call(this, content);
                     this.__.forEach(exps, function (i, v) {
@@ -3976,6 +4016,20 @@
                         content = content.replace(v, '');
                     });
                     return content;
+                },
+                /**
+                 * Turns this-src to src on images
+                 * @param {_} container
+                 */
+                renderSrc: function (container) {
+                    var _this = this;
+                    this._(container).find('img[this-src]').each(function () {
+                        var __this = _this._(this);
+                        if (__this.attr('this-src').indexOf('{{') !== -1)
+                            return;
+                        __this.attr('src', __this.attr('this-src'))
+                                .removeAttr('this-src');
+                    });
                 },
                 /**
                  * Resets a form wisely without removing values from buttons
@@ -4156,6 +4210,9 @@
                             this.container = this._('body');
                         else if (!this.container.this('id'))
                             this.container.this('id', __.randomString());
+                        // remove comments
+                        var content = internal.removeComments.call(this, this.container.html());
+                        this.container.html(content);
                         // setup record for this app
                         internal.records[this.container.this('id')] = {
                             running: true,
@@ -4372,8 +4429,7 @@
                                  * `this-model` must be provided unless the target
                                  * form already has the required attributes.
                                  */
-                                .on('click', '[this-create][this-form]', function ()
-                                {
+                                .on('click', '[this-create][this-form]', function () {
                                     var __this = _this._(this),
                                             selector = 'form[this-id="'
                                             + __this.this('form') + '"]',
@@ -4408,8 +4464,7 @@
                                  * `this-model` may be provided if target isn't
                                  * in a model container or target page doesn't have these attributes.
                                  */
-                                .on('click', '[this-goto][this-delete]', function ()
-                                {
+                                .on('click', '[this-goto][this-delete]', function () {
                                     var __this = _this._(this),
                                             _model = __this.closest('model,[this-type="model"]'),
                                             url = __this.this('delete')
@@ -4718,17 +4773,12 @@
                                                 __this.this('id', _this.__.randomString());
                                             _list.this('autocompleting',
                                                     __this.this('id'))
-                                                    .children().this('cache', '')
-                                                    .hide();
+                                                    .children().html('');
                                             internal.fillAutocompleteList
                                                     .call(_this, {
-                                                        selector: '[this-type="list"][this-id="'
-                                                                + __this.this('list')
-                                                                + '"],list[this-id="'
-                                                                + __this.this('list')
-                                                                + '"]',
-                                                        data: data,
-                                                        emptyList: true
+                                                        list: _list,
+                                                        filter: _list.this('filter'),
+                                                        data: data
                                                     });
                                             internal.recordsStore.save(data, 'autocompleting');
                                         },
@@ -4758,8 +4808,7 @@
                                         }
                                     }, __this.this('delay') || 300);
                                 })
-                                .on('click', '[this-autocompleting]>[this-key]', function ()
-                                {
+                                .on('click', '[this-autocompleting]>[this-key]', function () {
                                     var __this = _this._(this),
                                             selectedListSelector = '[this-type="list"][this-id="'
                                             + __this.parent().this('selection-list')
@@ -5119,8 +5168,7 @@
                                 document.scrollingElement.scrollTop = 0;
                             updateLinks.call(_this);
                         })
-                                .when('component.loaded', 'component', function ()
-                                {
+                                .when('component.loaded', 'component', function () {
                                     var elem = _this._(this);
                                     // page is already loaded
                                     if (_this.pageIsLoaded) {
@@ -5195,12 +5243,13 @@
                     }.bind(this), this.__.isNumber(wait) ? wait : 0);
                     if (this.config.titleContainer)
                         this.config.titleContainer.html(this.page.this('title'));
-                    internal.toggleFeatures.call(this, this.container);
+                    // this ensures that only expressions and variables for the page
+                    // are run
+                    internal.emptyFeatures.call(this, this.container);
                     var content = internal.inLoop.call(this, {}, true, this.container.html());
                     content = internal.processExpressions.call(this, content, {}, {});
                     content = internal.removeComments.call(this, content);
                     this.container.html(content);
-                    internal.toggleFeatures.call(this, this.container, true);
                     this.page = this.container.find('page[this-id="' + this.page.this('id')
                             + '"]:not([this-dead]),[this-type="page"][this-id="'
                             + this.page.this('id') + '"]:not([this-dead])');
@@ -5222,29 +5271,7 @@
                  * @returns {Store}
                  */
                 store: function (name) {
-                    return new Store(name);
-                },
-                toggleFeatures: function (container, show) {
-                    var _this = this,
-                            container = this._(container);
-                    if (show) {
-                        container.find('[this-feature]').each(function () {
-                            var __this = _this._(this);
-                            __this.replaceWith(internal.hiddenFeatures[__this.this('feature')]);
-                        });
-                    }
-                    else {
-                        container.find('model:not([this-loaded]):not([this-loading]):not([this-in-collection]),'
-                                + '[this-type="model"]:not([this-loaded]):not([this-loading]):not([this-in-collection]),'
-                                + 'collection:not([this-loaded]):not([this-loading]),'
-                                + '[this-type="collection"]:not([this-loaded]):not([this-loading])')
-                                .each(function (i) {
-                                    internal.hiddenFeatures.push(this);
-                                    var pos = internal.hiddenFeatures.length - 1;
-                                    _this._(this).replaceWith('<div this-feature="' + pos + '" />');
-                                });
-                    }
-                    return container;
+                    return name ? new Store(name) : null;
                 },
                 /**
                  * Updates a retrieved saved page
@@ -5934,9 +5961,8 @@
                         if (_template.length)
                             elem.html(_template.html());
                         return this.app.promise(function (resolve) {
-                            internal.bindToObject.call(this.app, elem,
-                                    this.attributes || {},
-                                    function (elem) {
+                            internal.loadModel.call(this.app, elem,
+                                    function () {
                                         elem.show();
                                         var attr = {
                                             "this-type": "model",
@@ -5958,7 +5984,8 @@
                                             elem.attr(attr);
                                         }
                                         resolve();
-                                    }.bind(this));
+                                    }.bind(this),
+                                    this.attributes);
                         }.bind(this));
                     },
                     /**
@@ -5999,15 +6026,15 @@
                             var _this = this;
                             if (!this.app) {
                                 console.error('Invalid model object');
-                                reject('Invalid model object');
+                                return reject('Invalid model object');
                             }
                             else if (!this.name) {
                                 _this.app.error('Cannot delete an unnamed model.');
-                                reject('Cannot delete an unnamed model.');
+                                return reject('Cannot delete an unnamed model.');
                             }
                             else if (!this.id) {
                                 _this.app.error('Cannot delete a model without an id.');
-                                reject('Cannot delete a model without an id.');
+                                return reject('Cannot delete a model without an id.');
                             }
                             var done = function () {
                                 // model is a part of a page pagination
@@ -6103,13 +6130,13 @@
                                             _this.collection.length--;
                                         }
                                     }
-                                    resolve(data);
                                     _this.app.__.callable(config.success).call(this, data);
+                                    resolve(data);
                                     _this.app.__.callable(config.complete).call(this);
                                 },
                                         _error = function (e) {
-                                            reject(e);
                                             _this.app.__.callable(config.error).call(this, e);
+                                            reject(e);
                                             _this.app.__.callable(config.complete).call(this, e);
                                         };
                                 if (this.app.dataTransport)
@@ -6132,7 +6159,7 @@
                             }
                             else {
                                 this.app.error('Cannot remove model from server: No URL supplied.');
-                                reject('Cannot remove model from server: No URL supplied.');
+                                return reject('Cannot remove model from server: No URL supplied.');
                             }
                         }.bind(this));
                     },
@@ -6146,11 +6173,11 @@
                         return this.app.promise(function (resolve, reject) {
                             if (!this.app) {
                                 console.error('Invalid model object');
-                                reject('Invalid model object');
+                                return reject('Invalid model object');
                             }
                             else if (!this.name) {
                                 _this.app.error('Cannot save an unnamed model.');
-                                reject('Cannot save an unnamed model.');
+                                return reject('Cannot save an unnamed model.');
                             }
                             config = this.app.__.extend({}, config);
                             var data = config.data || {},
@@ -6169,8 +6196,8 @@
                                     && !config.form) {
                                 this.app.error('No data or form to save');
                                 this.app.__.callable(config.error).call(this.app);
-                                this.app.__.callable(config.complete).call(this.app);
                                 reject('No data or form to save');
+                                return this.app.__.callable(config.complete).call(this.app);
                             }
 
                             var finalizeSave = function (config, data) {
@@ -6253,8 +6280,8 @@
                                         _this.app.__.callable(config.complete).call(this);
                                     },
                                             _error = function (e) {
-                                                reject(e);
                                                 _this.app.__.callable(config.error).call(this, e);
+                                                reject(e);
                                                 _this.app.__.callable(config.complete).call(this, e);
                                             };
                                     if (this.app.dataTransport)
@@ -6280,7 +6307,7 @@
                                 }
                                 else {
                                     _this.app.error('Cannot save model to server: No URL supplied.');
-                                    reject('Cannot save model to server: No URL supplied.');
+                                    return reject('Cannot save model to server: No URL supplied.');
                                 }
                             };
                             // saving form while there's an uploader for the app
@@ -6614,13 +6641,13 @@
                                                 internal.store.call(_this.name).drop();
                                             _this.models = {};
                                             _this.length = 0;
-                                            resolve(data);
                                             _this.app.__.callable(config.success).call(_this, data);
+                                            resolve(data);
                                             _this.app.__.callable(config.complete).call(_this);
                                         },
                                         _error = function (e) {
-                                            reject(e);
                                             _this.app.__.callable(config.error).call(_this, e);
+                                            reject(e);
                                             _this.app.__.callable(config.complete).call(_this);
                                         };
                                 if (this.app.dataTransport)
@@ -6655,7 +6682,45 @@
                     _Collection.length = Object.keys(models).length;
                 _Collection.parent = _Collection.__proto__;
                 return _Collection;
+            },
+            Extender = function (target) {
+                return {
+                    /**
+                     * Extends the target with the given property name and value
+                     * 
+                     * @param {string} name The property name
+                     * @param {function} func The property value
+                     * @returns {Object}
+                     */
+                    extend: function (name, value) {
+                        if (name && value) {
+                            target[name] = value;
+                        }
+                        return this;
+                    },
+                    /**
+                     * Fetches a list of the available properties
+                     * @returns {array}
+                     */
+                    properties: function () {
+                        return {
+                            custom: Object.keys(target),
+                            initial: Object.keys(target.__proto__)
+                        };
+                    },
+                    /**
+                     * Runs a property function
+                     * @param {string} name
+                     * @param mixed value
+                     * @returns mixed
+                     */
+                    run: function (name, value) {
+                        return __.callable(target[name]).call(target, value);
+                    }
+                };
             };
+    Filters.parent = Filters.__proto__;
+    Transitions.parent = Transitions.__proto__;
     _.prototype = __.__proto__;
     ThisApp = function (config) {
         if (!(this instanceof ThisApp))
@@ -6667,98 +6732,10 @@
     /**
      * Transitions affect how old pages are exited and new pages are entered
      */
-    ThisApp.Transitions = {
-        /**
-         * Adds a transition type if it doesn't exist already
-         * 
-         * @param string name Identifier to the transition. This is also what developers would
-         * supply in the configuration or with method setTransition().
-         * @param function func The function to call when transiting between pages. The old page
-         *  and the new page objects are the first parameters. The options object is the third
-         * and last parameter.
-         * The function should return the milliseconds before the oldPage is removed totally from
-         * the page. This is particularly useful for animated transitions which might take a few
-         * seconds to execute.
-         * @returns {ThisApp.Transitions}
-         */
-        add: function (name, func) {
-            if (name && func && !Transitions[name]) {
-                Transitions[name] = func;
-            }
-            return this;
-        },
-        /**
-         * Checks if a transition exists with the given name
-         *           * @param string name
-         * @returns boolean
-         */
-        exists: function (name) {
-            return Transitions[name] !== undefined;
-        },
-        /**          * Overwrites a transition type if it already exists and adds it otherwise
-         * 
-         * @param string name Identifier to the transition. This is also what developers would
-         * supply in the configuration or with method setTransition().
-         * @param function func The function to call when transiting between pages. The old page
-         *  and the new page objects are the first parameters. The options object is the third
-         * and last parameter.
-         * The function should return the milliseconds before the oldPage is removed totally from
-         * the page. This is particularly useful for animated transitions which might take a few
-         * seconds to execute.
-         * @returns {ThisApp.Transitions}
-         */
-        overwrite: function (name, func) {
-            if (name && func) {
-                Transitions[name] = func;
-            }
-            return this;
-        }
-    };
+    ThisApp.Transitions = Extender(Transitions);
     /**
      * Filters are applied to variables before rendering      */
-    ThisApp.Filters = {
-        /**
-         * Adds a filter if it doesn't exist already
-         * 
-         * @param string name Identifier to the filter. This is also what developers would pipe
-         * with desired variables.
-         * @param function func The function to call. The first parameter is the value that needs
-         * filtering. The second parameter is the options string for the filter.
-         * The function should return the value after being worked on by the function
-         * @returns {ThisApp.Filters}
-         */
-        add: function (name, func) {
-            if (name && func && !Filters[name]) {
-                Filters[name] = func;
-            }
-            return this;
-        },
-        /**
-         * Checks if a filter exists with the given name
-         * 
-         * @param string name
-         * @returns boolean
-         */
-        exists: function (name) {
-            return Transitions[name] !== undefined;
-        },
-        /**
-         * Overwrites a filter if it already exist or adds it otherwise
-         * 
-         * @param string name Identifier to the filter. This is also what developers would pipe
-         * with desired variables.
-         * @param function func The function to call. The first parameter is the value that needs
-         * filtering. The second parameter is the options string for the filter.
-         * The function should return the value after being worked on by the function
-         * @returns {ThisApp.Filters}
-         */
-        overwrite: function (name, func) {
-            if (name && func) {
-                Filters[name] = func;
-            }
-            return this;
-        }
-    };
+    ThisApp.Filters = Extender(Filters);
     /**
      * Extends the engine
      * @param {object} obj Object of methods to add to the engine
@@ -6955,7 +6932,7 @@
             return this.tryCatch(function () {
                 if (e && this.__.isObject(e) && e['preventDefault'])
                     e.preventDefault();
-                if (history.length <= 2) {
+                if (!this.canGoBack()) {
                     return this.home(true);
                 }
                 else if (internal.canContinue
@@ -7002,6 +6979,12 @@
                     this.__.callable(callback).apply(this, Array.from(arguments));
                 }.bind(this));
             });
+        },
+        /**
+         * Checks whether the page has a previous page it can go back to
+         */
+        canGoBack: function () {
+            return history.length > 2;
         },
         /**
          * Clears the cache of all models and collections on the current page
@@ -7106,7 +7089,8 @@
                                     // get expiration if set and data from dataKey if specified
                                     if (_this.config.dataKey) {
                                         // set data expiration timestamp too.
-                                        if (!isNaN(data.expires)) // expiration is a number. Must be milliseconds
+                                        if (!isNaN(data.expires))
+                                            // expiration is a number. Must be milliseconds
                                             expires = new Date().setMilliseconds(1000 * data.expires);
                                         else if (_this.__.isString(data.expires)) // expiration is a string. Must be date
                                             _data.expires = new Date(data.expires).getTime();
@@ -7124,9 +7108,9 @@
                                 _this.__.callable(config.success).call(_this, col);
                                 resolve(col);
                             },
-                            error: function (a, b, c) {
-                                _this.__.callable(config.error).call(_this, a, b, c);
-                                reject(a, b, c);
+                            error: function () {
+                                _this.__.callable(config.error).apply(_this, Array.from(arguments));
+                                reject.apply(null, Array.from(arguments));
                             }
                         });
                     });
@@ -7143,7 +7127,7 @@
          */
         debug: function (debug) {
             if (!internal.isRunning.call(this))
-                this.config.debug = debug || false;
+                this.config.debug = debug === undefined ? true : false;
             return this;
         },
         /**
@@ -7170,19 +7154,6 @@
                 history.forward();
                 return this;
             });
-        },
-        /**
-         * Gets a list of available filters
-         * @returns array          */
-        getAvailableFilters: function () {
-            return Object.keys(Filters);
-        },
-        /**
-         * Gets a list of available transitions
-         * @returns array
-         */
-        getAvailableTransitions: function () {
-            return Object.keys(Transitions);
         },
         /**
          * Fetches the unique key generated for the last request
@@ -7244,6 +7215,7 @@
                 elem.find('[this-type="style"]').each(function () {
                     _this._(this).replaceWith('<style>' + this.innerText + '</style>');
                 });
+                internal.emptyFeatures.call(_this, elem);
                 return this._(elem.outerHtml()
                         .replace(/__obrace__/g, '{{')
                         .replace(/__cbrace__/g, '}}')
@@ -7656,8 +7628,41 @@
             };
             return this;
         },
-        setStore: function (store) {
-            // @todo
+        /**
+         * Sets the store for the app to use
+         * 
+         * @param {Function} newStore
+         * 
+         * Must be a function which returns a collections object.
+         * The collections object must have methods find, save, saveMany, remove
+         * and drop
+         * 
+         * @returns {ThisApp}
+         */
+        setStore: function (newStore) {
+            if (!internal.isRunning.call(this)) {
+                if (!this.__.isFunction(newStore)) {
+                    this.error('Store must be funtion which returns a store object on the given collection name.');
+                }
+                else {
+                    var testStore = newStore('___test');
+                    if (!this.__.isObject(testStore)) {
+                        this.error('Store must return a collections object');
+                    }
+                    else if (!this.__.isFunction(testStore.find) ||
+                            !this.__.isFunction(testStore.save) ||
+                            !this.__.isFunction(testStore.saveMany) ||
+                            !this.__.isFunction(testStore.remove) ||
+                            !this.__.isFunction(testStore.drop)) {
+                        this.error('Returned collections object must have methods'
+                                + ' find, save, saveMany, remove and drop which are all'
+                                + ' functions.');
+                    }
+                    testStore.drop();
+                    Store = newStore;
+                }
+            }
+            return this;
         },
         /**
          * Sets the container that would always hold the page title
@@ -7718,7 +7723,7 @@
             }
             // load from old state if fresh copy not required and not debugging
             if (!freshCopy && !this.config.debug && history.state &&
-                    hash === internal.recordsState.find('last_page')) {
+                    hash === internal.recordsStore.find('last_page')) {
                 internal.restoreState.call(this, history.state);
             }
             else {

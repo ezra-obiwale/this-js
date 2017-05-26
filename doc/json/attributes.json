@@ -279,7 +279,7 @@
             "value": "Expression",
             "description": [
                 "The expression filters the items to display. The expression is provided with variable `current` which holds the current item in the iteration",
-                "If iterating a collection, `current` has attributes `index` and `model`",
+                "If iterating a collection or list, `current` has attributes `index` and `model`",
                 "If iterating a loop, `current` has attributes `key` and `value`",
                 "If the expression fails, the value is skipped.",
                 "A function may be called in the expression. The function must however return `TRUE` or `FALSE` which indicates that the model/value should be operated on or skipped respectively",
@@ -288,7 +288,8 @@
             "links": [
                 "this-type",
                 "this-each"
-            ]
+            ],
+            "on": "list,collection,this-each"
         },
         "this-form": {
             "id": "this-form",
@@ -887,7 +888,7 @@
             "id": "this-static",
             "description": [
                 "This indicates that the collection should only be loaded once on the page.",
-                "To ensure staticity, make the collection a component."
+                "When the collection is made a component, it can then be used severally on the same page and even other pages without reloading."
             ],
             "on": "collections",
             "links": [
