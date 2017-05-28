@@ -37,18 +37,31 @@
                 "this-query-key"
             ]
         },
-        "this-bind": {
+        "this-bind":{
             "id": "this-bind",
-            "value": "model ID",
+            "value": "string",
             "description": [
-                "Binds an element and its children to a model. The value is the ID of the model",
-                "All variables in the element would be parsed based on the binded model",
-                "This is only required if the element is on the same page as the link that connects it to a model. If they are on different pages, `this-model` alone would suffice."
+                "Used with `this-bind-to`, it id the child key of the model to bind to the target element.",
+                "If this is not specified, the whole model would be bound to the target element"
             ],
             "links": [
-                "this-model",
+                "this-bind"
+            ],
+            "on": "link elements, models"
+        },
+        "this-bind-to": {
+            "id": "this-bind-to",
+            "value": "string",
+            "description": [
+                "Binds an element's model (or child attribute) to the element whose id is specified as the value of the attribute.",
+                "All variables in the element would be parsed based on the binded model",
+                "This is only possible if the target element is on the same page as the link that connects it to a model. If they are on different pages, use `this-read` instead."
+            ],
+            "links": [
+                "this-read",
                 "this-id",
-                "this-type"
+                "this-type",
+                "this-bind"
             ],
             "on": "link elements, models"
         },
@@ -153,6 +166,15 @@
                 "Having multiple pages with the attribute throws an error and no page is loaded"
             ],
             "on": "pages"
+        },
+        "this-default-transport": {
+            "id": "this-default-transport",
+            "description": "Indicates that the element should be loaded with the default data transport instead of the custom provided transport.",
+            "on": "collections, models, autocomplete, forms",
+            "links": [
+                "this-autocomplete",
+                "this-type"
+            ]
         },
         "this-delay": {
             "id": "this-delay",

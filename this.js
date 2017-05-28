@@ -83,10 +83,10 @@
     };
     FormData.prototype.toQueryString = function () {
         var str = '';
-        for (var [key, value] of this) {
+        for (var key in this) {
             if (str !== '')
                 str += '&';
-            str += key + '=' + encodeURIComponent(value);
+            str += key + '=' + encodeURIComponent(this[key]);
         }
         return str;
     };
@@ -195,7 +195,8 @@
     function objToQStr(obj, callback) {
         if (!__.isObject(obj))
             return obj;
-        var str = '';
+        var str = '',
+                callback = __.callable(callback);
         __.forEach(obj, function (i, v) {
             if (str)
                 str += '&';
@@ -222,7 +223,8 @@
         return str;
     }
     function qStrToObj(str, callback) {
-        var obj = {};
+        var obj = {},
+                callback = __.callable(callback);
         __.forEach(str.split('&'), function (i, v) {
             var parts = v.split('=');
             try {
@@ -271,8 +273,7 @@
             href = '#/' + _a.this('goto');
             if (_a.hasThis('read')) {
                 var hrf = '',
-                        _model = _a.closest('[this-model]'),
-                        _collection = _a.closest('[this-type="collection"],collection');
+                        _model = _a.closest('[this-model]');
                 if (_a.this('read'))
                     hrf += _a.this('read');
                 else if (_model.length) {
@@ -311,6 +312,7 @@
             async: true,
             clearCache: false
         }, config);
+        config.type = config.type.toLowerCase();
         var httpRequest = new XMLHttpRequest(), contentType;
         if (app && config.api) {
             var records = internal.record.call(app),
@@ -338,24 +340,32 @@
                 __.callable(config.complete).call(httpRequest, httpRequest.response);
             }
         };
-        if (config.type.toLowerCase() === 'get' && config.data) {
-            if (__.isObject(config.data)) {
-                if (config.data instanceof FormData)
-                    config.data = config.data.toQueryString();
-                else if (Object.keys(config.data).length)
-                    config.data = objToQStr(config.data);
+        if (config.ignoreCache) {
+            config.url += ((/\?/).test(config.url) ? "&" : "?") + (new Date()).getTime();
+        }
+        // data is object, request method is PUT or PATCH: 
+        // convert data to query string if put or patch
+        if (config.data && __.isObject(config.data)
+                && __.inArray(config.type, ['get', 'put', 'patch'])) {
+            if (config.data instanceof FormData) {
+                config.data = config.data.toQueryString();
             }
-            if (__.isString(config.data)) {
+            else {
+                config.data = objToQStr(config.data);
+            }
+        }
+        // data is string but no content type has been set
+        if (config.data && __.isString(config.data)) {
+            if (config.type === 'get') {
                 if (config.data.startsWith('&') || config.data.startsWith('?'))
                     config.data = config.data.substr(1);
                 config.url += ((/\?/).test(config.url) ? "&" : "?") + config.data;
                 config.data = null;
             }
+            else if (!contentType)
+                httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         }
-        if (config.ignoreCache) {
-            config.url += ((/\?/).test(config.url) ? "&" : "?") + (new Date()).getTime();
-        }
-        httpRequest.open(config.type.toUpperCase(), config.url, config.async);
+        httpRequest.open(config.type, config.url, config.async);
         httpRequest.responseType = config.dataType;
         httpRequest.withCredentials = config.crossDomain;
         if (__.isObject(config.headers)) {
@@ -365,25 +375,6 @@
                     contentType = value;
                 }
             });
-        }
-// data is object, request method is PUT or PATCH: 
-// convert data to query string if put or patch
-        if (__.isObject(config.data) && (config.type.toLowerCase() === 'put'
-                || config.type.toLowerCase() === 'patch')) {
-            if (config.data instanceof FormData) {
-                config.data = config.data.toQueryString();
-            }
-            else {
-                config.data = objToQStr(config.data);
-            }
-        }
-// data is object but not FormData: convert to query string
-        else if (__.isObject(config.data) && !(config.data instanceof FormData)) {
-            config.data = objToQStr(config.data);
-        }
-// data is string but no content type has been set
-        else if (__.isString(config.data) && !contentType) {
-            httpRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
         }
         __.tryCatch(function () {
             httpRequest.upload.onprogress = function (e) {
@@ -629,7 +620,13 @@
                  */
                 closest: function (selector) {
                     return this.tryCatch(function () {
-                        return _(this.items.length ? this.items[0].closest(selector) : [], this.debug);
+                        var closest = null;
+                        if (this.items.length) {
+                            closest = this.items[0].closest(selector);
+                            if (closest === this.items[0])
+                                closest = null;
+                        }
+                        return _(closest, this.debug);
                     });
                 },
                 /**
@@ -754,12 +751,11 @@
                 /**
                  * Clones a new object from the given objects. There can be as many as possible objects to 
                  * clone from
-                 * @param object object
-                 * @param object _object
+                 * @param {object} object
                  * @param {Boolean} deep Indicates deep cloning
                  * @returns object The new object
                  */
-                extend: function (object, _, deep) {
+                extend: function (object, deep) {
                     var args = Array.from(arguments),
                             newObject = {},
                             newArray = [],
@@ -867,7 +863,6 @@
                         }
                         return this;
                     });
-                    return this;
                 },
                 /**
                  * Fetches the item at the given index
@@ -1115,7 +1110,6 @@
                             }, false);
                         });
                     });
-                    return this;
                 },
                 /**
                  * Fetches the outer html of the first item
@@ -1411,7 +1405,6 @@
                         else
                             _this.addClass(className);
                     });
-                    return this;
                 },
                 /**
                  * Parses a string to object
@@ -1554,9 +1547,10 @@
                  * Binds the target to the model of the given element
                  * @param {_}|{string} _target
                  * @param {_}|{string} _elem
+                 * @param {string} childKey The child key to bind on the target
                  * @returns {Promise}
                  */
-                bindToElementModel: function (_target, _elem) {
+                bindToElementModel: function (_target, _elem, childKey) {
                     _target = this._(_target);
                     _elem = this._(_elem);
                     if (!_target.length || !_elem.length)
@@ -1567,9 +1561,9 @@
                         return Promise.reject('Element to bind must be already bound to model.');
                     }
                     var model_name = _elem.this('model') || _elem.this('id'),
-                            _this = this,
                             selector = internal.elementToSelector.call(this, _target, true),
-                            _tmpl = this.getCached(selector);
+                            _tmpl = this.getCached(selector),
+                            _this = this;
                     if (_tmpl.length) {
                         if (_target.this('tar'))
                             _tmpl.this('tar', _target.this('tar'));
@@ -1583,12 +1577,23 @@
                                 collection.model(_elem.this('mid'), {
                                     url: _elem.this('url'),
                                     success: function (model) {
-                                        model.bind(_target.this('model', model_name)
-                                                .this('mid', _elem.this('mid'))
-                                                .this('url', _elem.this('url'))
-                                                .this('id-key', _elem.this('id-key')))
-                                                .then(resolve)
-                                                .catch(reject);
+                                        if (childKey) {
+                                            var data = internal.getVariableValue
+                                                    .call(_this, childKey, model.attributes);
+                                            internal.bindToObject
+                                                    .call(_this, _target, data,
+                                                            function (elem) {
+                                                                resolve();
+                                                            });
+                                        }
+                                        else {
+                                            model.bind(_target.this('model', model_name)
+                                                    .this('mid', _elem.this('mid'))
+                                                    .this('url', _elem.this('url'))
+                                                    .this('id-key', _elem.this('id-key')))
+                                                    .then(resolve)
+                                                    .catch(reject);
+                                        }
                                     }
                                 });
                             }
@@ -1606,50 +1611,16 @@
                 bindToObject: function (elem, object, callback) {
                     var notWiths = internal.hideNotWiths.call(this, elem);
                     return internal.loadComponents.call(this, function () {
-                        return internal.parseData.call(this, object, elem, false, true, function (elem) {
-                            internal.loadFormElements.call(this, elem.find('[this-is]'), object);
-                            internal.showNotWiths.call(this, elem, notWiths);
-                            elem.trigger('model.binded', {
-                                data: object
-                            });
-                            this.__.callable(callback).apply(this, Array.from(arguments));
-                        }.bind(this));
+                        return internal.parseData.call(this, object, elem, false, true,
+                                function (elem) {
+                                    internal.loadFormElements.call(this, elem.find('[this-is]'), object);
+                                    internal.showNotWiths.call(this, elem, notWiths);
+                                    elem.trigger('model.binded', {
+                                        data: object
+                                    });
+                                    this.__.callable(callback).apply(this, Array.from(arguments));
+                                }.bind(this));
                     }.bind(this), elem.find('[this-component]'));
-                },
-                /**
-                 * Saves to cache or retrieves from cache
-                 * @param string type collection or model
-                 * @param string id The id of the collection or model
-                 * @param array|object data Data to store
-                 * @param boolean update Indicates whether update if exist
-                 * @returns ThisApp
-                 */
-                cache: function (type, id, data, update) {
-                    // return the whole store
-                    if (!type)
-                        return this.store();
-                    // get type from store
-                    var __data = this.store(type.toLowerCase()) || {};
-                    // not saving. get and return type by id
-                    if (!data) {
-                        if (!id)
-                            return __data;
-                        return __data ? __data[id] : [];
-                    }
-
-                    // saving
-                    // update if exists
-                    if (update && __data[id]) {
-                        // save data to id
-                        __data[id] = this.__.extend(__data[id], data, true);
-                    }
-                    else // overwrite otherwise
-                        __data[id] = data;
-                    // set the length of objects in collection
-                    __data[id].length = Object.keys(__data[id].data).length;
-                    // save to store
-                    this.store(type.toLowerCase(), __data);
-                    return this;
                 },
                 /**
                  * Checks beforeCallbacks for the given action to determine if the action should
@@ -2504,12 +2475,26 @@
                 loadAssets: function (elem, callback) {
                     var _this = this,
                             elemType = getElemType(elem) || '',
-                            leaveUnrequired;
+                            leaveUnrequired,
+                            loading = 0,
+                            allChecked = false,
+                            done = function () {
+                                if (allChecked && !loading) {
+                                    this.__.callable(callback).call(this);
+                                }
+                            }.bind(this);
                     if (elem.this('load-css') && !elem.hasThis('with-css')) {
+                        loading++;
+                        var csses = elem.this('load-css').split(',');
                         // load comma-separated css files
-                        this.__.forEach(elem.this('load-css').split(','),
+                        this.__.forEach(csses,
                                 function (i, css) {
-                                    internal.loadAsset.call(_this, 'css', css, elem);
+                                    internal.loadAsset.call(_this, 'css', css, elem, function () {
+                                        if (csses.length - 1 === i) {
+                                            loading--;
+                                            done();
+                                        }
+                                    });
                                 });
                         elem.this('with-css', '').removeThis('load-css');
                     }
@@ -2520,6 +2505,7 @@
                                 .removeThis('loaded');
                     if (elem.this('load-js-first') && !loadedPageJS.first[this.page.this('id')]) {
                         leaveUnrequired = true;
+                        loading++;
                         var jses = elem.this('load-js-first').split(','),
                                 removedAssets = this.removedAssets[elemType];
                         // load comma-separated css files
@@ -2533,8 +2519,8 @@
                                         _this._('script[this-app="' + _this.container.this('id')
                                                 + '"][this-for="' + elemType + '"]:not([this-loaded])')
                                                 .remove();
-                                    // call callback function
-                                    _this.__.callable(callback).call(_this);
+                                    loading--;
+                                    done();
                                 }
                             });
                         });
@@ -2545,11 +2531,11 @@
                         this._('script[this-app="' + this.container.this('id')
                                 + '"][this-for="' + elemType + '"]:not([this-loaded])')
                                 .remove();
-                    // indicate that unrequired assets have been removed to avoid removal of currently
+                    // indicate that unrequired js have been removed to avoid removal of currently
                     // required assets
                     this.removedAssets[elemType] = true;
-                    if (!leaveUnrequired)
-                        this.__.callable(callback).call(this);
+                    allChecked = true;
+                    done();
                     return internal;
                 },
                 /**
@@ -2582,17 +2568,12 @@
                             .children()
                             .clone().removeThis('cache').outerHtml(),
                             _this = this,
-                            model_name = __this.this('model'),
-                            model_to_bind = this.container.find('model[this-id="' + model_name
-                                    + '"],[this-type="model"][this-id="' + model_name
-                                    + '"]');
+                            model_name = __this.this('model');
                     __this = internal.doTar.call(this, __this, true);
                     if (!__this.hasThis('paginate') ||
                             !__this.children(':first-child').this('mid')) {
                         __this.html('');
                     }
-                    if (model_name && model_to_bind.length)
-                        model_to_bind.this('bind', true);
                     var requestData = {}, save = true, success, error;
                     if (_this.page.this('query')) {
                         requestData['query'] = _this.page.this('query');
@@ -2683,6 +2664,7 @@
                         done();
                     else
                         collections.each(function () {
+                            var __this = this;
                             internal.loadCollection.call(_this, this, function () {
                                 length--;
                                 if (!length) {
@@ -2748,7 +2730,7 @@
                 loadComponents: function (callback, components) {
                     var _this = this,
                             components = components || this.container.find('[this-component]'),
-                            loaded = 0, length = components.length;
+                            length = components.length;
                     if (!length) {
                         this.__.callable(callback).call(this);
                     }
@@ -2842,6 +2824,7 @@
                         // check if can continue with rendering
                         var __data = internal.canContinue
                                 .call(this, 'collection.render', [data], container.get(0));
+
                         // rendering canceled
                         if (!__data) {
                             return this;
@@ -2854,8 +2837,6 @@
                                 filter = container.this('filter'),
                                 // unique id key for models
                                 uid = container.this('model-id-key') || this.config.idKey,
-                                // the url of the collection/model
-                                url = container.this('url'),
                                 tab_cont = internal.checkTableContent.call(this, content),
                                 level = tab_cont.level,
                                 content = tab_cont.container.outerHtml();
@@ -3111,6 +3092,9 @@
                                 // using attribute so that redumping content 
                                 // would still work fine
                                 __this.find('[value="' + data + '"]').attr('selected', 'selected');
+                            }
+                            else if (__this.is('textarea')) {
+                                __this.html(data);
                             }
                             else if (__this.hasThis('autocomplete')) {
                                 var _dropDownList = _this.container
@@ -3444,6 +3428,7 @@
                             }
                         }
                     }
+
                     var success = function () {
                         _this.__.callable(config.success)
                                 .apply(config.elem, Array.from(arguments));
@@ -3518,13 +3503,13 @@
                         catch (e) {
                             type = 'get';
                         }
-                        // Data transport exists
-                        if (this.dataTransport) {
-                            if (!config.elem.hasThis('no-updates') && this.watchCallback)
-                                internal.watch.call(this, config.elem);
-                            config.elem.removeThis('no-updates');
-                            return this.__.callable(this.dataTransport)
-                                    .call(this, {
+
+                        return internal.request.call(this, config.elem,
+                                function () {
+                                    if (!config.elem.hasThis('no-updates') && this.watchCallback)
+                                        internal.watch.call(this, config.elem);
+                                    config.elem.removeThis('no-updates');
+                                    return {
                                         elem: config.elem,
                                         type: type,
                                         id: config.elem.this('mid'),
@@ -3533,17 +3518,20 @@
                                         data: config.requestData,
                                         success: success,
                                         error: error
-                                    });
-                        }
-                        else if (config.elem.this('url')) {
-                            return _this.request({
-                                type: type,
-                                url: config.elem.this('url'),
-                                data: config.requestData,
-                                success: success,
-                                error: error
-                            });
-                        }
+                                    };
+                                },
+                                function () {
+                                    return {
+                                        type: type,
+                                        url: config.elem.this('url'),
+                                        data: config.requestData,
+                                        success: success,
+                                        error: error
+                                    };
+                                },
+                                function () {
+                                    loadDataOrCache(config);
+                                });
                     }
                     loadDataOrCache(config);
                 },
@@ -3767,14 +3755,14 @@
                     // load required if not already loaded js
                     if (this.page.this('load-js')
                             && !loadedPageJS.last[this.page.this('id')]) {
-                        var jses = this.page.this('load-js').split(','),
-                                removedAssets = this.removedAssets;
+                        var jses = this.page.this('load-js').split(',');
                         // load comma-separated css files
                         this.__.forEach(jses, function (i, js) {
                             internal.loadAsset.call(_this, 'js', js, _this.page);
                         });
                         loadedPageJS.last[this.page.this('id')] = true;
                     }
+                    this.loadedPartial = !this.firstPage;
                     // page was just loaded and not restored from history
                     if (!restored) {
                         this.restored = false;
@@ -4032,6 +4020,40 @@
                     });
                 },
                 /**
+                 * Decides which transporter to run
+                 * @param {_}|{HTMLElement} Element on which the request is being
+                 * made
+                 * @param {function} custom Function to get the config for the
+                 * custom transporter
+                 * @param {function} def Function to get the config for the default
+                 * tranporter
+                 * @param {function} neither Function to run when neither the 
+                 * custom nor the default can be run
+                 */
+                request: function (elem, custom, def, neither) {
+                    elem = this._(elem);
+                    // Data transport exists
+                    if (!elem.hasThis('default-transport') && this.dataTransport) {
+                        return this.__.callable(this.dataTransport)
+                                .call(this, this.__.callable(custom).call(this));
+                    }
+                    else {
+                        // get default request config
+                        var config = this.__.callable(def).call(this);
+                        // url exists
+                        if (config.url) {
+                            // load request
+                            this.request(config);
+                        }
+                        // url does not exist:
+                        else {
+                            // run neither function
+                            return this.__.callable(neither);
+                        }
+                    }
+
+                },
+                /**
                  * Resets a form wisely without removing values from buttons
                  * and hidden input elements
                  */
@@ -4206,8 +4228,11 @@
                                 this._('[this-id="' + this.config.container + '"]') :
                                 this._('[this-app-container]');
                         // use the body tag if no container is set
-                        if (!this.container.length)
-                            this.container = this._('body');
+                        if (!this.container.length || this.container.is('body')) {
+                            // always use an app container and not the body
+                            this._('body').append('<div this-app-container />');
+                            this.container = this._('[this-app-container]');
+                        }
                         else if (!this.container.this('id'))
                             this.container.this('id', __.randomString());
                         // remove comments
@@ -4264,6 +4289,9 @@
                                     internal.record.call(this, 'debug'));
                         var autocomplete_timeout;
                         this.container
+                                .on('click', '[href="#"]', function (e) {
+                                    e.preventDefault();
+                                })
                                 /* reload current page or loaded collection|model */
                                 .on('click', '[this-reload],[this-reload-page],[this-reload-layouts]',
                                         function (e) {
@@ -4405,7 +4433,8 @@
                                     var __this = _this._(this),
                                             url = __this.this('create') || '#';
                                     var goto = internal.pageIDFromLink.call(this,
-                                            __this.this('goto')),
+                                            __this.this('goto'))
+                                            ,
                                             // necessary in case goto is a url and not an id
                                             pageId = goto.replace(/\/\\/g, '-');
                                     _this.tar['page#' + pageId] = {
@@ -4432,15 +4461,14 @@
                                 .on('click', '[this-create][this-form]', function () {
                                     var __this = _this._(this),
                                             selector = 'form[this-id="'
-                                            + __this.this('form') + '"]',
+                                            + __this.this('form') + '"]'
+                                            ,
                                             _target = _this.container.find(selector)
                                             .removeAttr([
                                                 "this-binding", "this-mid", "this-id-key",
                                                 "this-url"
                                             ]),
-                                            _tmpl = _this.getCached(selector),
-                                            common_selector = '',
-                                            type = getElemType(_target);
+                                            _tmpl = _this.getCached(selector);
                                     _target.html(_tmpl.html());
                                     internal.bindToObject.call(_this, _target, {}, function (elem) {
                                         elem.attr({
@@ -4494,7 +4522,7 @@
                                  * 
                                  * Event page.leave is triggered
                                  */
-                                .on('click', '[this-goto]', function (e) {
+                                .on('click', '[this-goto]:not(form)', function (e) {
                                     e.preventDefault();
                                     var __this = _this._(this);
                                     if (!__this.this('goto'))
@@ -4518,10 +4546,10 @@
                                  * Click event
                                  * Bind model to target
                                  */
-                                .on('click', '[this-bind]', function (e) {
+                                .on('click', '[this-bind-to]', function (e) {
                                     e.preventDefault();
                                     var __this = _this._(this),
-                                            bind = __this.this('bind'),
+                                            bind = __this.this('bind-to'),
                                             _model = __this.closest('model,'
                                                     + '[this-type="model"],'
                                                     + '[this-model]');
@@ -4563,7 +4591,7 @@
                                             __this.removeThis('treated');
                                         });
                                     }
-                                    internal.bindToElementModel.call(_this, _target, _model);
+                                    internal.bindToElementModel.call(_this, _target, _model, __this.this('bind'));
                                 })
                                 /*
                                  * DELETE event
@@ -4800,13 +4828,15 @@
                                                 config.data[i] = v;
                                             });
                                         }
-                                        if (_this.dataTransport) {
-                                            _this.dataTransport.call(this, config);
-                                        }
-                                        else {
-                                            _this.request(config);
-                                        }
-                                    }, __this.this('delay') || 300);
+                                        internal.request.call(_this, __this,
+                                                function () {
+                                                    return config;
+                                                },
+                                                function () {
+                                                    return config;
+                                                });
+                                    },
+                                            __this.this('delay') || 300);
                                 })
                                 .on('click', '[this-autocompleting]>[this-key]', function () {
                                     var __this = _this._(this),
@@ -5012,34 +5042,31 @@
                                                     response: this
                                                 });
                                             };
-                                    if (_this.dataTransport)
-                                        /* action (create,update,read,delete),
-                                         * id, url, data [formData] (only for create and update actions), success callback, error callback
-                                         * and isCollection (only for read action)
-                                         * The s
-                                         */
-                                        _this.__.callable(_this.dataTransport).call(_this, {
-                                            type: _form.attr('method'),
-                                            url: _form.attr('action'),
-                                            data: fd,
-                                            success: success,
-                                            error: error,
-                                            headers: headers,
-                                            form: this
-                                        });
-                                    else {
-                                        if (_form.attr('enctype') === 'application/x-www-form-urlencoded')
-                                            fd = fd.toQueryString();
-                                        _this.request({
-                                            url: _form.attr('action'),
-                                            type: _form.attr('method'),
-                                            dataType: _form.this('response-type'),
-                                            data: fd,
-                                            success: success,
-                                            error: error,
-                                            headers: headers
-                                        });
-                                    }
+                                    internal.request.call(_this, _form,
+                                            function () {
+                                                return {
+                                                    type: _form.attr('method'),
+                                                    url: _form.attr('action'),
+                                                    data: fd,
+                                                    success: success,
+                                                    error: error,
+                                                    headers: headers,
+                                                    form: _form.get(0)
+                                                };
+                                            },
+                                            function () {
+                                                if (_form.attr('enctype') === 'application/x-www-form-urlencoded')
+                                                    fd = fd.toQueryString();
+                                                return {
+                                                    url: _form.attr('action'),
+                                                    type: _form.attr('method'),
+                                                    dataType: _form.this('response-type'),
+                                                    data: fd,
+                                                    success: success,
+                                                    error: error,
+                                                    headers: headers
+                                                };
+                                            });
                                 })
                                 /*
                                  * Search Event
@@ -5225,13 +5252,14 @@
                  */
                 showPage: function (replaceInState) {
                     var transit = this.__.callable(this.config.transition, true),
-                            wait, _this = this;
+                            wait;
                     if (transit)
                         wait = transit.call(null, this.oldPage.removeThis('current'),
                                 this.page, this.config.transitionOptions);
                     else if (this.__.isString(this.config.transition)) {
                         if (!Transitions[this.config.transition])
                             this.config.transition = 'switch';
+                        this.oldPage = this._(this.oldPage);
                         wait = Transitions[this.config.transition](this.oldPage
                                 .removeThis('current'),
                                 this.page, this.config.transitionOptions);
@@ -5915,7 +5943,7 @@
              * before currentPage is removed from the dom
              */
             Transitions = Object.create({
-                "switch": function (currentPage, newPage, options) {
+                "switch": function (currentPage, newPage) {
                     newPage.show();
                     return 0;
                 }
@@ -6139,23 +6167,25 @@
                                             reject(e);
                                             _this.app.__.callable(config.complete).call(this, e);
                                         };
-                                if (this.app.dataTransport)
-                                    this.app.__.callable(this.app.dataTransport)
-                                            .call(this.app, {
+                                internal.request.call(this.app, null,
+                                        function () {
+                                            return {
                                                 type: config.method || this.app.config.crud.methods.delete,
                                                 url: config.url || this.url,
                                                 id: config.id || this.id,
                                                 action: 'delete',
                                                 success: _success,
                                                 error: _error
-                                            });
-                                else
-                                    this.app.request({
-                                        type: config.method || this.app.config.crud.methods.delete,
-                                        url: config.url || _this.url,
-                                        success: _success,
-                                        error: _error
-                                    });
+                                            };
+                                        }.bind(this),
+                                        function () {
+                                            return {
+                                                type: config.method || this.app.config.crud.methods.delete,
+                                                url: config.url || _this.url,
+                                                success: _success,
+                                                error: _error
+                                            };
+                                        }.bind(this));
                             }
                             else {
                                 this.app.error('Cannot remove model from server: No URL supplied.');
@@ -6215,6 +6245,7 @@
                                 else if (this.url || config.url) {
                                     if (this.app._(config.form).attr('enctype') === 'application/x-www-form-urlencoded')
                                         formData = formData.toQueryString();
+                                    else formData = formData.toObject();
                                     var _success = function (data, id) {
                                         if (data) {
                                             var model = getRealData.call(_this.app, data),
@@ -6284,9 +6315,9 @@
                                                 reject(e);
                                                 _this.app.__.callable(config.complete).call(this, e);
                                             };
-                                    if (this.app.dataTransport)
-                                        this.app.__.callable(this.app.dataTransport)
-                                                .call(this.app, {
+                                    internal.request.call(this.app, config.form,
+                                            function () {
+                                                return {
                                                     url: config.url || this.url,
                                                     id: this.id,
                                                     form: config.form,
@@ -6294,16 +6325,17 @@
                                                     type: config.method || method,
                                                     success: _success,
                                                     error: _error
-                                                });
-                                    else {
-                                        this.app.request({
-                                            type: config.method || method,
-                                            url: config.url || _this.url,
-                                            data: formData,
-                                            success: _success,
-                                            error: _error
-                                        });
-                                    }
+                                                };
+                                            }.bind(this),
+                                            function () {
+                                                return {
+                                                    type: config.method || method,
+                                                    url: config.url || _this.url,
+                                                    data: formData,
+                                                    success: _success,
+                                                    error: _error
+                                                };
+                                            });
                                 }
                                 else {
                                     _this.app.error('Cannot save model to server: No URL supplied.');
@@ -6507,7 +6539,7 @@
                     model: function (model_id, options) {
                         var _this = this, url,
                                 options = this.app.__.extend({
-                                    success: function (model) {},
+                                    success: function () {},
                                     error: function (e) {}
                                 }, options);
                         if (model_id) {
@@ -6569,9 +6601,9 @@
                             url: url,
                             collection: this
                         });
-                        return Promise.resolve(_model);
                         this.app.__.callable(options.success)
                                 .call(this.app, _model);
+                        return Promise.resolve(_model);
                     },
                     /**
                      * Fetchs the next model
@@ -6650,21 +6682,23 @@
                                             reject(e);
                                             _this.app.__.callable(config.complete).call(_this);
                                         };
-                                if (this.app.dataTransport)
-                                    this.__.callable(this.app.dataTransport)
-                                            .call(this, {
+                                internal.request.call(this.app, null,
+                                        function () {
+                                            return {
                                                 url: this.url,
                                                 type: config.method || this.app.config.crud.methods.delete,
                                                 success: _success,
                                                 error: _error
-                                            });
-                                else
-                                    this.app.request({
-                                        url: this.url,
-                                        type: config.method || this.app.config.crud.methods.delete,
-                                        success: _success,
-                                        error: _error
-                                    });
+                                            };
+                                        }.bind(this),
+                                        function () {
+                                            return {
+                                                url: this.url,
+                                                type: config.method || this.app.config.crud.methods.delete,
+                                                success: _success,
+                                                error: _error
+                                            };
+                                        }.bind(this));
                             }.bind(this));
                         }
                     },
@@ -6771,15 +6805,15 @@
          * App configuration object
          */
         config: {
-            /** 			 * The base url upon which other urls are built
+            /* 			 * The base url upon which other urls are built
              */
             baseURL: location.origin + location.pathname,
-            /**
+            /*
              * Indicates whether received model data should be cached for offline
              * access
              */
             cacheData: true,
-            /**
+            /*
              * CRUD settings
              */
             crud: {
@@ -6800,26 +6834,26 @@
                     delete: 'DELETE'
                 }
             },
-            /**
+            /*
              * The key in each ajax response which holds the actual object or array of objects
              */
             dataKey: 'data',
-            /**
+            /*
              * Indicates whether the app should run in debug mode or not.
              */
             debug: false,
-            /**
+            /*
              * Indicates whether to keep app parameters in the url after processing
              */
             keepParamsInURL: false,
-            /** 			 * The default layout for the application
+            /* 			 * The default layout for the application
              */
             layout: null,
-            /**
+            /*
              * Default uid for models and collections if not explicitly defined
              */
             idKey: 'id',
-            /**
+            /*
              * Pagination settings
              */
             pagination: {
@@ -6830,7 +6864,7 @@
                 // FALSE means new data would be appended
                 overwrite: false
             },
-            /**              * Paths to pages, layouts and components
+            /*              * Paths to pages, layouts and components
              */
             paths: {
                 pages: {
@@ -6848,18 +6882,18 @@
                 js: './assets/js',
                 css: './assets/css'
             },
-            /**
+            /*
              * ID of the page to start the app with
              */
             startWith: null,
-            /**
+            /*
              * The selector that holds the title of each page
              */
             titleContainer: null,
-            /** 			 * The transition effect to use between pages
+            /* 			 * The transition effect to use between pages
              */
             transition: 'switch',
-            /**
+            /*
              * The options for the transition effect
              */
             transitionOptions: {}
@@ -6901,11 +6935,11 @@
             return _(selector, debug || this.config ? internal.record.call(this, 'debug') : true);
         },
         /**
-         * Adds an element to the template collection
+         * Adds an element to the cache collection for later reuse
          * @param {_}|{HTMLElement} elem
          * @returns {ThisApp}
          */
-        addToCache: function (elem, replace) {
+        addToCache: function (elem) {
             return this.tryCatch(function () {
                 var _this = this;
                 elem.each(function () {
@@ -6943,7 +6977,7 @@
             });
         },
         /**
-         * Registers a callbact to be called before an event happens. If the callback returns false,
+         * Registers a callback to be called before an event happens. If the callback returns false,
          * the event is terminated.
          * @param {string} event
          * @param {function} callback
@@ -6993,8 +7027,7 @@
          * @returns {ThisApp}
          */
         clearPageCache: function (reload) {
-            var cleared = {},
-                    _this = this,
+            var _this = this,
                     did_page = false;
             this.container.find('[this-model],model:not([this-in-collection]),'
                     + '[this-type="model"]:not([this-in-collection])')
@@ -7127,7 +7160,7 @@
          */
         debug: function (debug) {
             if (!internal.isRunning.call(this))
-                this.config.debug = debug === undefined ? true : false;
+                this.config.debug = debug === undefined ? true : debug;
             return this;
         },
         /**
@@ -7206,6 +7239,14 @@
                     if (!elem.length)
                         elem = this.templates.children('[this-type="component"]')
                                 .find(selector);
+                    if (!elem.length) {
+                        var _layout = this.page.closest('layout,[this-type="layout"]');
+                        while (!elem.length && _layout.length) {
+                            elem = this.templates.find('layout ' + selector
+                                    + ',[this-type="layout"] ' + selector);
+                            _layout = _layout.closest('layout,[this-type="layout"]');
+                        }
+                    }
                 }
                 if (!elem.length)
                     elem = this.templates.children(selector);
@@ -7254,7 +7295,7 @@
                             method = 'load' + type[0].toUpperCase() + type.substr(1),
                             valid = _this.__.inArray(type.toLowerCase(),
                                     ['component', 'collection', 'model']);
-                    if (!internal[method])
+                    if (!internal[method] || !valid)
                         return;
                     internal[method].call(_this, this, callback, data);
                 });
@@ -7823,4 +7864,7 @@
             });
         }
     };
+    ThisApp.toString = function () {
+        return 'ThisApp() { [custom code] }';
+    }
 })();

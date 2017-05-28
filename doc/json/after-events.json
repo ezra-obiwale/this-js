@@ -235,8 +235,8 @@
                 "load.content.complete"
             ]
         },
-        "list-option-selected": {
-            "id": "list-option-selected",
+        "list.option.selected": {
+            "id": "list.option.selected",
             "description": "Triggered when a list option has been selected",
             "on": "lists",
             "links": [
