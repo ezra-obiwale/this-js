@@ -1,0 +1,70 @@
+[
+    {
+        "id": "this-data",
+        "value": "model property name",
+        "on": "collections",
+        "description": "This attaches the given property name to the collection, which is in a model",
+        "links": [
+            {
+                "label": "Collection in Model",
+                "goto": "collections&in-model"
+            }
+        ]
+    },
+    {
+        "id": "this-id-key",
+        "value": "string",
+        "description": [
+            "The name of the model key which serves as the unique identifier. Every element with `this-model` should have one.",
+            "If none is specified, `id` is assumed"
+        ],
+        "on": "collections",
+        "links": [
+            "this-model"
+        ]
+    },
+    {
+        "id": "this-paginate",
+        "value": "integer",
+        "description": [
+            "Indicates that the collection should be paginated",
+            "Value is the number of results to show per page.",
+            "If no value is provided, the config limit apply."
+        ],
+        "on": "collections",
+        "links": [
+            "this-paginate-next",
+            "this-paginate-previous",
+            "this-pagination-overwrite"
+        ]
+    },
+    {
+        "id": "this-pagination-overwrite",
+        "value": "boolean",
+        "description": [
+            "Indicates that new page results should overwrite existing collection content"
+        ],
+        "on": "collections",
+        "links": [
+            "this-paginate",
+            "this-paginate-next",
+            "this-pagination-previous"
+        ]
+    },
+    {
+        "id": "this-prepend-new",
+        "description": "Indicates that new models should be prepended to the collection listing instead of appended, which is the default",
+        "on": "collections"
+    },
+    {
+        "id": "this-static",
+        "description": [
+            "This indicates that the collection should only be loaded once on the page.",
+            "When the collection is made a component, it can then be used severally on the same page and even other pages without reloading."
+        ],
+        "on": "collections",
+        "links": [
+            "this-component"
+        ]
+    }
+]

@@ -1,9 +1,7 @@
-{
-    "data": {
-        "trim": {
-            "id": "trim",
-            "params": "",
-            "description": ""
-        }
+[
+    {
+        "id": "trim",
+        "params": "",
+        "description": ""
     }
-}
+]

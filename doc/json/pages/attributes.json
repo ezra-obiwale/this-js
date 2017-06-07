@@ -1,0 +1,84 @@
+[
+    {
+        "id": "this-current",
+        "description": "Indicates the current page",
+        "internal": true,
+        "on": "pages"
+    },
+    {
+        "id": "this-dead",
+        "description": "Indicates a page which is being navigated away from",
+        "internal": true,
+        "on": "pages"
+    },
+    {
+        "id": "this-default-page",
+        "description": [
+            "Indicates the page as the default page to load if no page is specified. As such, only one page should be tagged as default.",
+            "Having multiple pages with the attribute throws an error and no page is loaded"
+        ],
+        "on": "pages"
+    },
+    {
+        "id": "this-layout",
+        "value": "string",
+        "description": "The layout a page should use. If none is specified, the general app layout is used if specified. And if that isn't specified either, the page is loaded without a layout.",
+        "on": "pages",
+        "links": [
+            "this-type"
+        ]
+    },
+    {
+        "id": "this-path",
+        "value": "string",
+        "description": [
+            "The relative path to the page file based on the config pages base path"
+        ],
+        "links": [
+            "this-goto"
+        ],
+        "on": "pages"
+    },
+    {
+        "id": "this-query",
+        "value": "string",
+        "description": "Holds the string being searched for when a search is performed",
+        "links": [
+            "this-do",
+            "this-search"
+        ],
+        "internal": true,
+        "on": "pages"
+    },
+    {
+        "id": "this-read",
+        "value": "url",
+        "description": [
+            "Used together with `this-goto` and within a model, it indicates that the page being link would read the model within which is the current element. This is the R in CRUD.",
+            "The value then can be empty.",
+            "However, if another model is to be read and not the one within which the link is, then the value is the url of the model and the model name must be also provided with the attribute `this-model`."
+        ],
+        "links": [
+            "this-goto",
+            "this-create",
+            "this-update",
+            "this-delete"
+        ],
+        "on": "pages"
+    },
+    {
+        "id": "this-reading",
+        "description": "Indicates that the page is reading from a model",
+        "internal": true,
+        "on": "pages"
+    },
+    {
+        "id": "this-title",
+        "value": "string",
+        "description": "Holds the title of the page",
+        "links": [
+            "this-page-title"
+        ],
+        "on": "pages"
+    }
+]

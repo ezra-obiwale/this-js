@@ -1,0 +1,21 @@
+[
+    {
+        "id": "this-in-collection",
+        "description": "Indicates that a model element is within a collection element",
+        "internal": true,
+        "on": "models"
+    },
+    {
+        "id": "this-mid",
+        "value": [
+            "integer",
+            "string"
+        ],
+        "internal": true,
+        "description": "The unique id of a particular model.",
+        "links": [
+            "this-model"
+        ],
+        "on": "models"
+    }
+]

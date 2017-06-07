@@ -1,0 +1,225 @@
+[
+    {
+        "id": "this-block-code",
+        "description": "Indicates the content is code and should be wrapped in `&lt;pre&gt;&lt;code&gt;`",
+        "links": [
+            "this-inline-code",
+            "this-code"
+        ]
+    },
+    {
+        "id": "this-clear-page-cache",
+        "value": "boolean",
+        "description": [
+            "Triggers `ThisApp.clearPageCache`.",
+            "If value is `TRUE`, the current page is also reloaded after all cache has been cleared."
+        ]
+    },
+    {
+        "id": "this-code",
+        "description": "Indicates that the content should be parsed as code by replacing < with &amp;lt; and > with &amp;gt;",
+        "links": [
+            "this-inline-code",
+            "this-block-code"
+        ]
+    },
+    {
+        "id": "this-else",
+        "description": [
+            "Finalizes branching. Requires no value and if provided, it is ignored.",
+            "Element will only remain if `this-if` and `this-else-if` expressions fail otherwise, it is removed."
+        ],
+        "on": "branching",
+        "links": [
+            "this-if",
+            "this-else-if"
+        ]
+    },
+    {
+        "id": "this-else-if",
+        "value": "Expression",
+        "description": [
+            "Continues branching. Expression will only be executed if the `this-if` and previous `this-else-if` expressions fail",
+            "If expression passes, the element stays in the DOM otherwise, it is removed.",
+            "If this ends the branching, that is, no `this-else` is given, add attribute `this-end-if`",
+            "Note: The expression should not be surrounded by ({...}). This is known to cause issues."
+        ],
+        "on": "branching",
+        "links": [
+            "this-if",
+            "this-else",
+            "this-end-if"
+        ]
+    },
+    {
+        "id": "this-end-if",
+        "description": [
+            "Indicates the end of a branching. It is only required on `this-if` or the last `this-end-if`",
+            "If the brancing includes a `this-else` element, there's not need for `this-end-if` then."
+        ],
+        "on": "branching",
+        "links": [
+            "this-if",
+            "this-else-if",
+            "this-else"
+        ]
+    },
+    {
+        "id": "this-hidden",
+        "description": "Makes the element hidden by default",
+        "links": [
+            "this-show",
+            "this-hide"
+        ]
+    },
+    {
+        "id": "this-hide",
+        "value": "ID",
+        "description": [
+            "When clicked, hides the target element. The value is the ID of the element.",
+            "Multiple elements can also be targeted by separating their IDs with comma"
+        ],
+        "links": [
+            "this-show",
+            "this-toggle"
+        ],
+        "on": "link elements"
+    },
+    {
+        "id": "this-if",
+        "value": "Expression",
+        "description": [
+            "Starts branching. The value should be the logical expression to check",
+            "This can be used with `this-else-if` and/or `this-else`. If neither is required, this must also have `this-end-if`",
+            "If the expression passes, then the element stays and `this-else-if` and `this-else` elements are removed.",
+            "Note: The expression should not be surrounded by ({...}). This is known to cause issues."
+        ],
+        "on": "branching",
+        "links": [
+            "this-else-if",
+            "this-else",
+            "this-end-if"
+        ]
+    },
+    {
+        "id": "this-ignore",
+        "description": "Used to temporarily ignore children branching when processing parent branching",
+        "internal": true,
+        "on": "branching",
+        "links": [
+            "this-if",
+            "this-else-if",
+            "this-else"
+        ]
+    },
+    {
+        "id": "this-inline-code",
+        "description": "Indicates the content is code and should be wrapped in `&lt;code&gt;`",
+        "links": [
+            "this-block-code",
+            "this-code"
+        ]
+    },
+    {
+        "id": "this-loaded",
+        "description": "Indicates a loaded element",
+        "internal": true,
+        "on": "layouts, pages, components, collections, models, links, scripts",
+        "links": [
+            "this-model",
+            "this-type"
+        ]
+    },
+    {
+        "id": "this-model",
+        "value": "string",
+        "description": [
+            "The name of the model to bind an element to. This is necessary to clearly differentiate entity types from one another.",
+            "On a collection, if the attribute is not provided, the `this-id` value is assumed."
+        ],
+        "links": [
+            "this-bind"
+        ]
+    },
+    {
+        "id": "this-not-with",
+        "value": "model ID",
+        "description": [
+            "This indicates the container's content should not be loaded with the specified model",
+            "The value is the id of the model",
+            "In case where there are descendant models, the value may be a comma-separated list of model ids"
+        ],
+        "links": [
+            "this-type"
+        ]
+    },
+    {
+        "id": "this-query-key",
+        "value": "string",
+        "description": "This is the GET parameter key on which to send the user entry when autocompleting. Defaults to `q` if not provided.",
+        "on": "input",
+        "links": [
+            "this-autcomplete"
+        ]
+    },
+    {
+        "id": "this-repeat-for",
+        "value": "string",
+        "description": [
+            "Indicates that the value is to be looped over. The value could be an attribute of a model/value, if the value is iteratable, a parsed variable, or a direct array.",
+            "To iterate over an iterable value of a model/value, just supply the attribute name to the value WITHOUT PARENTHESIS",
+            "To iterate over a parsed variable, put the variable in-between double curly brackets e.g. {{variable}}. The variable may very well be filtered as with normal variables",
+            "To iterate over a direct array, surround the array with ({ and })",
+            "Each loop item may be filtered with `this-filter`",
+            "Within each loop, variables `key` and `value` are available."
+        ],
+        "on": "looping",
+        "links": [
+            {
+                "label": "Model Attributes",
+                "goto": "model&attributes"
+            },
+            "this-filter"
+        ]
+    },
+    {
+        "id": "this-reset",
+        "description": [
+            "When used on an element, it indicates that any time the element or any of its ancestors is being loaded, it should be reset to the how it was initially before anything was loaded on it.",
+            "This is very useful for reloading a list within a model when the object being listed might have changed.",
+            "By default, models and collections are reset."
+        ],
+        "links": [
+            "this-type"
+        ]
+    },
+    {
+        "id": "this-show",
+        "value": "ID",
+        "description": [
+            "Shows the target element. The value is the ID of the element.",
+            "Multiple elements can also be targeted by separating their IDs with comma"
+        ],
+        "links": [
+            "this-hide",
+            "this-toggle"
+        ],
+        "on": "link elements"
+    },
+    {
+        "id": "this-tar",
+        "value": "string",
+        "description": "Temporary attribute which holds other attributes. This is given to a template element. When the template is parsed, the attribute value is parsed and passed on to the parsed element after which it is removed",
+        "internal": true
+    },
+    {
+        "id": "this-toggle",
+        "value": "ID",
+        "description": "Toggles the display of the target element on/off. The value is the ID of the element.",
+        "links": [
+            "this-show",
+            "this-hide"
+        ],
+        "on": "link elements"
+    }
+]

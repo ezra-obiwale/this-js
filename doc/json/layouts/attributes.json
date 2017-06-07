@@ -1,0 +1,13 @@
+[
+    {
+        "id": "this-content",
+        "description": "Indicates the area to load the content into in a layout",
+        "on": "layouts"
+    },
+    {
+        "id": "this-extends",
+        "value": "layout ID",
+        "description": "The name of the target layout the layout is extending",
+        "on": "layouts"
+    }
+]
