@@ -40,6 +40,12 @@
         "on": "pages"
     },
     {
+        "id": "this-no-layout",
+        "description": [
+            "Indicates that the page should be loaded without a layout. This is more important when a default layout has been set with javascript but is not needed for the page."
+        ]
+    },
+    {
         "id": "this-query",
         "value": "string",
         "description": "Holds the string being searched for when a search is performed",

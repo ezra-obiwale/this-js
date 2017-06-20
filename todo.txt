@@ -3,3 +3,13 @@ Write documentation
     - Make header fixed
 Write tests
 use indexdb for caching
+
+Use builder for request to achieve
+
+app.request(url)
+    .get() // replaceable with post, put, delete all taking param data
+    .then()
+    .catch();
+Allow use with jQuery
+Merge this.__ and this._ into one like JQuery
+Refactor bindToObject and loadModel - doing the same thing?

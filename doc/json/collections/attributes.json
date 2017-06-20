@@ -24,6 +24,18 @@
         ]
     },
     {
+        "id": "this-on-emptied",
+        "description": [
+            "Used on a child of a collection template, it indicates that the child should be shown if all models in the collection have been deleted."
+        ]
+    },
+    {
+        "id": "this-on-empty",
+        "description": [
+            "Used on a child of a collection template, it indicates that the child should be shown if the collection is empty"
+        ]
+    },
+    {
         "id": "this-paginate",
         "value": "integer",
         "description": [

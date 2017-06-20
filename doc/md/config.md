@@ -43,6 +43,10 @@ The default config object is below and can be changed as seen fit.
      */
     debug: false,
     /*
+     * The default layout to use with all pages if none is explicitly specified for the page
+     */
+    defaultLayout: null,
+    /*
      * Indicates whether to keep app parameters in the url after processing
      */
     keepParamsInURL: false,
