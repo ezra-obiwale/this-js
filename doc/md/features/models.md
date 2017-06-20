@@ -36,9 +36,11 @@ The following is how to represent the model in the DOM:
 
 By specifying attribute `type` as model, you mark the element as representing an object. 
 
-All models must have an id which differentiates one model apart from the other, thus attribute `id` must be specified.
+All models must have an id which differentiates one model apart from the other, 
+thus attribute `id` must be specified.
 
-**Important!** - Subsequently, method 2 would be used in all examples where possible but note that everything also applies to method 1.
+**Important!** - Subsequently, method 2 would be used in all examples where 
+possible but note that everything also applies to method 1.
 
 ### Model Properties
 
@@ -72,9 +74,11 @@ Filters act on model properties to render them in a more specific way. For examp
 {{ firstName | ucase }}
 ````
 
-would apply the `ucase` filter on the `firstName` property of the model and render the result.
+would apply the `ucase` filter on the `firstName` property of the model and render 
+the result.
 
-To apply a filter, specify the name of the filter separated from the property name by a pipe (`|`). Multiple filters can be applied to a property like thus:
+To apply a filter, specify the name of the filter separated from the property name 
+by a pipe (`|`). Multiple filters can be applied to a property like thus:
 
 ````html
 {{ firstName | ucase | replace=John:Jane }}
@@ -88,7 +92,8 @@ Important thins to know:
 
 - Parameters are separated from the filter name by the equal sign (`=`)
 - Multiple parameters can be provided and must be separated by semicolons (`;`)
-- Where a parameter has parts (as seen for filter `replace` in the example above), the parts must be separated by colons (`:`)
+- Where a parameter has parts (as seen for filter `replace` in the example above), 
+  the parts must be separated by colons (`:`)
 
 The example below achieves the same result as the one above:
 

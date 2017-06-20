@@ -1,18 +1,22 @@
 # ThisJS
 
-Have you ever really wondered why you need to write out a whole lot of classes just to use a framework? Wished there was someway to avoid this?
+Have you ever really wondered why you need to write out a whole lot of classes just 
+to use a framework? Wished there was someway to avoid this and still benefit from the advantages of a framework?
 
-This exactly was why `ThisJS` was developed - to cut out the redundancies and just allow you code the necessary things - events.
+This's exactly why `ThisJS` was developed - to cut out the redundancies and 
+allow you write the necessary code - [events](./doc/md/events.md).
 
 ## Concept
 
-The concept is to not write a single class or other really unnecessary code but to only listen to events and respond to them:
+The concept is to not write a single class or other really unnecessary code but 
+to only listen to events and respond to them:
 
-1.   Extend the dom with the [`this-*` attributes](./doc/md/attributes.md)
+1.   Extend the DOM with the [`this-*` attributes](./doc/md/attributes.md)
 
 2.   Intialize the app (with or without configuration)
 
-3.   Add event listeners (e.g. before page loads, when page loads, before leaving the page, etc). [See more about events here](./doc/md/events.md)
+3.   Add event listeners (e.g. before page loads, when page loads, before leaving 
+the page, etc). [See more about events here](./doc/md/events.md)
     
 4.   Start the app
 

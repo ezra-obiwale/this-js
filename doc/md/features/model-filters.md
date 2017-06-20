@@ -82,7 +82,9 @@ The following is a full list of available filters:
 - **filter ( funcName )**
 
     Filters items out of an object or array with the function whose name is provided.
+
     The function would receive two parameters: the value and the index, in that order.
+
     If the function returns true, then the value is retained otherwise it's removed.
 - **join ( glue ) **
 
