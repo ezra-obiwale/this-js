@@ -96,4 +96,4 @@ The example below achieves the same result as the one above:
 {{ firstName | ucase | replace=o:a;n:e;h:n }}
 ````
 
-[See full list of filters](./filters.md)
+[See full list of filters](./model-filters.md)

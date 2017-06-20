@@ -12,9 +12,7 @@ The concept is to not write a single class or other really unnecessary code but 
 
 2.   Intialize the app (with or without configuration)
 
-3.   Add event listeners (e.g. before page loads, when page loads, before leaving the page, etc)
-
-    [See more about events here](./doc/md/events.md)
+3.   Add event listeners (e.g. before page loads, when page loads, before leaving the page, etc). [See more about events here](./doc/md/events.md)
     
 4.   Start the app
 
@@ -49,44 +47,24 @@ Initialize the app
 
 Apps use different features and `ThisJS` provides the following features:
 
--   **Pages**
+-   #### [Pages](./doc/md/features/pages.md)
     
-    [Details here](./doc/md/features/pages.md)
+-   #### [Layouts](./doc/md/features/layouts.md)
     
--   **Layouts**
+-   #### [Models](./doc/md/features/models.md)
     
-    [Details here](./doc/md/features/layouts.md)
+-   #### [Collections](./doc/md/features/collections.md)
     
--   **Models**
-    
-    [Details here](./doc/md/features/models.md)
-    
--   **Collections**
-    
-    [Details here](./doc/md/features/collections.md)
-    
--   **Components**
-    
-    [Details here](./doc/md/features/components.md)
+-   #### [Components](./doc/md/features/components.md)
 
 ### Others
 
--   **Forms**
+-   #### [Forms](./doc/md/others/forms.md)
     
-    [Details here](./doc/md/others/forms.md)
+-   ####[Autocomplete](./doc/md/others/autocomplete.md)
     
--   **Autocomplete**
+-   #### [Looping](./doc/md/others/looping.md)
     
-    [Details here](./doc/md/others/autocomplete.md)
+-   #### [Branching](./doc/md/others/branching.md)
     
--   **Looping**
-    
-    [Details here](./doc/md/others/looping.md)
-    
--   **Branching**
-    
-    [Details here](./doc/md/others/branching.md)
-    
--   **Helpers**
-
-    [Details here](./doc/md/others/helpers.md)
+-   #### [Helpers](./doc/md/others/helpers.md)
