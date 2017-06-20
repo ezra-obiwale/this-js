@@ -1,6 +1,6 @@
 # Extended DOM Attributes
 
-The `this-*` attributes extend the DOM from being ordinary to being extraordinary and the help to make your life a lot easier.
+The `this-*` attributes extend the DOM from being ordinary to being extraordinary and to help to make your life a lot easier.
 
 ## Rationale
 
