@@ -90,7 +90,7 @@ They include:
 ### Forms
 
 -   #### form.send
-    Called when a form that's not bound to any model but has attribute [`this-handle-submit`](./attribute.md#this-handle-submit) is submitted with valid field entries.
+    Called when a form that's not bound to any model but has attribute [`this-handle-submit`](./attributes.md#this-handle-submit) is submitted with valid field entries.
 
     The context is the form which was submitted
 
