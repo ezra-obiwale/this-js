@@ -120,15 +120,15 @@ as a parameter type, the actual HTMLElement can be used instead.
     
     ```javascript
     {
-        **type**: "GET", // POST | PATCH | PUT | DELETE
-        **url**: location.href, // The url to connect to. Default is current url
-        **dataType**: 'json', // The expected response type
-        **withCredentials**: null, // Boolean. Indicates whether to send request with credientials or not.
-        **async**: true, // Asyncronous request or not
-        **data**: {}, // The object or query string data to send with the request. This may also be an instance of FormData
-        **headers**: {}, // Object of string keys to string values to pass to the request header
-        **success**: function(){}, // Function to call when a success response is gotten. The response data is passed as a parameter
-        **error**: function(){} // Function to call when error occurs
+        type: "GET", // POST | PATCH | PUT | DELETE
+        url: location.href, // The url to connect to. Default is current url
+        dataType: 'json', // The expected response type
+        withCredentials: null, // Boolean. Indicates whether to send request with credientials or not.
+        async: true, // Asyncronous request or not
+        data: {}, // The object or query string data to send with the request. This may also be an instance of FormData
+        headers: {}, // Object of string keys to string values to pass to the request header
+        success: function(){}, // Function to call when a success response is gotten. The response data is passed as a parameter
+        error: function(){} // Function to call when error occurs
     }
     ```
 
@@ -173,11 +173,11 @@ as a parameter type, the actual HTMLElement can be used instead.
     ```javascript
     {
         // ...
-        **action**: '', // create | read | update | delete | autocomplete | handled-submit
-        **elem**: _, // Available only when action is read
-        **id**: '', // Available only when action is update
-        **isCollection**: true, // or false. Available when loading a collection or a model
-        **form**: HTMLFormElement, // Available when submitting a form
+        action: '', // create | read | update | delete | autocomplete | handled-submit
+        elem: _, // Available only when action is read
+        id: '', // Available only when action is update
+        isCollection: true, // or false. Available when loading a collection or a model
+        form: HTMLFormElement, // Available when submitting a form
     }
     ```
 
@@ -224,16 +224,16 @@ as a parameter type, the actual HTMLElement can be used instead.
     
     ```javascript
     {
-        **modelName**: '', // the model on which the upload action is being carried out
-        **files**: [], // ann array of all file elements in the form,
-        **data**: {}, // a copy of the data gotten from the form
-        **id**: '#', // the id of the model, if updating one
-        **url**: '...', // the url of the model
+        modelName: '', // the model on which the upload action is being carried out
+        files: [], // ann array of all file elements in the form,
+        data: {}, // a copy of the data gotten from the form
+        id: '#', // the id of the model, if updating one
+        url: '...', // the url of the model
         // This function must be called when upload is done. The form data 
         // would be updated with the data object passed into this function. The 
         // second parameter should be a function to call in case saving the model
         // fails. Here, the uploaded file may be deleted.
-        **done**: function( `object` data, `function` cancelUpload )
+        done: function( `object` data, `function` cancelUpload )
     }
     ```
 
@@ -288,10 +288,10 @@ as a parameter type, the actual HTMLElement can be used instead.
     
         ```javascript
         {
-            **type**: '...', // model or collection
-            **url**: '...', // the url for the model or collection
-            **mid**: '#', // the id of the model
-            **modelName**: '...' // the model name
+            type: '...', // model or collection
+            url: '...', // the url for the model or collection
+            mid: '#', // the id of the model
+            modelName: '...' // the model name
         }
         ```
         
@@ -304,9 +304,9 @@ as a parameter type, the actual HTMLElement can be used instead.
         
         ```javascript
         {
-            **event**: '...', // created, updated, deleted
-            **id**: '...', // the id of the model acted upon. This must be returned for all events
-            **data**: {} // the created or updated data object
+            event: '...', // created, updated, deleted
+            id: '...', // the id of the model acted upon. This must be returned for all events
+            data: {} // the created or updated data object
         }
         ```
         
