@@ -4181,7 +4181,6 @@
                         catch (e) {
                             type = 'get';
                         }
-
                         return ext.request.call(this, config.elem,
                                 function () {
                                     if (!config.elem.hasThis('no-updates') &&
@@ -4189,6 +4188,7 @@
                                         ext.watch.call(this, config.elem);
                                     config.elem.removeThis('no-updates');
                                     return {
+										action: 'read',
                                         elem: config.elem,
                                         type: type,
                                         id: config.elem.this('mid'),
@@ -5624,6 +5624,7 @@
                                             ext.record.call(app).store.save(data, 'autocompleting');
                                         },
                                                 config = {
+													action: 'autocomplete',
                                                     type: type,
                                                     url: url,
                                                     success: success,
@@ -5886,6 +5887,7 @@
                                     ext.request.call(app, _form,
                                             function () {
                                                 return {
+													action: 'handled-submit',
                                                     type: _form.attr('method'),
                                                     url: _form.attr('action'),
                                                     data: fd,
@@ -6374,13 +6376,15 @@
                             !elem.this('url'))
                         return this;
                     var isCollection = ext.is.call(this, 'collection', elem),
-                            model_name = elem.this('model') || elem.this('id');
-                    this.watching[elem.this('id')] = {
-                        type: isCollection ? 'collection' : 'model',
-                        url: elem.this('url'),
-                        mid: elem.this('mid')
-                    };
-                    __.callable(this.watchCallback)(elem.this('url'),
+                            model_name = elem.this('model') || elem.this('id'),
+							config = {
+								type: isCollection ? 'collection' : 'model',
+								url: elem.this('url'),
+								mid: elem.this('mid'),
+								modelName: model_name
+							};
+                    this.watching[elem.this('id')] = config;
+                    __.callable(this.watchCallback)(config,
                             function (resp) {
                                 // save model to collection
                                 switch (resp.event) {
@@ -7253,6 +7257,7 @@
                                                 return {
                                                     url: config.url || this.url,
                                                     id: this.id,
+													action: this.id ? 'update' : 'create',
                                                     form: config.form,
                                                     data: form,
                                                     type: config.method || method,
@@ -7666,6 +7671,7 @@
                                 ext.request.call(this.app, null,
                                         function () {
                                             return {
+												action: 'delete',
                                                 url: this.url,
                                                 type: config.method ||
                                                         ext.config.call(app).crud.methods.delete,
@@ -8531,7 +8537,7 @@
         },
         /**
          * Reset an autocomplete input element
-         * @param {string} id The id of the element. Could also be a comma-separted
+         * @param {string} id The id of the element. Could also be a comma-separated
          * list of ids
          * @return {ThisApp}
          */
@@ -8570,7 +8576,7 @@
          * Provide function to ensure api requests are secured by providing either
          * headers or request body data, or both.
          * @param {Function} func The function to be called when making api
-         * requests. The function would receive 3 parameters: (string) key, 
+         * requests. The function would receive 3 parameters: 
          * (object) header, (object) body
          * @returns {ThisApp}
          */
@@ -8616,7 +8622,8 @@
             return this;
         },
         /**
-         * Sets the key in the response which holds the data array          * @param string key
+         * Sets the key in the response which holds the data array
+		 * @param string key
          * @returns ThisApp
          */
         setDataKey: function (key) {
@@ -8760,7 +8767,7 @@
             return this;
         },
         /**
-         * Initializes the app
+         * Starts the app
          * @param string page The ID of the page
          * @param boolean freshCopy Indicates to ignore copy in history and 
          * generate a fresh one
@@ -8799,12 +8806,12 @@
          * @param string collection
          * @returns {Store}
          */
-        store: function (collection) {
+        store: function (collectionName) {
             if (!ext.isRunning.call(this)) {
                 return this.error('App is not started yet!');
             }
             return this.tryCatch(function () {
-                return ext.store.call(this, collection);
+                return ext.store.call(this, collectionName);
             });
         },
         /**
