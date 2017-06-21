@@ -36,7 +36,7 @@ Navigate to any specific attributes with these links:
     Indicates that an element is bound to a model.
 
 -   ### this-default-transport
-    Indicates that the [feature element](../../../readme.md#features) should be loaded with the 
+    Indicates that the [feature element](../../README.md#features) should be loaded with the 
     default data transport instead of the custom provided transport.
 
 -   ### this-delete
@@ -537,7 +537,7 @@ Lists are used with autocomplete to list items found.
 
 -   ### this-ignore
     Indicates that the feature should not be loaded when loading the 
-    [feature](../../../readme.md#features) within which it is placed.
+    [feature](../../README.md#features) within which it is placed.
 
 -   ### this-inline-code
     Indicates the content is an inline code and should be wrapped in `&lt;code&gt;`
@@ -545,7 +545,7 @@ Lists are used with autocomplete to list items found.
 -   ### this-loaded
     **For internal use only**
     
-    Indicates a loaded [feature](../../../readme.md#features) element
+    Indicates a loaded [feature](../../README.md#features) element
 
 -   ### this-model
     The name of the model to bind an element to. This is necessary to clearly 

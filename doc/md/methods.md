@@ -311,7 +311,7 @@ as a parameter type, the actual HTMLElement can be used instead.
         
 -   <a name="when">**when**</a> ( `string` event, `string` selector, `function` callback ) : `ThisApp`
 
-    A handy shortcut to method [`on()`](#on) for [features](../../readme.md#features).
+    A handy shortcut to method [`on()`](#on) for [features](../../README.md#features).
     
     Instead of writing
     

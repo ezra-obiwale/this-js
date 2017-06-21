@@ -8021,6 +8021,7 @@
          * @param {_}|{HTMLElement} elem
          * @param {Object} object
          * @param {Funtion} callback
+		 * @returns {Promise}
          */
         bindToObject: function (elem, object, callback) {
             if (!ext.isRunning.call(this)) {
@@ -8277,7 +8278,7 @@
          * @param {HTMLElement}|{_}|{string} elem
          * @param {Object} data
          * @param {Function} callback
-         * @returns {ThisApp}
+         * @returns {Promise}
          */
         load: function (elem, data, callback) {
             if (!ext.isRunning.call(this)) {
@@ -8285,7 +8286,7 @@
                 __.callable.call(this, null, 'App not started yet!');
                 return this;
             }
-            return this.tryCatch(function () {
+            return this.promise(function (resolve) {
                 var _this = this;
                 this._(elem).each(function () {
                     var type = getElemType(_this._(this)),
@@ -8294,9 +8295,11 @@
                                     ['component', 'collection', 'model']);
                     if (!ext[method] || !valid)
                         return;
-                    ext[method].call(_this, this, callback, data);
+                    ext[method].call(_this, this, function(){
+						__.callable(callback).apply(this, arguments);
+						resolve.apply(this, arguments);
+					}, data);
                 });
-                return this;
             });
         },
         /**
