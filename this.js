@@ -4369,8 +4369,7 @@
                 pageFound: function (page, replaceInState) {
                     if (ext.is.call(this, 'page', page)) {
                         if (this.page) {
-                            this.oldPage = this.page.this('dead', '')
-                                    .trigger('page.leave');
+                            this.oldPage = this.page.this('dead', '');
                             if (this.oldPage.this('id') === page.this('id'))
                                 replaceInState = true;
                         }
@@ -4991,7 +4990,7 @@
                     this.tryCatch(function () {
                         var app = this;
                         // save page state before leaving
-                        this.when('page.leave', 'page', function () {
+                        this.before('page.leave', function () {
                             ext.saveState.call(app, true);
                         });
                         // save page state before leaving
@@ -5315,8 +5314,6 @@
                                  * Load page
                                  * 
                                  * Target must have attribute `this-goto`
-                                 * 
-                                 * Event page.leave is triggered
                                  */
                                 .on('click', '[this-goto]:not(form)', function (e) {
                                     e.preventDefault();
@@ -6050,9 +6047,6 @@
                          */
                         this._(window).on('popstate', function (e) {
                             if (e.state) {
-                                if (this.page) {
-                                    this.page.trigger('page.leave');
-                                }
                                 location.replace(e.state.url);
                                 ext.pageIDFromLink.call(this, e.state.url, true);
                                 this.__proto__.modelParams = this._params;
