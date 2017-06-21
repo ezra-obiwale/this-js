@@ -63,7 +63,7 @@ as a parameter type, the actual HTMLElement can be used instead.
     If parameter is `true`, the current page is lost in history and replaced with 
     the home page.
 
--   <a name="load">**load**</a> ( `_` element, `object` data, `function` callback ) : `ThisApp`
+-   <a name="load">**load**</a> ( `_` element, `object` data, `function` callback ) : `Promise`
 
     Loads any feature element that can be on the page (collection, model, component).
     
@@ -245,7 +245,7 @@ as a parameter type, the actual HTMLElement can be used instead.
     If `freshCopy` is true, a fresh copy of the page is rendered. Otherwise, a 
     copy from history is rendered, if available.
 
--   <a name="store">**store**</a> ( `string` collectionName ) : `ThisApp`
+-   <a name="store">**store**</a> ( `string` collectionName ) : `Store`
         
     Fetches the store object for the given `collectionName`.
     
@@ -282,7 +282,7 @@ as a parameter type, the actual HTMLElement can be used instead.
     The provided function is called is called when models and collections are 
     rendered for the server to be watched for changes to these.
     
-    The function recieves two parameters:
+    The function receives two parameters:
     
     -  `object` **config** - The config representing the endpoint to be watched
     
