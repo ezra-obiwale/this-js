@@ -4,7 +4,7 @@ A model represents different parts of your application. More often than not, the
 
 ## Operations
 
-With `thisJS`, there is no need to create a model object in javascript - the DOM is good enough.
+With `ThisJS`, there is no need to create a model object in javascript - the DOM is good enough.
 
 ### Example Model
 

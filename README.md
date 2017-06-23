@@ -24,14 +24,15 @@ And that's that - your app works perfectly and beautifully.
 
 ## Usage
 
-Add the script to your page
+```html
+<!-- container to hold the app -->
+<div this-app-container>
+    ...
+</div>
 
-````javascript
+<!-- include the ThisApp -->
 <script src="path/to/this.min.js"></script>
-````
-Initialize the app
-
-````javascript
+<!-- initialize the app -->
 <script>
     var config = {},
         app = new ThisApp(config);
