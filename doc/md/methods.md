@@ -149,14 +149,34 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     Set the base url for the app.
 
--   <a name="setComponentsPath">**setComponentsPath**</a> ( `string` path, `string` fileExtension ) : `ThisApp`
+-   <a name="setComponentsPath">**setComponentsPath**</a> ( `string` path, `string` fileExtension, `object` minification ) : `ThisApp`
 
     Sets the path from where to load components from. Parameter `fileExtension` 
     indicates the file extension for components. Default is `html`
 
--   <a name="setCSSPath">**setCSSPath**</a> ( `string` path ) : `ThisApp`
+    The minification object has the following defaults:
+
+    ```javascript
+    {
+        prod: false, // use minified in production
+        dev: false, // use minified in developement (when debug:true)
+        subdir: "" // subdirectory containing minified files
+    }
+    ```
+
+-   <a name="setCSSPath">**setCSSPath**</a> ( `string` path, `object` minification ) : `ThisApp`
 
     Sets the path from where to load CSS files from.
+
+    The minification object has the following defaults:
+
+    ```javascript
+    {
+        prod: false, // use minified in production
+        dev: false, // use minified in developement (when debug:true)
+        subdir: "" // subdirectory containing minified files
+    }
+    ```
 
 -   <a name="setDataKey">**setDataKey**</a> ( `string` dataKey ) : `ThisApp`
 
@@ -184,19 +204,49 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     Sets the default layout for the application
 
--   <a name="setJSPath">**setJSPath**</a> ( `string` path ) : `ThisApp`
+-   <a name="setJSPath">**setJSPath**</a> ( `string` path, `object` minification ) : `ThisApp`
 
     Sets the path from where to load JavaScript files from.
 
--   <a name="setLayoutsPath">**setLayoutsPath**</a> ( `string` path, `string` fileExtension ) : `ThisApp`
+    The minification object has the following defaults:
+
+    ```javascript
+    {
+        prod: false, // use minified in production
+        dev: false, // use minified in developement (when debug:true)
+        subdir: "" // subdirectory containing minified files
+    }
+    ```
+
+-   <a name="setLayoutsPath">**setLayoutsPath**</a> ( `string` path, `string` fileExtension, `object` minification ) : `ThisApp`
 
     Sets the path from where to load layouts from. Parameter `fileExtension` 
     indicates the file extension for layouts. Default is `html`
 
--   <a name="setPagesPath">**setPagesPath**</a> ( `string` path, `string` fileExtension ) : `ThisApp`
+    The minification object has the following defaults:
+
+    ```javascript
+    {
+        prod: false, // use minified in production
+        dev: false, // use minified in developement (when debug:true)
+        subdir: "" // subdirectory containing minified files
+    }
+    ```
+
+-   <a name="setPagesPath">**setPagesPath**</a> ( `string` path, `string` fileExtension, `object` minification ) : `ThisApp`
 
     Sets the path from where to load pages from. Parameter `fileExtension` 
     indicates the file extension for pages. Default is `html`
+
+    The minification object has the following defaults:
+
+    ```javascript
+    {
+        prod: false, // use minified in production
+        dev: false, // use minified in developement (when debug:true)
+        subdir: "" // subdirectory containing minified files
+    }
+    ```
 
 -   <a name="setStore">**setStore**</a> ( `function` func ) : `ThisApp`
 

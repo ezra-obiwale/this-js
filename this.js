@@ -7432,12 +7432,11 @@
                                         url: this.url,
                                         done: function (_data, cancelUpload) {
                                             if (_data === false) {
-                                                __.callable(config.error)
-                                                    .call(this.app);
+                                                __.callable(config.error).call(this.app);
                                                 return;
                                             }
                                             else if (__.isObject(_data, true)) {
-                                                data = __.extend(data, _data);
+                                                data = __.extend(data, _data, true);
                                             }
                                             finalizeSave.call(this, config, data, cancelUpload);
                                         }.bind(this)
