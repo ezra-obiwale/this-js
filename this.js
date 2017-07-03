@@ -42,7 +42,7 @@
     FormData.prototype.fromObject = function (object, appendArray) {
         var _this = this;
         function process(data, _key) {
-            __.forEach(data, function (key, value) {
+            __.each(data, function (key, value) {
                 if (_key) // parsing for object
                     key = _key + '[' + (__.isString(key) || !appendArray ?
                         key : '') + ']';
@@ -122,6 +122,7 @@
             return id !== undefined ? localData[id] : localData;
         };
         this.save = function (data, id, overwrite) {
+            if (!data) return;
             var old = true;
             if (!id && id !== 0) {
                 id = createId();
@@ -132,10 +133,11 @@
             return old ? localData[id] : id;
         };
         this.saveMany = function (data, idKey, overwrite) {
+            if (!data) return;
             if (!idKey)
                 idKey = 'id';
             var resp = {};
-            __.forEach(data, function (i, v) {
+            __.each(data, function (i, v) {
                 var id = v[idKey] || createId();
                 localData[id] = process(id, v, overwrite);
                 resp[id] = localData[id];
@@ -170,7 +172,7 @@
             return obj;
         var str = '',
             callback = __.callable(callback);
-        __.forEach(obj, function (i, v) {
+        __.each(obj, function (i, v) {
             callback.call(null, i, v);
 
             if (str) str += '&';
@@ -182,7 +184,7 @@
             // is array or object
             if (__.isObject(v, true)) {
                 var isArray = __.isArray(v);
-                __.forEach(v, function (j, w) {
+                __.each(v, function (j, w) {
                     if (j && __.isNumeric(j)) str += '&';
                     if (__.isObject(w, true))
                         str += objToQStr(w, null, pre + '[' + j + ']');
@@ -201,7 +203,7 @@
         var obj = {},
             callback = __.callable(callback);
         // loop through each key=value part
-        __.forEach(str.split('&'), function (i, keyToValue) {
+        __.each(str.split('&'), function (i, keyToValue) {
             // get key and value parts
             var parts = keyToValue.split('='),
                 // decode value
@@ -230,7 +232,7 @@
                     // previously used key
                     prevKey = firstKey;
                 // loop through other parts
-                __.forEach(parts, function (j, part) {
+                __.each(parts, function (j, part) {
                     // part is empty or integer: array
                     if (!part || parseInt(part) == part) {
                         // initialize next object
@@ -293,7 +295,7 @@
     function styleToObj(str, callback) {
         var obj = {},
             callback = __.callable(callback);
-        __.forEach(str.split(';'), function (i, v) {
+        __.each(str.split(';'), function (i, v) {
             var parts = v.split(':');
             obj[parts[0]] = parts[1];
             callback.apply(null, parts);
@@ -327,7 +329,7 @@
         analysis.page = parts.shift();
         // get action
         if (parts.length) {
-            __.forEach(crudConnectors, function (i, v) {
+            __.each(crudConnectors, function (i, v) {
                 if (v === parts[0]) {
                     parts.shift();
                     analysis.action = i;
@@ -350,11 +352,20 @@
         return analysis;
     }
     function when(event, target, callback) {
+        var selector = parseSelector(target);
+        return this.on(event, selector, callback);
+    }
+    /**
+     * Parses when selectors to usable selectors
+     * @param {string} str 
+     * @returns {str}
+     */
+    function parseSelector(str) {
         var selector = "", getId = function (str) {
             var parts = str.replace(/[^a-z\_\-]/i, '-->').split('-->');
             return parts.length > 1 ? parts[0] : '';
         };
-        __.forEach(target.split(','), function (i, v) {
+        __.each(str.split(','), function (i, v) {
             if (selector) selector += ', ';
             var exp = v.split('#'), id, type, others;
             if (exp.length > 1 && exp[0]) {
@@ -384,34 +395,7 @@
                 selector += ',' + id + others;
             }
         });
-        return this.on(event, selector, callback);
-    }
-    // @todo: Why this function?
-    function parseSelector(selector) {
-        // @todo: parse attributes as well na
-        var obj = {
-            tag: null,
-            id: null,
-            classes: []
-        },
-            parts = selector.split('#'),
-            part1 = parts[0].split('.');
-        // selector has id; deal with the first part
-        if (parts.length > 1) {
-            obj.tag = part1.shift();
-            // The rest are classes, if available
-            obj.classes = part1;
-            // set up id part
-            parts = parts[1].split('.');
-            obj.id = parts.shift();
-        }
-        else {
-            // nothing before the id
-            obj.tag = parts.shift();
-        }
-        obj.classes = obj.classes.concat(parts);
-
-        return obj;
+        return selector;
     }
     /**
      * @param {_} elem
@@ -504,10 +488,11 @@
                     }
                     connector = 'delete';
                 }
-
-                href += '/' + crudConnectors[connector] + '/' +
-                    (_a.this('model') || _model.this('model') ||
-                        _model.this('id') || ' ') + '/' + (hrf || '');
+                if (connector) {
+                    href += '/' + crudConnectors[connector] + '/' +
+                        (_a.this('model') || _model.this('model') ||
+                            _model.this('id') || ' ') + '/' + (hrf || '');
+                }
                 _a.attr('href', encodeURI(href));
             });
     }
@@ -531,6 +516,63 @@
     function findElem(selector) {
         return Array.from(this.querySelectorAll(selector));
     }
+    function prep4Tmpl(elem) {
+        elem.find('[this-hidden]').hide();
+        // ensure options with show, hide or toggle attributes have value attribute
+        elem.find('option[this-show]:not([value]),option[this-hide]:not([value])'
+            + ',option[this-toggle]:not([value])')
+            .each(function () {
+                _(this).attr('value', _(this).html());
+            });
+        // ensure collections have model attributes
+        elem.find('[this-type="collection"]:not([this-model]),'
+            + 'collection:not([this-model])')
+            .each(function () {
+                app._(this)
+                    .this('model', app._(this)
+                        .this('id'));
+            });
+        // connect autocomplete with its lists 
+        elem.find('[this-autocomplete][this-list]')
+            .each(function () {
+                var __this = app._(this),
+                    _scope = elem;
+                if (__this.hasThis('scoped')) {
+                    _scope = __this.this('scoped')
+                        ?
+                        __this.closest(parseSelector(__this.this('scoped')))
+                        : __this.parent();
+                    _scope.this('is-scope', '');
+                }
+                var _dropDownList = _scope.find('list[this-id="'
+                    + __this.this('list')
+                    + '"],[this-type="list"][this-id="' + __this.this('list')
+                    + '"]')
+                    .this('autocompleting', __this.this('id')),
+                    _selectedList = _scope.find('list[this-id="'
+                        + _dropDownList.this('selection-list')
+                        + '"],[this-type="list"][this-id="'
+                        + _dropDownList.this('selection-list')
+                        + '"]')
+                        .this('parent-list', _dropDownList.this('id'));
+                if (__this.hasThis('scoped')) {
+                    _dropDownList.this('scoped', __this.this('scoped') || '');
+                    _selectedList.this('scoped', __this.this('scoped') || '');
+                }
+            });
+        // change `src` to `this-src`
+        elem.find('img[src]')
+            .each(function () {
+                var __this = app._(this);
+                if (!__this.attr('src'))
+                    return;
+                __this.attr('this-src', __this.attr('src'))
+                    .removeAttr('src');
+            });
+        var content = ext.removeComments.call(app, elem.html());
+        elem.html(content);
+        return elem;
+    }
     var Form = function (form) {
         // Ensures Form is called as an object not a function
         if (!this instanceof Form) return new Form(form);
@@ -543,7 +585,7 @@
                     return;
                 data.push({
                     name: _elem.attr('name'),
-                    value: _elem.val()
+                    value: _elem.is('button') ? _elem.html() : _elem.val()
                 });
             },
             additionalData = {};
@@ -554,12 +596,21 @@
                 // ensure name exists
                 if (!_elem.attr('name')) return;
                 // handle checkboxes and radios
-                else if ((_elem.attr('type') === 'checkbox' || _elem.attr('type') === 'radio')
-                    && _elem.is(':checked')) {
-                    elemToData(_elem);
+                else if ((this.type === 'checkbox' || this.type === 'radio')) {
+                    if (_elem.is(':checked')) elemToData(_elem);
+                }
+                // handle submit input buttons
+                else if (_elem.is('input') && _elem.attr('type') === 'submit') {
+                    // ignore if one's already used
+                    if ((!Object.keys(additionalData).length ||
+                        // or this is the clicked one
+                        _elem.hasThis('clicked'))) {
+                        additionalData[this.name] = this.value;
+                        _elem.removeThis('clicked');
+                    }
                 }
                 // handle others
-                else if (_elem.val().trim()) {
+                else if (_elem.val().trim() || _elem.is('button')) {
                     elemToData(_elem);
                 }
             });
@@ -583,7 +634,7 @@
             // parse original form data
             data.forEach(function (entry) {
                 var obj = object, last;
-                __.forEach(entry.name.split('['), function (i, v) {
+                __.each(entry.name.split('['), function (i, v) {
                     var ky = v.replace(']', '');
                     if (!i) {
                         last = ky;
@@ -614,9 +665,9 @@
                 obj[last] = entry.value;
             });
             // parse additional data
-            __.forEach(additionalData, function (key, value) {
+            __.each(additionalData, function (key, value) {
                 var obj = object, last;
-                __.forEach(key.split('['), function (i, v) {
+                __.each(key.split('['), function (i, v) {
                     var ky = v.replace(']', '');
                     if (!i) {
                         last = ky;
@@ -675,127 +726,128 @@
         this.getForm = function () {
             return form;
         };
-    };
-    /**
-     * Creates an AJAX connection
-     * @param {object} config
-     * @param {_} app
-     * @returns ajax object
-     */
-    var Ajax = function (config, app) {
-        config = __.extend({
-            type: 'get',
-            url: location.href,
-            data: null,
-            dataType: 'json',
-            headers: {},
-            success: function () {
-            },
-            error: function () {
-            },
-            progress: function (e, loaded, total) {
-            },
-            async: true,
-            clearCache: false
-        }, config);
-        config.type = config.type.toLowerCase();
-        var httpRequest = new XMLHttpRequest(),
-            contentType = config.headers['Content-Type'] || config.headers['Content-type']
-                || config.headers['content-type'] || config.headers['CONTENT-TYPE'];
-        // call secureAPI
-        if (app && config.api) {
-            var secureAPI = ext.record.call(app, 'secureAPI'),
-                headers = {},
-                options = {},
-                data = {};
-            if (false === __.callable(secureAPI || app.secap)
-                .call(app, headers, data, options)) {
-                return __.callable(config.error).call(httpRequest);
-            }
-            // update config
-            if (__.isObject(options))
-                config = __.extend(config, options);
-            // update headers
-            if (__.isObject(headers))
-                config.headers = __.extend(config.headers, headers);
-            // update data
-            if (__.isObject(data)) {
-                if (config.data instanceof Form || config.data instanceof FormData)
-                    config.data.fromObject(data);
-                else if (__.isObject(config.data))
-                    config.data = __.extend(config.data, data);
-                else if (__.isString(config.data))
-                    config.data += '&' + objToQStr(data);
-            }
-        }
-        httpRequest.onreadystatechange = function () {
-            if (httpRequest.readyState === XMLHttpRequest.DONE) {
-                if (httpRequest.status >= 200 && httpRequest.status < 400) {
-                    __.callable(config.success)
-                        .call(httpRequest, httpRequest.response);
+    },
+        /**
+         * Creates an AJAX connection
+         * @param {object} config
+         * @param {_} app
+         * @returns ajax object
+         */
+        Ajax = function (config, app) {
+            config = __.extend({
+                type: 'get',
+                url: location.href,
+                data: null,
+                dataType: 'json',
+                headers: {},
+                success: function () {
+                },
+                error: function () {
+                },
+                progress: function (e, loaded, total) {
+                },
+                async: true,
+                clearCache: false
+            }, config);
+            config.type = config.type.toLowerCase();
+            var httpRequest = new XMLHttpRequest(),
+                contentType = config.headers['Content-Type'] || config.headers['Content-type']
+                    || config.headers['content-type'] || config.headers['CONTENT-TYPE'];
+            // call secureAPI
+            if (app && config.api) {
+                var secureAPI = ext.record.call(app, 'secureAPI'),
+                    headers = {},
+                    options = {},
+                    data = {};
+                if (false === __.callable(secureAPI || app.secap)
+                    .call(app, headers, data, options)) {
+                    return __.callable(config.error).call(httpRequest);
                 }
-                else {
-                    __.callable(config.error)
-                        .call(httpRequest, httpRequest.response);
+                // update config
+                if (__.isObject(options))
+                    config = __.extend(config, options);
+                // update headers
+                if (__.isObject(headers))
+                    config.headers = __.extend(config.headers, headers);
+                // update data
+                if (__.isObject(data)) {
+                    if (config.data instanceof Form || config.data instanceof FormData)
+                        config.data.fromObject(data);
+                    else if (__.isObject(config.data))
+                        config.data = __.extend(config.data, data);
+                    else if (__.isString(config.data))
+                        config.data += '&' + objToQStr(data);
                 }
             }
-        };
-        // add time query to string to make it ignore cache
-        if (config.ignoreCache)
-            config.url += ((/\?/).test(config.url) ? "&" : "?") +
-                (new Date()).getTime();
-
-
-        // leave data alone if content type is set
-        if (!contentType && __.isObject(config.data)
-            && !(config.data instanceof FormData)) {
-            // load plain object into Form Object
-            if (!(config.data instanceof Form))
-                config.data = (new Form()).fromObject(config.data);
-            // set config data to best format base on the type of request this is
-            var form = config.data.forRequest(config.type.toLowerCase());
-            contentType = form.contentType;
-            config.data = form.data;
-        }
-        // GET Request with string or object data
-        if (config.type === 'get' && (__.isString(config.data)
-            || __.isObject(config.data, true))) {
-            // convert data to string if not already string
-            config.data = __.isString(config.data) ? config.data :
-                objToQStr(config.data);
-            // append data string to url
-            config.url += ((/\?/).test(config.url) ? "&" : "?") + config.data;
-            // unset config data
-            config.data = null;
-        }
-        // data is string but no content type has been set
-        else if (config.type !== 'get' && __.isString(config.data) && !contentType)
-            contentType = 'application/x-www-form-urlencoded';
-
-        httpRequest.open(config.type, config.url, config.async);
-        httpRequest.responseType = config.dataType;
-        httpRequest.withCredentials = config.withCredentials;
-        if (__.isObject(config.headers)) {
-            __.forEach(config.headers, function (key, value) {
-                httpRequest.setRequestHeader(key, value);
-                if (key.toLowerCase() === 'content-type') {
-                    contentType = null;
-                }
-            });
-        }
-        if (contentType)
-            httpRequest.setRequestHeader('Content-Type', contentType);
-        __.tryCatch(function () {
-            httpRequest.upload.onprogress = function (e) {
-                if (e.lengthComputable) {
-                    __.callable(config.progress)
-                        .call(httpRequest, e, e.loaded, e.total);
+            httpRequest.onreadystatechange = function () {
+                if (httpRequest.readyState === XMLHttpRequest.DONE) {
+                    if (httpRequest.status >= 200 && httpRequest.status < 400) {
+                        __.callable(config.success)
+                            .call(httpRequest, httpRequest.response);
+                    }
+                    else {
+                        __.callable(config.error)
+                            .call(httpRequest, httpRequest.response);
+                    }
                 }
             };
-        });
-        httpRequest.send(config.data);
-        return httpRequest;
-    },
+            // add time query to string to make it ignore cache
+            if (config.ignoreCache)
+                config.url += ((/\?/).test(config.url) ? "&" : "?") +
+                    (new Date()).getTime();
+
+
+            // leave data alone if content type is set
+            if (!contentType && __.isObject(config.data)
+                && !(config.data instanceof FormData)) {
+                // load plain object into Form Object
+                if (!(config.data instanceof Form))
+                    config.data = (new Form()).fromObject(config.data);
+                // set config data to best format base on the type of request this is
+                var form = config.data.forRequest(config.type.toLowerCase());
+                contentType = form.contentType;
+                config.data = form.data;
+            }
+            // GET Request with string or object data
+            if (config.type === 'get' && (__.isString(config.data)
+                || __.isObject(config.data, true))) {
+                // convert data to string if not already string
+                config.data = __.isString(config.data) ? config.data :
+                    objToQStr(config.data);
+                // append data string to url
+                config.url += ((/\?/).test(config.url) ? "&" :
+                    "?") + config.data;
+                // unset config data
+                config.data = null;
+            }
+            // data is string but no content type has been set
+            else if (config.type !== 'get' && __.isString(config.data) && !contentType)
+                contentType = 'application/x-www-form-urlencoded';
+
+            httpRequest.open(config.type, config.url, config.async);
+            httpRequest.responseType = config.dataType;
+            httpRequest.withCredentials = config.withCredentials;
+            if (__.isObject(config.headers)) {
+                __.each(config.headers, function (key, value) {
+                    httpRequest.setRequestHeader(key, value);
+                    if (key.toLowerCase() === 'content-type') {
+                        contentType = null;
+                    }
+                });
+            }
+            if (contentType)
+                httpRequest.setRequestHeader('Content-Type', contentType);
+            __.tryCatch(function () {
+                httpRequest.upload.onprogress = function (e) {
+                    if (e.lengthComputable) {
+                        __.callable(config.progress)
+                            .call(httpRequest, e, e.loaded, e.total);
+                    }
+                };
+            });
+            httpRequest.send(config.data);
+            return httpRequest;
+        },
         __ = Object.create({
             debug: true,
             index: 0,
@@ -809,7 +861,7 @@
                 var _this = this;
                 return this.each(function () {
                     var __this = this;
-                    _this.forEach(className.split(' '), function (i, v) {
+                    _this.each(className.split(' '), function (i, v) {
                         __this.classList.add(v);
                     });
                 });
@@ -817,7 +869,7 @@
             /**
              * Adds an element after the current elements or fetches the sibling after current
              * items
-             * @param {_}|{HTMLElement}|{String} elem
+             * @param {_ | HTMLElement | String} elem
              * @returns {_}
              */
             after: function (elem) {
@@ -884,7 +936,7 @@
             },
             /**
              * Sets or gets the attr of the elements
-             * @param {string}|{object} attr
+             * @param {string | object} attr
              * @param {mixed} val
              * @returns __|string
              */
@@ -894,7 +946,7 @@
                         this.each(function () {
                             if (__.isObject(attr)) {
                                 var __this = this;
-                                __.forEach(attr, function (i, v) {
+                                __.each(attr, function (i, v) {
                                     __this.setAttribute(i, v);
                                 });
                             }
@@ -914,7 +966,7 @@
             /**
              * Adds an element before the current elements or fetches the sibling before current
              * items
-             * @param {_}|{HTMLElement}|{String} elem
+             * @param {_ | HTMLElement | String} elem
              * @returns {_}
              */
             before: function (elem) {
@@ -973,7 +1025,7 @@
                             this.id = 'rANd' + Math.ceil(Math.random() * 100);
                             id = true;
                         }
-                        __.forEach(selector.split(','), function (i, sel) {
+                        __.each(selector.split(','), function (i, sel) {
                             if (query)
                                 query += ',';
                             query += '#' + _this.id + '>' + sel;
@@ -1006,10 +1058,12 @@
              * @returns _
              */
             clone: function () {
+                var cloned = [];
                 return this.tryCatch(function () {
-                    return _(this.items.length ?
-                        this.items[0].cloneNode(true) : [
-                        ], this.debug);
+                    this.each(function () {
+                        cloned.push(this.cloneNode(true));
+                    })
+                    return _(cloned, this.debug);
                 });
             },
             /**
@@ -1019,12 +1073,11 @@
              */
             closest: function (selector) {
                 return this.tryCatch(function () {
-                    var closest = null;
-                    if (this.items.length) {
-                        closest = this.items[0].closest(selector);
-                        if (closest === this.items[0])
-                            closest = null;
-                    }
+                    var closest = [];
+                    this.each(function () {
+                        var cls = this.closest(selector);
+                        if (cls && cls !== this) closest.push(cls);
+                    });
                     return _(closest, this.debug);
                 });
             },
@@ -1041,7 +1094,7 @@
                 return this.tryCatch(function () {
                     if (_this.isObject(item, true)) {
                         var found = false;
-                        _this.forEach(item, function (i, v) {
+                        _this.each(item, function (i, v) {
                             if (_this.contains(v, str, all)) {
                                 found = true;
                                 return false;
@@ -1053,7 +1106,7 @@
                         return _this.isString(item) && item.indexOf(str) !== -1;
                     else if (this.isArray(str)) {
                         var found = true;
-                        this.forEach(str, function (i, v) {
+                        this.each(str, function (i, v) {
                             found = _this.contains(item, v, all);
                             if (!all && found) {
                                 return false;
@@ -1104,7 +1157,7 @@
             },
             /**
              * Sets/Gets a value into/from the dataset
-             * @param {string}|{object} key
+             * @param {string | object} key
              * @param {mixed} value
              * @returns {mixed}
              */
@@ -1135,8 +1188,15 @@
              * The this object is also the item
              * @returns __
              */
-            each: function (callback) {
-                return this.forEach(this.items, callback);
+            each: function (items, callback) {
+                if (arguments.length === 1) {
+                    callback = items;
+                    items = this.items;
+                }
+                return this.tryCatch(function () {
+                    forEach(items, callback);
+                    return this;
+                });
             },
             /**
              * Logs the error message
@@ -1164,9 +1224,9 @@
                 // set to false
                 if (this.isBoolean(args[args.length - 1]))
                     deep = args.pop(args);
-                this.forEach(args, function (i, o) {
+                this.each(args, function (i, o) {
                     if (_this.isArray(o)) {
-                        _this.forEach(o, function (j, v) {
+                        _this.each(o, function (j, v) {
                             // not first array param
                             // current is object but not the same as the one
                             // from the existing array
@@ -1194,7 +1254,7 @@
                         });
                     }
                     else if (_this.isObject(o)) {
-                        _this.forEach(o, function (i, v) {
+                        _this.each(o, function (i, v) {
                             // extend if old and new are object but new isn't an array
                             if (newObject[i] && _this.isObject(newObject[i]) &&
                                 _this.isObject(v) && !_this.isArray(v) && deep)
@@ -1237,28 +1297,14 @@
                 return _(result, this.debug);
             },
             /**
-             * Loops through the given array or object and calls the given callback on each item
-             * @param array|object items
-             * @param function|string callback
-             * The function receives two parameters: index and item
-             * The this object is also the item
-             * @returns __
-             */
-            forEach: function (items, callback) {
-                return this.tryCatch(function () {
-                    forEach(items, callback);
-                    return this;
-                });
-            },
-            /**
              * Fetches the item at the given index
-             * @param int index
-             * @param boolean in_ Indicates whether to wrap in _ Object
+             * @param {integer} index
+             * @param {boolean} wrap Indicates whether to wrap in _ Object
              * @returns mixed
              */
-            get: function (index, in_) {
+            get: function (index, wrap) {
                 var item = this.items[index];
-                return in_ ? _(item, this.debug) : item;
+                return wrap ? _(item, this.debug) : item;
             },
             /**
              * Checks if an attribute exists
@@ -1280,9 +1326,9 @@
                 if (this.length) {
                     var _this = this,
                         classNames = className.split(' ');
-                    this.forEach(Array.from(this.items[0].classList), function (i, v) {
+                    this.each(Array.from(this.items[0].classList), function (i, v) {
                         var found = 0;
-                        _this.forEach(classNames, function (j, w) {
+                        _this.each(classNames, function (j, w) {
                             if (v === w) {
                                 found++;
                             }
@@ -1351,18 +1397,18 @@
             /**
              * Checks if the items are of the given selector
              * @param string selector
-             * @param {Boolean} checkIdOnly Indicates to check the this-id of element
              * @returns Boolean
              */
-            is: function (selector, checkIdOnly) {
-                if (!this.items.length)
-                    return false;
-                if (checkIdOnly && this.items[0].getAttribute('this-id') === selector)
-                    return true;
-                var el = this.items[0];
-                return (el.matches || el.matchesSelector || el.msMatchesSelector
-                    || el.mozMatchesSelector || el.webkitMatchesSelector
-                    || el.oMatchesSelector).call(el, selector);
+            is: function (selector) {
+                var is = false, _this = this;
+                this.each(function () {
+                    is = _(this, _this.debug).this('type') === selector ||
+                        (this.matches || this.matchesSelector || this.msMatchesSelector
+                            || this.mozMatchesSelector || this.webkitMatchesSelector
+                            || this.oMatchesSelector).call(this, selector);
+                    return is;
+                });
+                return is;
             },
             /**
              * Checks if the given value exists in the given array
@@ -1426,12 +1472,12 @@
             /**
              * Checks if the given item exists in the given object
              * @param {mixed} item
-             * @param {object}|{array} object
+             * @param {object | array} object
              * @returns {Boolean}
              */
             inObject: function (item, object) {
                 var is = false;
-                this.forEach(object, function (i, v) {
+                this.each(object, function (i, v) {
                     if (v === item) {
                         is = true;
                         return false;
@@ -1441,8 +1487,8 @@
             },
             /**
              * Checks if the given key exists in the given object
-             * @param {integer}|{string} key
-             * @param {object}|{array} object
+             * @param {integer | string} key
+             * @param {object | array} object
              * @returns {Boolean}
              */
             keyExists: function (key, object) {
@@ -1492,7 +1538,7 @@
                 var _this = this;
                 return this.each(function () {
                     var target = this;
-                    _this.forEach(event.replace(/,/g, ' ')
+                    _this.each(event.replace(/,/g, ' ')
                         .split(' '), function (i, v) {
                             target.addEventListener(v.trim(), function (e) {
                                 // get target from event
@@ -1582,13 +1628,12 @@
              */
             queryStringToObject: qStrToObj,
             /**
-             * Calls the given function when the dom has been fully loaded
+             * Adds DOMContentLoaded event listener to items
              * @param {function} callback
              * @returns {_}
              */
             ready: function (callback) {
-                _(document, this.debug)
-                    .on('DOMContentLoaded', callback);
+                this.on('DOMContentLoaded', callback);
                 return this;
             },
             /**
@@ -1647,7 +1692,7 @@
             },
             /**
              * Removes the given attr(s) from elements
-             * @param {string}|{array} attr
+             * @param {string | array} attr
              * @returns ThisApp
              */
             removeAttr: function (attr) {
@@ -1658,12 +1703,12 @@
                 return this.each(function () {
                     var __this = this;
                     if (!attr) {
-                        _this.forEach(Array.from(this.attributes), function () {
+                        _this.each(Array.from(this.attributes), function () {
                             __this.removeAttribute(this.name);
                         });
                         return;
                     }
-                    __.forEach(attr, function (i, v) {
+                    __.each(attr, function (i, v) {
                         __this.removeAttribute(v);
                     });
                 });
@@ -1677,7 +1722,7 @@
                 var _this = this;
                 return this.each(function () {
                     var __this = this;
-                    _this.forEach(className.split(' '), function (i, v) {
+                    _this.each(className.split(' '), function (i, v) {
                         __this.classList.remove(v);
                     });
                 });
@@ -1723,8 +1768,12 @@
              * @returns _
              */
             siblings: function (selector) {
-                var siblings = [];
+                var siblings = [],
+                    usedParents = {};
                 this.each(function () {
+                    // ensure a parent is only used once
+                    if (usedParents[this.parentElement]) return;
+                    usedParents[this.parentElement] = true;
                     var rId = false, query = '',
                         _this = this;
                     if (!this.id) {
@@ -1732,7 +1781,7 @@
                         rId = true;
                     }
                     if (selector) {
-                        __.forEach(selector.split(','), function (i, sel) {
+                        __.each(selector.split(','), function (i, sel) {
                             if (query)
                                 query += ',';
                             query += sel + ':not(#' + _this.id + ')';
@@ -1878,16 +1927,20 @@
              * @returns __|string
              */
             val: function (value) {
-                var val;
-                this.each(function () {
-                    if (value !== undefined) {
+                if (value !== undefined) {
+                    return this.each(function () {
+                        if (_(this).is('textarea'))
+                            _(this).html(value);
+                        else if (_(this).is('select')) {
+                            _(this).find('[selected]').remove('selected');
+                            _(this).find('[value="' + value + '"]')
+                                .attr('selected', 'selected');
+                        }
                         this.value = value;
                         _(this).attr('value', value);
-                        return;
-                    }
-                    val = this.value;
-                });
-                return value !== undefined ? this : val;
+                    });
+                }
+                return this.items.length ? this.items[0].value : '';
             },
             /**
              * A shortcut to method on()
@@ -1906,7 +1959,7 @@
             },
             /**
              * Wraps the current elements with the given element
-             * @param {_}|{HTMLElement elem
+             * @param {_ | HTMLElement elem
              * @returns {_}
              */
             wrap: function (elem) {
@@ -1920,7 +1973,7 @@
         }),
         /**
          * Creates a wrapper for traversing the DOM
-         * @param {string}|{array}|{HTMLCollection}|{object} selector
+         * @param {string | array | HTMLCollection | object} selector
          * If as string, selector contains tags, they are created unattached to the DOM
          * @param {boolean} debug
          * @returns {_}
@@ -1977,8 +2030,8 @@
             records: {},
             /**
              * Binds the target to the model of the given element
-             * @param {_}|{string} _target
-             * @param {_}|{string} _elem
+             * @param {_ | string} _target
+             * @param {_ | string} _elem
              * @param {string} childKey The child key to bind on the target
              * @returns {Promise}
              */
@@ -2037,9 +2090,9 @@
             /**
              * Binds an elem to a fresh copy of the given object. Callee must
              * decide what to do with the bound elem (copy) in the callback.
-             * @param {_}|{HTMLElement} elem
+             * @param {_ | HTMLElement} elem
              * @param {Object} object
-             * @param {string}|{integer} key The unique identifier of the object, if coming
+             * @param {string | integer} key The unique identifier of the object, if coming
              * from a list
              * @returns {_}
              */
@@ -2079,6 +2132,8 @@
                 }
                 // check common callback only if page callback didn't return false or doesn't exist
                 if (response !== false && this.beforeCallbacks['___common']) {
+                    if (action === 'page.leave')
+                        ext.saveState.call(this, true);
                     response = __.callable(this.beforeCallbacks['___common'][action])
                         .apply(context || this, params);
                 }
@@ -2087,7 +2142,7 @@
             /**
              * Check if container is a table's descendant tag
              * and properly parses it.
-             * @param {_}|{string} container
+             * @param {_ | string} container
              * @returns {array}
              */
             checkTableContent: function (container) {
@@ -2166,7 +2221,7 @@
             },
             /**
              * Does the loading
-             * @param {HTMLElement}|{_} container
+             * @param {HTMLElement | _} container
              * @param object data
              * @param string content
              * @param {boolean} isModel Indicates whether loading a model or not
@@ -2250,7 +2305,7 @@
                         }
                         // check for loops within current loop and execute
                         if (__.isObject(value, true)) {
-                            __.forEach(value, function (i, v) {
+                            __.each(value, function (i, v) {
                                 if (!__.isObject(v, true))
                                     return;
                                 // do loop for repeater on current object
@@ -2289,7 +2344,7 @@
                 content = '<div>' + this._(content).show()
                     .outerHtml() + '</div>';
                 if (__.isObject(data, true)) {
-                    __.forEach(data, function (key, value) {
+                    __.each(data, function (key, value) {
                         process(key, value);
                     });
                 }
@@ -2345,7 +2400,7 @@
                 var type = getElemType(__this) || '',
                     tar = type + '#' + __this.this('id');
                 if (this.tar[tar]) {
-                    __.forEach(this.tar[tar], function (i, v) {
+                    __.each(this.tar[tar], function (i, v) {
                         __this.this('' + i, v);
                     });
                     delete this.tar[tar];
@@ -2363,7 +2418,7 @@
              * Empty lists, models and collections in the given elem.
              * When these are being loaded, their content is gotten from the
              * templates.
-             * @param {_}|{HTMLElement} elem
+             * @param {_ | HTMLElement} elem
              * @param {boolean} emptyLoaded Indicates whether to empty loaded features as well
              * @returns {ThisApp}
              */
@@ -2488,11 +2543,10 @@
                     _dropdownList, selected = '';
                 if (options.dropdownList) {
                     _dropdownList = options.dropdownList;
-                    var selected = _dropdownList
-                        .this('selected') || '';
+                    var selected = _dropdownList.this('selected') || '';
                 }
                 // loop through data
-                __.forEach(options.data, function (i, v) {
+                __.each(options.data, function (i, v) {
                     options.filter = ext.cleanFilter(options.filter);
                     // filter list
                     if (options.filter) {
@@ -2553,7 +2607,7 @@
             fillVariables: function (variables, data, content) {
                 var app = this;
                 if (variables && data && content) {
-                    __.forEach(variables, function (i, v) {
+                    __.each(variables, function (i, v) {
                         var value = ext.getVariableValue.call(app, v, data);
                         content = content.replace(v.trim(),
                             value || value == 0 ? value : v);
@@ -2568,7 +2622,7 @@
              * @returns {void}
              */
             finalizePageLoad: function (_layout, replaceInState) {
-                this.removedAssets = {};
+                this.__proto__.removeAssets = {};
                 ext.loadAssets.call(this, _layout);
                 var app = this;
                 if (_layout && _layout.length) {
@@ -2590,58 +2644,57 @@
                     });
                 this.page = this.container
                     .find('page[this-id="' + this.page.this('id')
-                    + '"]:not([this-dead]),'
-                    + '[this-type="page"][this-id="'
-                    + this.page.this('id')
-                    + '"]:not([this-dead])')
+                    + '"]:not([this-dead]),' + '[this-type="page"][this-id="'
+                    + this.page.this('id') + '"]:not([this-dead])')
                     .this('current', '')
                     .removeThis('layout').hide();
-                this.container.find('[this-type]:not([this-type="page"]):not(page)'
-                    + ':not(layout):not([this-type="layout"])'
-                    + ':not(component):not([this-type="component"])'
-                    + ',[this-repeat-for]')
+                this.container.find('collection:not([this-loaded]),[this-type="collection"]:not([this-loaded]),'
+                    + 'model:not([this-loaded]):not([this-in-collection]),'
+                    + '[this-type="model"]:not([this-loaded]):not([this-in-collection]),[this-repeat-for]')
                     .hide();
                 // delete pageModel for last page
                 delete this.pageModel;
                 this.pageIsLoaded = false;
                 // callback for when page assets have been loaded
                 var loadedAssets = function () {
-                    ext.loadComponents.call(this, function () {
-                        this.page = ext.doTar.call(this, this.page).hide();
-                        // load page as model if attached to a model
-                        if (this.page.this('url') && this.page.this('model')
-                            && this.page.this('do') !== 'create') {
-                            // get page model's collection
-                            new Collection({
-                                app: this,
-                                name: this.page.this('model')
-                            })
-                                .then(function (collection) {
-                                    return collection.model(this.page.this('mid'), {
-                                        url: this.page.this('url'),
-                                        ignoreCache: this.page.hasThis('ignore-cache')
-                                        || !ext.config.call(this).cacheData
-                                    });
-                                }.bind(this))
-                                .then(function (model) {
-                                    this.pageModel = model;
-                                    // load page model. data provided
-                                    ext.loadModel.call(this, this.page, function () {
-                                        ext.showPage.call(this, replaceInState);
-                                    }.bind(this), model.attributes || {});
-                                }.bind(this))
-                                .catch(function () {
-                                    // load page model. no data provided. request anew
-                                    ext.loadModel.call(app, this.page, function () {
-                                        ext.showPage.call(this, replaceInState);
-                                    }.bind(app), null);
+                    var loadComponents = function (model) {
+                        ext.loadComponents.call(this, function () {
+                            if (model === false) {
+                                return ext.showPage.call(this, replaceInState);
+                            }
+                            // load page model. data provided
+                            ext.loadModel.call(this, this.page, function () {
+                                ext.showPage.call(this, replaceInState);
+                            }.bind(this), model);
+                        }.bind(this));
+                    }.bind(this);
+                    this.page = ext.doTar.call(this, this.page).hide();
+                    // load page as model if attached to a model
+                    if (this.page.this('url') && this.page.this('model')
+                        && this.page.this('do') !== 'create') {
+                        // get page model's collection
+                        new Collection({
+                            app: this,
+                            name: this.page.this('model')
+                        })
+                            .then(function (collection) {
+                                return collection.model(this.page.this('mid'), {
+                                    url: this.page.this('url'),
+                                    ignoreCache: this.page.hasThis('ignore-cache')
+                                    || !ext.config.call(this).cacheData
                                 });
-                        }
-                        else {
-                            // load page s model. Ensures expresssion are executed
-                            ext.showPage.call(this, replaceInState);
-                        }
-                    }.bind(this));
+                            }.bind(this))
+                            .then(function (model) {
+                                this.pageModel = model;
+                                loadComponents(model.attributes);
+                            }.bind(this))
+                            .catch(function () {
+                                loadComponents();
+                            });
+                    }
+                    else {
+                        loadComponents(false);
+                    }
                 }.bind(this);
                 // load page content from elsewhere
                 if (this.page.this('path')) {
@@ -2682,47 +2735,21 @@
                     this.__callable(error).call(this);
                     return;
                 }
-                var url = pathConfig.dir + idOrPath + pathConfig.ext;
+                var url = pathConfig.dir;
+                // debugging and asked to load minified file for dev
+                if ((ext.record.call(this, 'debug') && pathConfig.min.dev)
+                    // not debugging and asked to load minified file for prod
+                    || (!ext.record.call(this, 'debug') && pathConfig.min.prod))
+                    url += pathConfig.min.subdir + idOrPath + '.min';
+                // use idOrPath as is
+                else url += idOrPath;
+                url += pathConfig.ext;
                 this.request({
                     url: url,
                     dataType: 'text'
                 })
                     .then(function (data) {
                         var elem = __.createElement(data),
-                            prep4Tmpl = function (elem) {
-                                var content = ext.removeComments.call(app, elem.html());
-                                elem.html(content);
-                                elem.find('[this-type="collection"]:not([this-model]),'
-                                    + 'collection:not([this-model])')
-                                    .each(function () {
-                                        app._(this)
-                                            .this('model', app._(this)
-                                                .this('id'));
-                                    });
-                                elem.find('[this-autocomplete][this-list]')
-                                    .each(function () {
-                                        var __this = app._(this),
-                                            _dropdownList = elem.find('list[this-id="'
-                                                + __this.this('list')
-                                                + '"],[this-type="list"][this-id="' + __this.this('list')
-                                                + '"]')
-                                                .this('autocompleting', __this.this('id')),
-                                            _selectedList = elem.find('list[this-id="'
-                                                + _dropdownList.this('selection-list')
-                                                + '"],[this-type="list"][this-id="'
-                                                + _dropdownList.this('selection-list')
-                                                + '"]')
-                                                .this('parent-list', _dropdownList.this('id'));
-                                    });
-                                elem.find('img[src]')
-                                    .each(function () {
-                                        var __this = app._(this);
-                                        if (!__this.attr('src'))
-                                            return;
-                                        __this.attr('this-src', __this.attr('src'))
-                                            .removeAttr('src');
-                                    });
-                            },
                             done = function () {
                                 __.callable(success)
                                     .call(this, elem.clone());
@@ -2751,7 +2778,7 @@
                             }
                             else if (!elem.is(type) && elem.this('type') !== type) {
                                 if (elem.this('type'))
-                                    elem = elem.wrap('<div this-type="page" />')
+                                    elem = elem.wrap('<div this-type="' + type + '" />')
                                         .parent();
                                 else
                                     elem.this('type', type);
@@ -2789,7 +2816,7 @@
                 var value = data,
                     vars = __.isObject(variable, true) ?
                         variable : variable.split('.');
-                __.forEach(vars, function (i, v) {
+                __.each(vars, function (i, v) {
                     if (!value)
                         return false;
                     value = value[v];
@@ -2803,7 +2830,7 @@
              */
             getExpressions: function (content) {
                 var exps = [];
-                __.forEach(content.split('({'), function (i, v) {
+                __.each(content.split('({'), function (i, v) {
                     if (!i)
                         return;
                     exps.push('({' + v.split('})')[0] + '})');
@@ -2856,7 +2883,7 @@
                         ext.getDeepValue.call(null, varname, data) :
                         data[varname];
                 // go through filters
-                __.forEach(vars, function (i, v) {
+                __.each(vars, function (i, v) {
                     // changed escaped pipes to real pipes
                     v = v.trim().replace(/__fpipe__/g, '|');
                     // get filter parts
@@ -2924,21 +2951,22 @@
                         var __this = app._(this);
                         __this.html(__this.html());
                         if (__this.this('this-repeat-for')) {
-                            __this.find('[this-if], [this-else-if], [this-else]')
+                            __this.find('[this-if],[this-if-end],[this-else-if],[this-else-if-end],[this-else]')
                                 .this('ignore', '')
                                 .this('muted', '');
                         }
                     });
-                content.find('[this-if],[this-else-if],[this-else]')
+                content.find('[this-if],[this-if-end],[this-else-if],[this-else-if-end],[this-else]')
                     .each(function () {
                         var __this = app._(this);
                         if (__this.hasThis('ignore'))
                             return;
-                        else if (__this.this('if')) {
+                        else if (__this.this('if') || __this.this('if-end')) {
+                            var exp = __this.this('if') || __this.this('if-end');
                             try {
                                 level++;
                                 matched[level] = false;
-                                if (eval(__this.this('if').trim())) {
+                                if (eval(exp.trim())) {
                                     __this.removeThis('if');
                                     matched[level] = true;
                                 }
@@ -2949,21 +2977,21 @@
                             catch (e) {
                                 __this.remove();
                             }
-                            if (__this.hasThis('end-if')) {
-                                __this.removeThis('end-if');
+                            if (__this.hasThis('if-end')) {
+                                __this.removeThis('if-end');
                                 delete matched[level];
                                 level--;
                             }
                         }
-                        else if (__this.this('else-if')) {
+                        else if (__this.this('else-if') || __this.this('else-if-end')) {
+                            var exp = __this.this('else-if') || __this.this('else-if-end');
                             try {
                                 if (!__.isBoolean(matched[level])) {
                                     app.error('Branching error: Else-if without If!');
                                     return;
                                 }
                                 if (matched[level] ||
-                                    !eval(__this.this('else-if')
-                                        .trim()))
+                                    !eval(exp.trim()))
                                     __this.remove();
                                 else {
                                     __this.removeThis('else-if');
@@ -2973,8 +3001,8 @@
                             catch (e) {
                                 __this.remove();
                             }
-                            if (__this.hasThis('end-if')) {
-                                __this.removeThis('end-if');
+                            if (__this.hasThis('else-if-end')) {
+                                __this.removeThis('else-if-end');
                                 delete matched[level];
                                 level--;
                             }
@@ -3001,7 +3029,8 @@
                         }
                     });
                 content.find('[this-if][this-ignore],[this-else-if][this-ignore],'
-                    + '[this-else][this-ignore],[this-end-if][this-ignore]')
+                    + '[this-if-end][this-ignore],[this-else-if-end][this-ignore],'
+                    + '[this-else][this-ignore]')
                     .removeThis('ignore');
                 return returnObject ? content.children() : content.html();
             },
@@ -3012,9 +3041,7 @@
              * @returns booean
              */
             is: function (type, container) {
-                return this._(container)
-                    .this('type') === type || this._(container)
-                        .is(type);
+                return this._(container).is(type);
             },
             /**
              * Check if an app is running
@@ -3041,8 +3068,9 @@
              */
             loadAsset: function (type, name, elem, callback) {
                 name = name.trim();
-                var url = (name.indexOf('://') !== -1 || name.startsWith('//')) ?
-                    name : ext.config.call(this).paths[type] + name,
+                var pathConfig = ext.config.call(this).paths[type],
+                    url = (name.indexOf('://') !== -1 || name.startsWith('//')) ?
+                        name : pathConfig.dir + name,
                     app = this,
                     load = function (url) {
                         if (type === 'js') {
@@ -3056,6 +3084,11 @@
                         __.callable(callback)
                             .call(this, pageAssets[type][url]);
                     }.bind(this);
+                // debugging and asked to load minified file for dev
+                if ((ext.record.call(this, 'debug') && pathConfig.min.dev)
+                    // not debugging and asked to load minified file for prod
+                    || (!ext.record.call(this, 'debug') && pathConfig.min.prod))
+                    url = pathConfig.dir + pathConfig.min.subdir + name + '.min';
                 // ensure url ends with .type (.js|.css|...)
                 if (!url.endsWith('.' + type))
                     url += '.' + type;
@@ -3098,9 +3131,26 @@
                     }.bind(this);
                 if (elem.this('load-css') && !elem.hasThis('with-css')) {
                     loading++;
-                    var csses = elem.this('load-css').split(',');
+                    var csses = elem.this('load-css').split(','),
+                        nextIndex = 0,
+                        loadNextCSS = function () {
+                            if (!csses[nextIndex]) {
+                                loading--;
+                                return done();
+                            }
+                            ext.loadAsset.call(app, 'css', csses[nextIndex], elem,
+                                function () {
+                                    nextIndex++;
+                                    loadNextCSS();
+                                });
+                        };
+                    loadNextCSS();
+                }
+                if (elem.this('load-css-async') && !elem.hasThis('with-css')) {
+                    loading++;
+                    var csses = elem.this('load-css-async').split(',');
                     // load comma-separated css files
-                    __.forEach(csses,
+                    __.each(csses,
                         function (i, css) {
                             ext.loadAsset.call(app, 'css', css, elem, function () {
                                 if (csses.length - 1 === i) {
@@ -3109,8 +3159,9 @@
                                 }
                             });
                         });
-                    elem.this('with-css', '').removeThis('load-css');
                 }
+                // mark elem has been loaded with css
+                elem.this('with-css', '').removeThis('load-css');
 
                 // mark all scripts as old by removing attribute `this-loaded`
                 if (!Object.keys(this.removedAssets).length)
@@ -3120,9 +3171,37 @@
                     leaveUnrequired = true;
                     loading++;
                     var jses = elem.this('load-js-first').split(','),
+                        removedAssets = this.removedAssets[elemType],
+                        nextIndex = 0,
+                        loadNextJS = function () {
+                            // loaded all
+                            if (!jses[nextIndex]) {
+                                // remove elem-type css and js files that don't belong to
+                                // the elem type
+                                if (!removedAssets)
+                                    app._('script[this-app="' + app.container.this('id')
+                                        + '"][this-for="' + elemType + '"]:not([this-loaded])')
+                                        .remove();
+                                loading--;
+                                return done();
+                            }
+                            // load comma-separated css files
+                            ext.loadAsset.call(app, 'js', jses[nextIndex], elem, function () {
+                                // load next
+                                nextIndex++;
+                                loadNextJS();
+                            });
+                        };
+                    loadNextJS();
+                    loadedPageJS.first[this.page.this('id')] = true;
+                }
+                if (elem.this('load-js-first-async') && !loadedPageJS.first[this.page.this('id')]) {
+                    leaveUnrequired = true;
+                    loading++;
+                    var jses = elem.this('load-js-first-async').split(','),
                         removedAssets = this.removedAssets[elemType];
                     // load comma-separated css files
-                    __.forEach(jses, function (i, js) {
+                    __.each(jses, function (i, js) {
                         ext.loadAsset.call(app, 'js', js, elem, function () {
                             // loaded js is last js
                             if (jses.length - 1 === i) {
@@ -3153,7 +3232,7 @@
             },
             /**
              * Loads a collection
-             * @param {_}|{HTMLElement} __this
+             * @param {_ | HTMLElement} __this
              * @param {Function} callback
              * @param {Object} data The data to load into the collection. If available and a url
              * exists on __this, it is monitored for changes to the data.
@@ -3267,6 +3346,8 @@
                                         __this.append(ext.processExpressions.call(app, lastChild));
                                         __.callable(callback)
                                             .call(this, data);
+                                        if (__this.this('value'))
+                                            __this.val(__this.this('value'));
                                     }.bind(app));
                             }
                         },
@@ -3343,12 +3424,13 @@
                 // component does not exist
                 if (!component ||
                     !this._(component).length) {
+                    if (!ext.canContinue.call(this, 'component.load', [], __this.get(0)))
+                        return __.callable(callback).call(this, false);
                     if (__this.this('url')) {
                         var cached = this.getCached('[this-url="' +
                             __this.this('url') + '"]', 'component');
                         if (cached.length)
-                            ext.loadComponent.call(this, __this, callback, cached.children()
-                                .clone().show());
+                            ext.loadComponent.call(this, __this, callback, cached.show());
                         else
                             ext.fullyFromURL
                                 .call(app, 'component', __this.this('url'),
@@ -3359,8 +3441,7 @@
                                 },
                                 function () {
                                     __this.remove();
-                                    __.callable(callback)
-                                        .call(app);
+                                    __.callable(callback).call(app);
                                 });
                     }
                     else {
@@ -3375,14 +3456,12 @@
                     return ext;
                 }
                 component = this._(component).clone();
-                if (component.is('component') || component.this('type') === 'component')
-                    component.removeThis('url');
+                ext.canContinue.call(this, 'component.render', [component.get(0)], __this.get(0));
+                if (component.is('component')) component.removeThis('url');
                 // load component
-                __this.replaceWith(component.show())
-                    .trigger('component.loaded');
+                __this.replaceWith(component.show()).trigger('component.loaded');
                 // call post load if loading component after page has been loaded
-                if (this.pageIsLoaded)
-                    ext.postLoad.call(this, __this, true);
+                if (this.pageIsLoaded) ext.postLoad.call(this, __this, true);
                 __.callable(callback).call(this);
             },
             /**
@@ -3400,8 +3479,8 @@
                 }
                 else {
                     ext.loadComponent.call(app, components.get(0), function () {
-                        length--;
-                        ext.componentLoaded.call(this, components, callback, length);
+                        // load next component
+                        ext.componentLoaded.call(this, components, callback, --length);
                     }.bind(this));
                 }
                 return this;
@@ -3452,10 +3531,9 @@
                     expires: new Date().setMilliseconds(1000 * 3600 * 24)
                 },
                     dataKey = container.this('data-key') ||
-                        ext.config.call(this).dataKey,
-                    real_data = getRealData.call(this, data, dataKey);
+                        ext.config.call(this).dataKey;
                 // get expiration if set and data from dataKey if specified
-                if (dataKey) {
+                if (dataKey && !container.hasThis('no-data-key')) {
                     // set data expiration timestamp too.
                     if (!isNaN(data.expires))
                         // expiration is a number. Must be milliseconds
@@ -3464,7 +3542,7 @@
                     else if (__.isString(data.expires))
                         // expiration is a string. Must be date
                         _data.expires = new Date(data.expires).getTime();
-                    data = real_data;
+                    data = getRealData.call(this, data, dataKey);
                 }
                 // trigger empty.response trigger if no data
                 if (!data || !__.isObject(data, true) || !Object.keys(data).length) {
@@ -3507,8 +3585,8 @@
                         tab_cont = ext.checkTableContent.call(this, content),
                         level = tab_cont.level,
                         content = tab_cont.container.outerHtml();
-                    this.collectionData = Object.keys(this.cacheTargets ||
-                        data).length;
+                    this.collectionData = Object
+                        .keys(this.tar[container.this('id')] || data).length;
                     var done = function () {
                         // was paginating
                         if (container.hasThis('paginate')) {
@@ -3563,9 +3641,9 @@
                                 }
                             }.bind(this);
                         // needed for subsequent pagination attempts
-                        __.forEach(this.cacheTargets || data, function (_index, _model) {
+                        __.each(this.tar[container.this('id')] || data, function (_index, _model) {
                             var index, model;
-                            if (app.cacheTargets) {
+                            if (app.tar[container.this('id')]) {
                                 index = _model;
                                 model = data[index];
                             }
@@ -3579,8 +3657,8 @@
                                     [model, container.get(0)],
                                     _tmpl.get(0));
                             // remove model if already exists in collection element
-                            container.children('[this-mid="' +
-                                index + '"]').remove();
+                            container.children('[this-mid="' + index + '"]')
+                                .remove();
                             // get id from model with idKey
                             var id = ext.getUIDValue.call(app, model, idKey);
                             // keep index for later cached pagination
@@ -3639,7 +3717,7 @@
                             ext.doLoad.call(app, container, model, _content,
                                 false, level, doneLoading);
                         });
-                        delete this.cacheTargets;
+                        delete this.tar[container.this('id')];
                         var pageIndex = container.this('pagination-page');
                         if (pageIndex !== undefined) {
                             // first page loaded
@@ -3748,7 +3826,7 @@
             loadFormElements: function (elements, model) {
                 if (elements.length && model) {
                     var app = this;
-                    __.forEach(elements, function () {
+                    __.each(elements, function () {
                         var __this = app._(this),
                             key = __this.this('is');
                         if (!key)
@@ -3760,39 +3838,36 @@
                             __.isObject(data)) {
                             data = ext.getUIDValue.call(app, data);
                         }
-                        __this.removeThis('is');
                         if (__this.attr('type') === 'radio' || __this.attr('type') === 'checkbox') {
                             // using attribute so that redumping content
                             // would still work fine
-                            if (__this.attr('value') == data || data == on)
+                            if (__this.attr('value') == data)
                                 __this.attr('checked', 'checked');
                         }
                         else if (__this.is('select')) {
-                            __this.children().each(function () {
-                                var val = app._(this)
-                                    .attr('value') || app._(this)
-                                        .html().trim();
-                                if (val == data)
-                                    app._(this)
-                                        .attr('selected', 'selected');
-                                else
-                                    app._(this).removeAttr('selected');
-                            });
-                            // using attribute so that redumping content
-                            // would still work fine
-                            __this.find('[value="' + data + '"]')
-                                .attr('selected', 'selected');
+                            // add value attribute if collection isn't
+                            // loaded yet
+                            if (__this.is('collection') &&
+                                !__this.hasThis('loaded')) {
+                                __this.this('value', data);
+                                return;
+                            }
+
+                            __this.children('[selected]')
+                                .remove('selected');
+                            __this.val(data);
                         }
                         else if (__this.is('textarea')) {
                             __this.html(data);
                         }
                         else if (__this.hasThis('autocomplete')) {
-                            var _dropDownList = app.container
-                                .find('list[this-id="' + __this.this('list')
+                            var _scope = app.container;
+                            if (__this.hasThis('scoped'))
+                                _scope = __this.closest('[this-is-scope]');
+                            var _dropDownList = _scope.find('list[this-id="' + __this.this('list')
                                 + '"],[this-type="list"][this-id="'
                                 + __this.this('list') + '"]'),
-                                _selectedList = app.container
-                                    .find('list[this-id="'
+                                _selectedList = _scope.find('list[this-id="'
                                     + _dropDownList.this('selection-list')
                                     + '"],[this-type="list"][this-id="'
                                     + _dropDownList.this('selection-list')
@@ -3828,17 +3903,17 @@
                                     });
                                 }
                             }.bind(app);
-                            // refill list from provided function
-                            if (_selectedList.this('refill')) {
-                                return __.callable(_selectedList.this('refill'))
+                            // fill list from provided function
+                            if (_selectedList.this('fill')) {
+                                return __.callable(_selectedList.this('fill'))
                                     .call(this, data, gotData);
                             }
-                            // refill list from
-                            else if (_selectedList.this('refill-url')) {
+                            // fill list from url
+                            else if (_selectedList.this('fill-url')) {
                                 return app.request({
                                     dataType: 'json',
                                     type: 'POST',
-                                    url: _selectedList.this('refill-url'),
+                                    url: _selectedList.this('fill-url'),
                                     data: {
                                         ids: data
                                     }
@@ -3852,14 +3927,14 @@
                             }
                             gotData(data);
                         }
-                        else if (__this.get(0).tagName.toLowerCase() ===
-                            'img')
+                        else if (__this.is('img'))
                             __this.attr('src', data);
                         else {
                             // using attribute so that redumping content
                             // would still work fine
                             __this.attr('value', data);
                         }
+                        __this.removeThis('is');
                     });
                 }
                 return this;
@@ -3882,8 +3957,12 @@
                     var __this = app._(this);
                     if (__this.is('form')) {
                         // pass form action type from page to form if not exist on form
-                        if (!__this.hasThis('do') && app.page.this('do'))
+                        if (!__this.hasThis('do') && app.page.this('do')) {
                             __this.this('do', app.page.this('do'));
+                            // set form method if page has method
+                            if (app.page.this('method'))
+                                __this.this('method', app.page.this('method'));
+                        }
                         // is search form. no need loading except for search field
                         if ((__this.this('do') === 'search' ||
                             app.page.this('do') === 'search') &&
@@ -3917,8 +3996,8 @@
             loadLayouts: function (replaceInState) {
                 var _layout = _(), app = this;
                 if (!this.page.hasThis('no-layout') &&
-                    (ext.config.call(this).layout || this.page.this('layout'))) {
-                    var layout = this.page.this('layout') || ext.config.call(this).layout;
+                    (ext.config.call(this).defaultLayout || this.page.this('layout'))) {
+                    var layout = this.page.this('layout') || ext.config.call(this).defaultLayout;
                     // get existing layout in container if not asked to reload layouts
                     _layout = this.reloadLayouts ? _layout :
                         this.container.find('layout[this-id="' + layout
@@ -4002,7 +4081,7 @@
             },
             /**
              * Loads a model on the current page
-             * @param {HTMLElement}|{_} target
+             * @param {HTMLElement | _} target
              * @param {Function} callback
              * @param boolean binding Indicates whether to currently binding model to a collection
              * @param boolean replaceState Indicates whether to overwrite current state
@@ -4017,8 +4096,10 @@
                 // mark as loading
                 __this.this('loading', '')
                     // mark model's collections as loading
-                    .find('collection:not([this-ignore]),'
-                    + '[this-type="collection"]:not([this-ignore])')
+                    .find('collection[this-data]:not([this-loaded])'
+                    + ':not([this-loading]):not([this-ignore]),'
+                    + '[this-type="collection"][this-data]:not([this-loaded])'
+                    + ':not([this-loading]):not([this-ignore])')
                     .this('loading', '');
                 if (__this.this('id'))
                     common_selector += '[this-id="' + __this.this('id') + '"]';
@@ -4032,8 +4113,7 @@
                 if (type !== 'page') {
                     // necessary in case of binding and target has already been used
                     __this.html(this.getCached(common_selector, type)
-                        .hide()
-                        .html());
+                        .hide().html());
                 }
                 function loadedComponents(content) {
                     this.notWiths = ext.hideNotWiths.call(this, __this);
@@ -4090,7 +4170,7 @@
              */
             loadModels: function (replaceState, chain) {
                 var app = this;
-                var models = this.page
+                var models = this.container
                     .find('model:not([this-in-collection]):not([this-ignore]),'
                     + '[this-type="model"]:not([this-in-collection]):not([this-ignore])'),
                     length = models.length;
@@ -4122,18 +4202,19 @@
                     expires = ext.record.call(this).expirationStore.find(model_name),
                     cache_expired = (expires && expires < Date.now()) || !expires,
                     cache, fromCache;
-                if (ext.config.call(this).cacheData) {
+                // use of cache is allowed
+                if (ext.config.call(this).cacheData
+                    && !config.elem.hasThis('ignore-cache')) {
                     if (!isCollection) {
                         cache = ext.store.call(app, model_name)
                             .find(config.elem.this('mid'));
                     }
                     else {
-                        cache = ext.store.call(app, model_name)
-                            .find();
+                        cache = ext.store.call(app, model_name).find();
                         // check pagination page data exists in cached data for collection
                         if (config.elem.hasThis('paginate') &&
                             // cached data exists and no pagination exists already
-                            cache) {
+                            Object.keys(cache).length) {
                             var pagination = ext.record.call(app).paginationStore.find(model_name);
                             if ((!pagination
                                 // or paginaion exists but the page meta doesn't exist yet
@@ -4142,10 +4223,14 @@
                                 || pagination[config.elem.this('pagination-page')].length
                                 !== config.requestData.limit))
                                 cache = null;
-                            else
-                                this.cacheTargets = pagination[config.elem.this('pagination-page')];
+                            else {
+                                this.tar[config.elem.this('id')] = pagination[config.elem.this('pagination-page')];
+                            }
                         }
                     }
+                    // cancel cache if cache has no object
+                    if (__.isObject(cache) && !Object.keys(cache).length)
+                        cache = null;
                 }
 
                 var success = function () {
@@ -4180,7 +4265,7 @@
                                 dataKey = config.elem.this('data-key') ||
                                     ext.config.call(this).dataKey;
                             // use dataKey if available
-                            if (dataKey) {
+                            if (dataKey && !config.elem.hasThis('no-data-key')) {
                                 _data[dataKey] = config.data;
                                 config.data = _data;
                             }
@@ -4266,7 +4351,7 @@
             /**
              * The function called when logging a message
              * @param {string} method
-             * @param {string}|{array} param
+             * @param {string | array} param
              * @returns {ThisApp}
              */
             log: function (method, param) {
@@ -4517,7 +4602,7 @@
                     var watching = ext.record.call(this).store.find('watching');
                     if (watching) {
                         // watch collections and models not on page
-                        __.forEach(watching, function (id, obj) {
+                        __.each(watching, function (id, obj) {
                             ext.watch.call(app, app._('<div this-id="' + id
                                 + '" this-type="' + obj.type
                                 + '" this-url="'
@@ -4530,10 +4615,26 @@
                 // load required js if not already loaded
                 if (this.page.this('load-js')
                     && !loadedPageJS.last[this.page.this('id')]) {
-                    var jses = this.page.this('load-js')
-                        .split(',');
+                    var jses = this.page.this('load-js').split(','),
+                        nextIndex = 0,
+                        loadNextJS = function () {
+                            if (!jses[nextIndex]) {
+                                return;
+                            }
+                            ext.loadAsset.call(app, 'js', jses[nextIndex], app.page,
+                                function () {
+                                    nextIndex++;
+                                    loadNextJS();
+                                });
+                        };
+                    loadNextJS();
+                    loadedPageJS.last[this.page.this('id')] = true;
+                }
+                if (this.page.this('load-js-async')
+                    && !loadedPageJS.last[this.page.this('id')]) {
+                    var jses = this.page.this('load-js-async').split(',');
                     // load comma-separated css files
-                    __.forEach(jses, function (i, js) {
+                    __.each(jses, function (i, js) {
                         ext.loadAsset.call(app, 'js', js, app.page);
                     });
                     loadedPageJS.last[this.page.this('id')] = true;
@@ -4618,9 +4719,10 @@
                     __.callable(callback).call(this, container);
                 }.bind(this);
                 if (isModel) {
-                    var collections = container.find('collection:not([this-loaded])'
-                        + ':not([this-data]):not([this-loading]):not([this-ignore]),'
-                        + '[this-type="collection"]:not([this-loaded]):not([this-data])'
+                    // load collections with this-data
+                    var collections = container.find('collection[this-data]:not([this-loaded])'
+                        + ':not([this-loading]):not([this-ignore]),'
+                        + '[this-type="collection"][this-data]:not([this-loaded])'
                         + ':not([this-loading]):not([this-ignore])');
                     if (collections.length) {
                         this.__proto__.modelCollections = collections.length;
@@ -4666,7 +4768,7 @@
                     var __this = app._(this),
                         tags = ext.parseBrackets.call(app, '<', '>', __this.html()),
                         content = __this.html();
-                    __.forEach(tags, function (i, v) {
+                    __.each(tags, function (i, v) {
                         content = content
                             .replace(v, '&lt;' + v.substr(1, v.length - 2) + '&gt;');
                     });
@@ -4675,8 +4777,7 @@
                     __this.html(content).removeThis('code');
                 });
                 elem.find('[this-hidden],[this-type="list"]')
-                    .hide()
-                    .removeThis('hidden');
+                    .hide().removeThis('hidden');
                 // remove comments
                 var content = ext.removeComments.call(this, elem.html());
                 elem.html(content);
@@ -4731,11 +4832,12 @@
                     // get next closess layout
                     _layout = _layout.closest('layout,[this-type="layout"]');
                 }
+                prep4Tmpl(this.container);
                 // load templates from store if other pages already exist in history
                 var templates = ext.store.call(this, '___cache')
                     .find(ext.getTemplatePath.call(this));
                 if (!templates) {
-                    this.templates = this._('[this-type="templates"][this-app="' +
+                    this.__proto__.templates = this._('[this-type="templates"][this-app="' +
                         this.container.this('id') + '"]')
                         // put all unloaded element into templates
                         .append(
@@ -4760,7 +4862,7 @@
                     templates = this._('<div>').html(templates);
                     // remove loaded templates from cached one
                     if (loaded) templates.find(loaded).remove();
-                    this.templates = this._('[this-type="templates"][this-app="'
+                    this.__proto__.templates = this._('[this-type="templates"][this-app="'
                         + this.container.this('id') + '"]')
                         .html(templates.children());
                 }
@@ -4783,7 +4885,7 @@
             processExpressions: function (content, current, model, removeUnresolved) {
                 var app = this,
                     exps = ext.getExpressions.call(this, content);
-                __.forEach(exps, function (i, v) {
+                __.each(exps, function (i, v) {
                     v = v.trim();
                     app.tryCatch(function () {
                         content = content.replace(v, eval(v.substr(2, v.length - 4)));
@@ -4859,7 +4961,7 @@
              */
             removeComments: function (content) {
                 var exps = ext.getComments.call(this, content);
-                __.forEach(exps, function (i, v) {
+                __.each(exps, function (i, v) {
                     content = content.replace(v, '');
                 });
                 return content;
@@ -4882,7 +4984,7 @@
             },
             /**
              * Decides which transporter to run
-             * @param {_}|{HTMLElement} Element on which the request is being
+             * @param {_ | HTMLElement} Element on which the request is being
              * made
              * @param {function} custom Function to get the config for the
              * custom transporter
@@ -4968,7 +5070,7 @@
                 if (ext.config.call(this).titleContainer)
                     ext.config.call(this).titleContainer.html(state.title);
                 ext.record.call(this).store.save(state.url, 'last_page');
-                this.removedAssets = {};
+                this.__proto__.removeAssets = {};
                 this.container.find('[this-type="layout"]')
                     .each(function () {
                         ext.loadAssets.call(app, app._(this));
@@ -5057,16 +5159,12 @@
                 this.tryCatch(function () {
                     var app = this;
                     // save page state before leaving
-                    this.before('page.leave', function () {
-                        ext.saveState.call(app, true);
-                    });
-                    // save page state before leaving
                     this._(window).on('beforeunload', function () {
-                        ext.saveState.call(app, true);
+                        ext.canContinue.call(app, 'page.leave', [], app.page.get(0));
                     });
                     // ensure paths end with /
                     if (this.config.paths) {
-                        __.forEach(this.config.paths, function (i, v) {
+                        __.each(this.config.paths, function (i, v) {
                             if (__.isString(v) && !v.endsWith('/'))
                                 app.config.paths[i] += '/';
                             else if (__.isObject(v))
@@ -5147,12 +5245,100 @@
                         this.config.titleContainer = this._(this.config.titleContainer,
                             ext.record.call(this, 'debug'));
 
-                    var autocomplete_timeout;
+                    var autocomplete_timeout,
+                        doHide = function (elem) {
+                            var _elem = app._(elem);
+                            if (!_elem.this('hide')) return;
+                            __.each(_elem.this('hide')
+                                .split(','), function (i, v) {
+                                    app.container.find('[this-id="' + v.trim() + '"]')
+                                        .hide();
+                                });
+                        },
+                        doShow = function (elem) {
+                            var _elem = app._(elem);
+                            if (!_elem.this('show')) return;
+                            __.each(_elem.this('show')
+                                .split(','), function (i, v) {
+                                    var _target = app.container
+                                        .find(ext.selector.call(app,
+                                            v.trim()));
+                                    if (_elem.this('create')) {
+                                        var form = _target.is('form[this-model="'
+                                            + _elem.this('model')
+                                            + '"]') ? _target :
+                                            _target.find('form[this-model="'
+                                                + _elem.this('model')
+                                                + '"]');
+                                        if (form.length) {
+                                            form.this('do', 'create')
+                                                .this('url', _elem.this('create'))
+                                                .this('binding', '');
+                                            if (_elem.this('model-id-key'))
+                                                form.this('model-id-key',
+                                                    _elem.this('model-id-key'));
+                                            form.removeThis('mid');
+                                            ext.resetForm.call(app, form.get(0));
+                                        }
+                                    }
+                                    _target.show();
+                                });
+                        },
+                        doToggle = function (elem) {
+                            var _elem = app._(elem);
+                            if (!_elem.this('toggle')) return;
+                            app.container.find(ext.selector.call(app,
+                                _elem.this('toggle'))).toggle();
+                        };
                     this.container
+                        /**
+                         * Mark clicked input submit button as so.
+                         * to identify it in Form
+                         */
+                        .on('click', 'input[type="submit"]', function () {
+                            app._(this).closest('form')
+                                .find('input[type="submit"]')
+                                .removeThis('clicked');
+                            app._(this).this('clicked', '');
+                        })
+                        /**
+                         * Disables click for all a tags with # as href value
+                         */
                         .on('click', 'a', function (e) {
-                            if (_(this).attr('href')
-                                .startsWith('#'))
+                            if (_(this).hasAttr('href')
+                                && _(this).attr('href')
+                                    .startsWith('#'))
                                 e.preventDefault();
+                        })
+                        /**
+                         * Trigger an event from a dom click event
+                         */
+                        .on('click', '[this-trigger]', function () {
+                            var __this = app._(this),
+                                trigger = __this.this('trigger');
+                            // trigger value must exist to continue
+                            if (!trigger) return;
+
+                            trigger.split(';')
+                                .forEach(function (part) {
+                                    var parts = part.split(':');
+                                    // no selector: trigger on self
+                                    if (parts.length < 2)
+                                        return __this.trigger(parts[0]);
+                                    // get usable selector
+                                    var selector = parseSelector(parts[1]);
+                                    // get element in container
+                                    app.container.find(selector)
+                                        // trigger event
+                                        .trigger(parts[0]);
+                                });
+                        })
+                        .on('change', 'select', function () {
+                            var _option = app._(this)
+                                .children('[value="' + this.value + '"]');
+                            doShow(_option);
+                            doHide(_option);
+                            doToggle(_option);
                         })
                         /* reload current page or loaded collection|model */
                         .on('click', '[this-reload],[this-reload-page],[this-reload-layouts]',
@@ -5238,11 +5424,12 @@
                             app.tar['page#' + pageId] = {
                                 reading: '',
                                 url: url,
-                                model: model_name
+                                model: model_name,
+                                mid: model_id
                             };
-                            app.tar['page#' + pageId]['mid'] = model_id;
-                            __this.this('goto', goto + '/#/' + model_name
-                                + '/' + url);
+                            if (__this.this('method'))
+                                app.tar['page#' + pageId]['method'] = __this.this('method');
+                            __this.this('goto', goto + '/#/' + model_name + '/' + url);
                         })
                         /*
                          * UPDATE event
@@ -5273,6 +5460,8 @@
                                 action: url,
                                 model: model_name
                             };
+                            if (__this.this('method'))
+                                app.tar['page#' + pageId]['method'] = __this.this('method');
                             if (__this.this('model-id-key'))
                                 app.tar['page#'
                                     + pageId]['model-id-key'] = __this.this('model-id-key');
@@ -5303,6 +5492,8 @@
                                 action: url,
                                 model: __this.this('model')
                             };
+                            if (__this.this('method'))
+                                app.tar['page#' + pageId]['method'] = __this.this('method');
                             if (__this.this('model-id-key'))
                                 app.tar['page#' + pageId]['model-id-key'] = __this
                                     .this('model-id-key');
@@ -5341,6 +5532,8 @@
                                 }).show();
                                 ext.resetForm.call(this, _target.get(0));
                                 _target.trigger('create.form.cleared');
+                                if (__this.this('method'))
+                                    _target.this('method', __this.this('method'));
                             }.bind(app));
                         })
                         /*
@@ -5374,6 +5567,8 @@
                                 __this.this('goto', goto + '/#/' +
                                     (_model.this('mid') || __this.this('model-id')));
                             }
+                            if (__this.this('method'))
+                                app.tar['page#' + pageId]['method'] = __this.this('method');
                             __this.this('goto', __this.attr('href'));
                         })
                         /*
@@ -5411,40 +5606,47 @@
                                 bind = __this.this('bind-to'),
                                 _model = __this.closest('model,'
                                     + '[this-type="model"],'
-                                    + '[this-model]');
-                            if (!bind || !_model.length)
-                                return;
+                                    + '[this-model]'),
+                                model_name = __this.this('model') || _model.this('model')
+                                    || _model.this('id'),
+                                model_id = __this.this('model-id') || _model.this('mid');
+                            if (!bind) return;
                             var _target = app.container.find(ext.selector
                                 .call(app, bind, ':not([this-in-collection])'));
                             if (!_target.length)
                                 return;
-                            _target.this('model', _model.this('model')
-                                || _model.this('id'))
+                            _target.this('model', model_name)
                                 .this('binding', '')
-                                .this('id-key', _model.this('id-key') || '')
+                                .this('id-key', __this.this('id-key') || _model.this('id-key') || '')
                                 .this('url', _model.this('url') || '')
+                                .this('mid', model_id)
                                 .removeThis('action');
                             var tar = _model.this('url') ?
-                                'url:' + _model.this('url') :
-                                '';
+                                'url:' + _model.this('url') : '';
+                            if (__this.this('method'))
+                                tar += ';method:' + __this.this('method');
                             if (__this.hasThis('read')) {
-                                if (__this.this('read'))
+                                if (__this.this('read')) {
                                     tar = 'url:' + __this.this('read');
+                                    _target.this(url, __this.this('read'));
+                                }
                                 app.container.find('[this-model="'
-                                    + (_model.this('model')
-                                        || _model.this('id'))
-                                    + '"][this-binding]')
+                                    + model_name + '"][this-binding]')
                                     .hide();
                                 _target.removeThis('do');
                             }
                             else if (__this.hasThis('update')) {
-                                if (__this.this('update'))
+                                if (__this.this('update')) {
                                     tar = 'url:' + __this.this('update');
+                                    _target.this(url, __this.this('update'));
+                                }
                                 tar += ';do:update';
                             }
                             else if (__this.hasThis('delete')) {
-                                if (__this.this('delete'))
+                                if (__this.this('delete')) {
                                     tar = 'url:' + __this.this('delete');
+                                    _target.this(url, __this.this('delete'));
+                                }
                                 tar += ';do:delete';
                                 __this.this('treated', '');
                                 setTimeout(function () {
@@ -5452,8 +5654,47 @@
                                 });
                             }
                             _target.this('tar', tar);
-                            ext.bindToElementModel
-                                .call(app, _target, _model, __this.this('bind'));
+
+                            new Collection({
+                                app: app,
+                                name: model_name
+                            })
+                                .then(function (collection) {
+                                    return collection.model(model_id, {
+                                        url: _target.this('url'),
+                                        method: __this.hasThis('read') ?
+                                            __this.this('method')
+                                            : ''
+                                    });
+                                })
+                                .then(function (model) {
+                                    if (__this.this('bind')) {
+                                        var data = ext.getVariableValue
+                                            .call(app, __this.this('bind'), model.attributes);
+                                        ext.bindToObject
+                                            .call(app, _target, data,
+                                            function (elem) {
+                                                _target.replaceWith(elem)
+                                                    .trigger('model.binded', {
+                                                        model: model
+                                                    });
+                                            });
+                                    }
+                                    else {
+                                        model.bind(_target.this('model', model_name))
+                                            .then(function (elem) {
+                                                _target.replaceWith(elem)
+                                                    .trigger('model.binded', {
+                                                        model: model
+                                                    });
+                                            })
+                                            .catch(function () {
+                                                _target.trigger('model.bind.failed', {
+                                                        model: model
+                                                    });
+                                            });
+                                    }
+                                });
                         })
                         /*
                          * DELETE event
@@ -5473,14 +5714,14 @@
                             var __this = app._(this);
                             if (__this.hasThis('treated'))
                                 return;
-                            var _model = __this.closest('model,[this-type="model"],'
-                                + '[this-model]'),
+                            var _model = __this.closest('model,[this-type="model"], [this-model]'),
                                 _do = __this.closest('[this-do="delete"]'),
                                 model_url = __this.this('delete') ||
                                     _model.this('url') ||
                                     _do.this('action'),
                                 model_id = _model.this('mid') ||
                                     _do.this('mid'),
+                                method = __this.this('method') || _do.this('method'),
                                 model;
                             if (!ext.canContinue
                                 .call(app, 'model.delete',
@@ -5505,7 +5746,9 @@
                                 // got model
                                 .then(function (model_) {
                                     model = model_;
-                                    return model.remove();
+                                    return model.remove({
+                                        method: method
+                                    });
                                 })
                                 // removed
                                 .then(function (data) {
@@ -5514,7 +5757,7 @@
                                         data[crudStatus.key] === crudStatus.successValue)
                                         || !crudStatus) {
                                         if (app.page.this('do') === 'delete'
-                                            || _model.this('type') === 'page')
+                                            || _model.is('page'))
                                             app.back();
                                         else {
                                             app.container.find('[this-model="'
@@ -5561,59 +5804,21 @@
                          */
                         .on('click', '[this-toggle]', function (e) {
                             e.preventDefault();
-                            app.container.find(ext.selector.call(app,
-                                app._(this)
-                                    .this('toggle'))).toggle();
+                            doToggle(this);
                         })
                         /*
                          * Hides target elements
                          */
                         .on('click', '[this-hide]', function (e) {
                             e.preventDefault();
-                            __.forEach(app._(this)
-                                .this('hide')
-                                .split(','), function (i, v) {
-                                    app.container.find('[this-id="' + v.trim() + '"]')
-                                        .hide();
-                                });
+                            doHide(this);
                         })
                         /*
                          * Shows target elements
                          */
                         .on('click', '[this-show]', function (e) {
                             e.preventDefault();
-                            var __this = app._(this);
-                            __.forEach(__this.this('show')
-                                .split(','),
-                                function (i, v) {
-                                    var _target = app.container
-                                        .find(ext.selector.call(app,
-                                            v.trim()));
-                                    if (__this.this('create')) {
-                                        var form = _target.is('form[this-model="'
-                                            + __this.this('model')
-                                            + '"]') ?
-                                            _target :
-                                            _target.find('form[this-model="'
-                                                + __this
-                                                    .this('model')
-                                                + '"]');
-                                        if (form.length) {
-                                            form.this('do', 'create')
-                                                .this('url',
-                                                __this
-                                                    .this('create'))
-                                                .this('binding', '');
-                                            if (__this.this('model-id-key'))
-                                                form.this('model-id-key',
-                                                    __this
-                                                        .this('model-id-key'));
-                                            form.removeThis('mid');
-                                            ext.resetForm.call(app, form.get(0));
-                                        }
-                                    }
-                                    _target.show();
-                                });
+                            doShow(this);
                         })
                         /**
                          * Autocomplete
@@ -5624,16 +5829,26 @@
                                 min_chars = __this.this('min-chars') || 3,
                                 url = __this.this('autocomplete')
                                     || __this.this('url'),
-                                _list = app.container
-                                    .find('[this-type="list"][this-id="'
-                                    + __this.this('list')
-                                    + '"],list[this-id="'
-                                    + __this.this('list')
-                                    + '"]');
+                                _scope;
+                            // process autocompleting scope
+                            if (__this.hasThis('scoped')) {
+                                _scope = __this.closest('[this-is-scope]');
+                            }
+                            // no scope: use container.
+                            else _scope = app.container;
+                            if (!_scope.length) {
+                                app.error('Autocomplete scope not found!');
+                                return;
+                            }
+                            var _list = _scope
+                                .find('[this-type="list"][this-id="'
+                                + __this.this('list')
+                                + '"],list[this-id="'
+                                + __this.this('list')
+                                + '"]');
                             // list element must exist
                             if (!_list.length) {
-                                app.error('List #' + __this.this('list')
-                                    + ' not found');
+                                app.error('List #' + __this.this('list') + ' not found');
                                 return;
                             }
 
@@ -5717,12 +5932,23 @@
                                 id = __this.this('id'),
                                 index = __this.this('index'),
                                 _dropDownList = __this.parent(),
-                                _input = app.container
-                                    .find('[this-autocomplete][this-id="'
-                                    + _dropDownList
-                                        .this('autocompleting') +
-                                    '"]'),
                                 selectionList = _dropDownList.this('selection-list'),
+                                selectedListSelector = '[this-type="list"][this-id="'
+                                    + selectionList + '"],list[this-id="'
+                                    + selectionList + '"]',
+                                // no scope: use container.
+                                _scope = app.container;
+                            // process dropdownList scope
+                            if (_dropDownList.hasThis('scoped')) {
+                                _scope = _dropDownList.closest('[this-is-scope]');
+                            }
+                            if (!_scope.length) {
+                                app.error('Autocomplete scope not found!');
+                                return;
+                            }
+                            var _input = _scope
+                                .find('[this-autocomplete][this-id="'
+                                + _dropDownList.this('autocompleting') + '"]'),
                                 valueKey = _input.this('value-key'),
                                 // get the saved data from the autcompletion
                                 list = ext.record.call(app).store.find('autocompleting')
@@ -5738,7 +5964,8 @@
                                 if (valueKey) {
                                     var val = ext.getVariableValue.call(app, valueKey, data);
                                     // set value of autocomplete as the value of valueKey in data
-                                    _input.val(val).this('last-query', val);
+                                    _input.val(val)
+                                        .this('last-query', val);
                                     // selection made: empty the list
                                     _dropDownList.html('')
                                         .trigger('list.emptied');
@@ -5748,18 +5975,13 @@
                                 // don't process
                                 return;
                             }
-                            var selectedListSelector = '[this-type="list"][this-id="'
-                                + selectionList + '"],list[this-id="'
-                                + selectionList + '"]',
-                                _selectedList = app.container
-                                    .find(selectedListSelector),
+                            var _selectedList = _scope.find(selectedListSelector),
                                 elem = app.getCached(selectedListSelector)
                                     .children();
                             // empty selected list if nothing had
                             // been selected
-                            if (!_dropDownList.this('selected')) {
+                            if (!_dropDownList.this('selected'))
                                 _selectedList.html('');
-                            }
                             ext.bindToObject
                                 .call(app, elem, data, function (elem) {
                                     elem.this('type', 'listing')
@@ -5786,23 +6008,31 @@
                                     }
                                 });
                         })
-                        .on('click', 'list [this-remove],'
-                        + '[this-type="list"] [this-remove]',
+                        .on('click', 'list [this-remove],[this-type="list"] [this-remove]',
                         function () {
                             var __this = app._(this)
                                 .closest('[this-type="listing"]'),
                                 _list = __this.parent(),
-                                _dropDownList = app.container
-                                    .find('[this-type="list"][this-selection-list="'
-                                    + _list.this('id')
-                                    + '"],list[this-selection-list="'
-                                    + _list.this('id') + '"]');
+                                _scope;
+                            // process autocompleting scope
+                            if (_list.hasThis('scoped')) {
+                                _scope = _list.closest('[this-is-scope]');
+                            }
+                            // no scope: use container.
+                            else _scope = app.container;
+                            if (!_scope.length) {
+                                app.error('Autocomplete scope not found!');
+                                return;
+                            }
+                            var _dropDownList = _scope
+                                .find('[this-type="list"][this-selection-list="'
+                                + _list.this('id') + '"],list[this-selection-list="'
+                                + _list.this('id') + '"]');
                             _dropDownList.this('selected',
                                 _dropDownList.this('selected')
-                                    .replace(__this.this('id')
-                                    + ',', ''))
+                                    .replace(__this.this('id') + ',', ''))
                                 .show();
-                            var _input = app.container
+                            var _input = _scope
                                 .find('[this-autocomplete][this-id="'
                                 + _dropDownList
                                     .this('autocompleting') +
@@ -5830,10 +6060,7 @@
                             var __this = app._(this),
                                 creating = __this.this('do')
                                     === 'create',
-                                method = __this.this('method')
-                                    || (creating ?
-                                        'post' :
-                                        'put');
+                                method = __this.this('method') || '';
                             if (!this.reportValidity()) {
                                 __this.trigger('form.invalid.submission');
                                 return;
@@ -5876,8 +6103,7 @@
                                         if (creating) {
                                             ext.resetForm.call(app, __this.get(0));
                                             if (!__this.hasThis('binding')
-                                                &&
-                                                !__this.closest('[this-binding]')
+                                                && !__this.closest('[this-binding]')
                                                     .length)
                                                 app.back();
                                             // hide creation form if binding
@@ -5932,7 +6158,8 @@
                                         });
                                 });
                         })
-                        .on('submit', 'form[this-handle-submit]:not([this-do])', function (e) {
+                        .on('submit', 'form[this-handle-submit]:not([this-do])',
+                        function (e) {
                             e.preventDefault();
                             var _form = app._(this);
                             if (!this.reportValidity()) {
@@ -6009,8 +6236,7 @@
                                 selector = 'collection[this-id="' + exp[0]
                                     + '"],[this-type="collection"][this-id="' + exp[0] + '"]',
                                 keys = exp[1],
-                                page = _form.this('type') === 'page' ?
-                                    _form :
+                                page = _form.is('page') ? _form :
                                     _form.closest('page,[this-type="page"]'),
                                 goto = _form.attr('goto') || page.this('id'),
                                 filter = '', _collection,
@@ -6018,9 +6244,8 @@
                                 replaceState = app.page.this('id') === goto &&
                                     app.page.this('query') === _search.val()
                                         .trim();
-                            if (keys)
-                                keys = keys.split(',');
-                            __.forEach(keys, function (i, key) {
+                            if (keys) keys = keys.split(',');
+                            __.each(keys, function (i, key) {
                                 if (filter)
                                     filter += ' || ';
                                 filter += '__.contains(filters.lcase(model#' + key
@@ -6150,7 +6375,7 @@
                     /*
                      * Container events activation
                      */
-                    __.forEach(this.events, function () {
+                    __.each(this.events, function () {
                         app.container.on(this.event, this.selector, this.callback);
                     });
                     delete this.__proto__.events;
@@ -6212,7 +6437,7 @@
              * given element
              */
             showNotWiths: function (elem, notWiths) {
-                __.forEach(notWiths, function (i, v) {
+                __.each(notWiths, function (i, v) {
                     elem.find('[this-with="' + i + '"]')
                         .replaceWith(v);
                 });
@@ -6253,7 +6478,7 @@
                     };
                 // add created object to collection
                 if (_collections.length) {
-                    __.forEach(created, function (model_name, arr) {
+                    __.each(created, function (model_name, arr) {
                         var _collection = app.container.find('collection[this-model="'
                             + model_name
                             + '"],[this-type="collection"][this-model="'
@@ -6267,7 +6492,7 @@
                         touched.created = true;
                         var __collection = ext.store.call(app, model_name),
                             idKey = __collection.idKey || '';
-                        __.forEach(arr, function (i, v) {
+                        __.each(arr, function (i, v) {
                             var _clone = app.getCached('[this-id="'
                                 + _collection.this('id') +
                                 '"]', 'collection'),
@@ -6308,7 +6533,7 @@
                 }
                 if (_models.length) {
                     // update object elements, whether in collection or standalone
-                    __.forEach(updated, function (model_name, arr) {
+                    __.each(updated, function (model_name, arr) {
                         var _model = app.container.find('model[this-id="' +
                             model_name +
                             '"],[this-type="model"][this-id="'
@@ -6324,7 +6549,7 @@
                         if (!_model.length)
                             return;
                         touched.updated = true;
-                        __.forEach(arr, function (id, v) {
+                        __.each(arr, function (id, v) {
                             // update page model if part of update models
                             if (app.pageModel &&
                                 app.pageModel.name === model_name &&
@@ -6398,8 +6623,8 @@
                             ext.record.call(app).updatedStore.save(arr, model_name, true);
                     });
                     // delete object elements
-                    __.forEach(deleted, function (model_name, arr) {
-                        __.forEach(arr, function (i, mid) {
+                    __.each(deleted, function (model_name, arr) {
+                        __.each(arr, function (i, mid) {
                             var _model = app.container
                                 .find('[this-id="' + model_name
                                 + '"][this-mid="' + mid + '"],'
@@ -6532,16 +6757,16 @@
         Filters = Object.create({
             /**
              * Helper function to check array or str and call function only on str
-             * @param {string}|{array} str
+             * @param {string | array} str
              * @param {string} options
              * @param {function} funcA Try this function
              * @param {function} funcB Do this if first failed
-             * @returns {string}|{array}
+             * @returns {string | array}
              */
             __factory: function (str, options, funcA, funcB) {
                 if (__.isArray(str)) {
                     var arr = [];
-                    __.forEach(str, function (i, v) {
+                    __.each(str, function (i, v) {
                         arr.push(Filters.__factory(v, options, funcA, funcB));
                     });
                     return arr;
@@ -6572,7 +6797,7 @@
                     // split by semicolons into parts
                     .split(';');
                 var finalOptions;
-                __.forEach(options, function (i, v) {
+                __.each(options, function (i, v) {
                     // parts also have parts: options would be an object
                     if (v.indexOf(':') !== -1) {
                         if (!finalOptions)
@@ -6673,76 +6898,126 @@
                     min = d.getMinutes(),
                     sec = d.getSeconds(),
                     msec = d.getMilliseconds(),
-                    tzon = d.getTimezoneOffset() ?
-                        d.getTimezoneOffset() : 0,
+                    tzon = d.getTimezoneOffset() ? d.getTimezoneOffset() : 0,
                     tzstr = "GMT";
                 if (tzon) {
                     tzon = -1 * tzon / 60;
-                    tzstr += tzon > 0 ? '+' + tzon :
-                        '-' + tzon;
+                    tzstr += tzon > 0 ? '+' + tzon : '-' + tzon;
                 }
-                var cnv =
-                    // day of the week and date
-                    'DDDD:' + longDays[dy - 1].toUpperCase() // Full string of day, upper case
-                    + ';dddd:' + longDays[dy - 1].toLowerCase() // Full string of day, lower case
-                    + ';Dddd:' + longDays[dy - 1] // Full string of day, capitalized
-                    + ';DDD:' + smallDays[dy - 1].toUpperCase() // 3 letter string of day, upper case
-                    + ';ddd:' + smallDays[dy - 1].toLowerCase() // 3 letter string of day, lower case
-                    + ';Ddd:' + smallDays[dy - 1] // 3 letter string of day, capitalized
-                    // day of the week with leading zero
-                    + ';DD:' + (dy < 10 ? '0' + dy :
-                        dy)
-                    // date with leading zero
-                    + ';dd:' + (date < 10 ?
-                        '0' + date : date)
-                    + ';D:' + dy // day of the week, no leading zero
-                    + ';d:' + date // date, no leading zero
-                    // month, minute, millisecond, and meridian status
-                    + ';MMMM:' + longMonths[mon - 1].toUpperCase() // Full string of day, upper case
-                    + ';Mmmm:' + longMonths[mon - 1] // Full string of day, capitalized
-                    + ';mmmm:' + longMonths[mon - 1].toLowerCase() // Full string of day, lower case
-                    + ';MMM:' + smallMonths[mon - 1].toUpperCase() // 3 letter string of month, upper case
-                    + ';Mmm:' + smallMonths[mon - 1] // 3 letter string of day, capitalized
-                    + ';mmm:' + smallMonths[mon - 1].toLowerCase() // 3 letter string of month, lower case
-                    // month with leading zero
-                    + ';MM:' + (mon < 10 ? '0' + mon :
-                        mon)
-                    // minute with leading zero
-                    + ';mm:' + (min < 10 ? '0' + min :
-                        min)
-                    // meridian status, lower case
-                    + ';mer:' + ((hr - 12) < 0 ? 'am' :
-                        'pm')
-                    // meridian status, upper case
-                    + ';MER:' + ((hr - 12) < 0 ? 'AM' :
-                        'PM')
-                    + ';ms:' + msec // millisecond
-                    + ';M:' + mon // month, no leading zero
-                    + ';m:' + min // minute, no leading zero
+
+                var exchange = {
+                    // day of the week - string
+                    DDDD: longDays[dy - 1].toUpperCase(), // Full string of day, upper case
+                    Dddd: longDays[dy - 1], // Full string of day, capitalized
+                    dddd: longDays[dy - 1].toLowerCase(), // Full string of day, lower case
+                    DDD: smallDays[dy - 1].toUpperCase(), // 3 letter string of day, upper case
+                    Ddd: smallDays[dy - 1], // 3 letter string of day, capitalized
+                    ddd: smallDays[dy - 1].toLowerCase(), // 3 letter string of day, lower case
+                    // day of the week - integer
+                    DD: dy < 10 ? '0' + dy : dy, // with leading zero
+                    D: dy, // no leading zero
+                    // date
+                    dd: date < 10 ? '0' + date : date, // with leading zero
+                    d: date, // no leading zero,
+                    // meridian status
+                    mer: (hr - 12) < 0 ? 'am' : 'pm', // lower case
+                    MER: (hr - 12) < 0 ? 'AM' : 'PM', // upper case
+                    // month - string
+                    MMMM: longMonths[mon - 1].toUpperCase(), // Full string of day, upper case
+                    Mmmm: longMonths[mon - 1], // Full string of day, capitalized
+                    mmmm: longMonths[mon - 1].toLowerCase(), // Full string of day, lower case
+                    MMM: smallMonths[mon - 1].toUpperCase(), // 3 letter string of month, upper case
+                    Mmm: smallMonths[mon - 1],// 3 letter string of day, capitalized
+                    mmm: smallMonths[mon - 1].toLowerCase(), // 3 letter string of month, lower case
+                    // month - integer
+                    MM: (mon < 10 ? '0' + mon : mon), // with leading zero
+                    M: mon, // no leading zero
+                    // minute
+                    mm: min < 10 ? '0' + min : min, // with leading zero
+                    m: min, // no leading zero
+                    // millisecond
+                    ms: msec,
                     // year
-                    + ';YYYY:' + yr // 4 character year
-                    + ';yyyy:' + yr //        "
-                    + ';YY:' + yr % 1000 // 2 character year
-                    + ';yy:' + yr % 1000 //       "
+                    YYYY: yr, // 4 character year
+                    yyyy: yr, //       "
+                    YY: yr % 1000, // 2 character year
+                    yy: yr % 1000, //       "
                     // hour
-                    // 24 hour with leading zero
-                    + ';HH:' + (hr < 10 ? '0' + hr :
-                        hr)
-                    + ';H:' + hr // 24 hour, no leading zero
-                    // 12 hour with leading zero
-                    + ';hh:' + (h < 10 ? '0' + h : h)
-                    + ';h:' + h // 12 hour, no leading zero
-                    // second
-                    // second with leading zero
-                    + ';ss:' + (sec < 10 ? '0' + sec :
-                        sec)
-                    + ';s:' + sec // second, no leading zero
+                    HH: (hr < 10 ? '0' + hr : hr), // 24 hour with leading zero
+                    H: hr, // 24 hour, no leading zero
+                    hh: (h < 10 ? '0' + h : h), // 12 hour with leading zero
+                    h: h, // 12 hour, no leading zero
+                    // seconds
+                    ss: (sec < 10 ? '0' + sec : sec), // no leading zero
+                    s: sec, // with leading zero
                     // timezone
-                    + ';TZ:' + tzstr // Timezone, upper case
-                    + ';tz:' + tzstr.toLowerCase() // Timezone, lower case
+                    TZ: tzstr, // upper case,
+                    tz: tzstr.toLowerCase(), // lower case,
                     // timestamp
-                    + ';t:' + d.getTime(); // timestamp of date
-                return this.replace(options, cnv);
+                    t: d.getTime()
+                },
+                    result = '';
+                // handle option parts separately
+                options.split(' ').forEach(function (part) {
+                    // add space back
+                    if (result) result += ' ';
+                    // part has option: use it
+                    if (exchange[part]) result += exchange[part];
+                    // part has no option: maybe that it has more characters in it
+                    else {
+                        // remove all escaped and none-alphabet characters
+                        var cpart = part.replace(/(\\[a-zA-Z])+/g, '').replace(/[^a-z]/gi, '');
+                        // the cleaned part has option: replace it with the option in raw part
+                        if (exchange[cpart]) result += part.replace(cpart, exchange[cpart]);
+                        // even cleaned part isn't found
+                        else {
+                            var matches = {},
+                                temp = part;
+                            // loop through exchanges
+                            __.each(exchange, function (i, v) {
+                                var exp = new RegExp(i, 'g');
+                                if (!temp.match(exp)) return;
+                                // keep exchange
+                                matches[i] = v;
+                                // remove so parts can't be reused
+                                temp = temp.replace(exp, '');
+                            });
+                            // now use matches
+                            __.each(matches, function (i, v) {
+                                part = part.replace(new RegExp(i, 'g'), v);
+                            })
+                            // add part back to result
+                            result += part;
+                        }
+                    }
+                }.bind(this));
+                // get required positions
+                var positions = result.match(/([0-9]+p)/ig)
+                if (positions) {
+                    // loop through found positions
+                    positions.forEach(function (position) {
+                        // get integer before p/P
+                        var value = parseInt(position.substr(0, position.length - 1)),
+                            pos;
+                        // need integer
+                        if (isNaN(value)) return;
+                        else if (value % 10 === 1)
+                            pos = 'st';
+                        else if (value % 10 === 2)
+                            pos = 'nd';
+                        else if (value % 10 === 3)
+                            pos = 'rd';
+                        else
+                            pos = 'th';
+                        // use upper case if required
+                        if (position[position.length - 1] === 'P')
+                            pos = pos.toUpperCase();
+                        // replace position in result
+                        result = result.replace(position[position.length - 1], pos);
+                    });
+                }
+                // unescape escaped characters
+                return result.replace(/\\/g, '');
             },
             /**
              * Filters items out of the object or array
@@ -6758,7 +7033,7 @@
                     }
                     else {
                         var newObj = {};
-                        __.forEach(obj, function (i, v) {
+                        __.each(obj, function (i, v) {
                             if (true === func.call(null, v, i)) {
                                 newObj[i] = v;
                             }
@@ -6770,7 +7045,7 @@
             },
             /**
              * Joins the array into a string with the given separator
-             * @param {object}|{array} obj
+             * @param {object | array} obj
              * @param {string} separator
              * @returns {Array}
              */
@@ -6843,9 +7118,9 @@
             },
             /**
              * Performs a replace operation on the given string
-             * @param {string}|{array} str
-             * @param {string} options search:replacement;search2:replacement2;...
-             * @returns {String}|{array}
+             * @param {string | array} str
+             * @param {string} options search:replacement,gi;search2:replacement2,g;...
+             * @returns {String | array}
              */
             replace: function (str, options) {
                 return this.__factory(str, options,
@@ -6853,15 +7128,35 @@
                         str = str.replace(/_/g, '-u-');
                         forEach(options, function (search, replace) {
                             search = search.replace(/_/g, '-u-');
-                            str = str.replace(new RegExp(eval(search), 'g'), replace);
+                            var parts = replace.split(',');
+
+                            if (parts.length > 1) {
+                                var opts = parts.pop();
+                                // apostraphes are in opts
+                                if (parts.length && (opts.indexOf('"') !== -1 || opts.indexOf("'") !== -1)) {
+                                    parts.push(opts);
+                                    opts = null;
+                                }
+                            }
+                            str = str.replace(new RegExp(eval(search), opts), parts.join(','));
                         });
                         return str.replace(/-u-/g, '_');
                     },
                     function (str, options) {
                         if (!str || !__.isString(str))
                             return str;
-                        __.forEach(options, function (search, replace) {
-                            str = str.replace(new RegExp(search, 'g'), replace);
+                        __.each(options, function (search, replace) {
+                            var parts = replace.split(',');
+
+                            if (parts.length > 1) {
+                                var opts = parts.pop();
+                                // apostraphes are in opts
+                                if (parts.length && (opts.indexOf('"') !== -1 || opts.indexOf("'") !== -1)) {
+                                    parts.push(opts);
+                                    opts = null;
+                                }
+                            }
+                            str = str.replace(new RegExp(search, opts), parts.join(','));
                         });
                         return str;
                     });
@@ -6895,7 +7190,7 @@
             },
             /**
              * Splits the str into an array by the given separator
-             * @param {string}|{array} str
+             * @param {string | array} str
              * @param {string} separator
              * @returns {Array}                  */
             split: function (str, separator) {
@@ -6907,8 +7202,8 @@
             },
             /**
              * Trims the given string or array of strings
-             * @param {Array}|{String} str
-             * @returns {Array}|{String}
+             * @param {Array | String} str
+             * @returns {Array | String}
              */
             trim: function (str) {
                 return this.__factory(str, null, function (str) {
@@ -7002,21 +7297,17 @@
         Model = function (id, attributes, props) {
             var _Model = Object.create({
                 app: props && props.app ? props.app : null,
-                attributes: __.isObject(attributes) ?
-                    attributes : {},
+                attributes: __.isObject(attributes) ? attributes : {},
                 id: id,
                 collection: props && props.collection ?
                     props.collection : null,
-                method: props && props.method ?
-                    props.method : null,
-                name: props && props.name ? props.name :
-                    null,
-                idKey: props && props.idKey ? props.idKey :
-                    '',
+                method: props && props.method ? props.method : null,
+                name: props && props.name ? props.name : null,
+                idKey: props && props.idKey ? props.idKey : '',
                 url: props && props.url ? props.url : null,
                 /**
                  * Binds the model to the given element
-                 * @param {string}|{HTMLElement}|{_} elem
+                 * @param {string | HTMLElement | _} elem
                  * @returns {Promise}
                  */
                 bind: function (elem) {
@@ -7065,6 +7356,14 @@
                     }.bind(this));
                 },
                 /**
+                 * Fetches the value of an attribute of the model
+                 * @param {string} key Chaining is allowed e.g. `name.first`
+                 * @returns {any}
+                 */
+                get: function (key) {
+                    return ext.getVariableValue.call(this.app, key, this.attributes) || null;
+                },
+                /**
                  * Checks if the given key exists in the model
                  * @param {string} key
                  * @returns boolean
@@ -7088,7 +7387,7 @@
                                 // default result
                                 var result = null;
                                 // loop through object
-                                __.forEach(value, function (i, v) {
+                                __.each(value, function (i, v) {
                                     // apply arguments to callback function
                                     // for comparison
                                     var res = key.apply(this, arguments);
@@ -7113,6 +7412,16 @@
                         this.attributes[attr] = val;
                         return this;
                     };
+                },
+                /**
+                 * Checks that the value of the attribute is equal to the
+                 * given value
+                 * @param {string} key
+                 * @param {any} value
+                 * @returns {boolean}
+                 */
+                is: function (key, value) {
+                    return this.attributes[key] == value;
                 },
                 /**
                  * Removes the model
@@ -7273,7 +7582,8 @@
                 /**
                  * Persists the model. If not exists, it is created.
                  * @param {Object} config Keys may include cacheOnly (default: FALSE),
-                 * url, data, form, method (default: PUT|POST), success, error, complete
+                 * url, data, form, method (default: PUT|POST), success, error, complete,
+                 * ignoreDOM (boolean)
                  * @returns {Promise}
                  */
                 save: function (config) {
@@ -7289,9 +7599,8 @@
                         config = __.extend({}, config);
                         var data = config.data || {},
                             _data = ext.canContinue
-                                .call(this.app, this.id
-                                    ? 'model.update'
-                                    : 'model.create',
+                                .call(this.app, this.id ? 'model.update' :
+                                    'model.create',
                                 [data], config.form);
                         if (false === _data) {
                             return reject('Canceled by a before event');
@@ -7328,7 +7637,7 @@
                                     modelId: this.id,
                                     model: form.toObject(),
                                     isNew: !this.id,
-                                    ignoreDom: !(!config.ignoreDOM)
+                                    ignoreDOM: config.ignoreDOM
                                 });
                                 return resolve(model);
                             }
@@ -7357,7 +7666,7 @@
                                                             + _this.name + '"]')
                                                             .hasThis('paginate'),
                                                         isNew: !_this.id,
-                                                        ignoreDom: !(!config.ignoreDOM)
+                                                        ignoreDOM: config.ignoreDOM
                                                     });
                                             }
                                             // update model's collection
@@ -7412,13 +7721,13 @@
                                 _this.app.error('Cannot save model to server: No URL supplied.');
                                 return reject('Cannot save model to server: No URL supplied.');
                             }
-                        };
+                        },
+                            // get files
+                            files = this.app._(config.form)
+                                .find('input[type="file"]');
                         // saving form while there's an uploader for the app
                         if (config.form &&
                             ext.record.call(this.app, 'uploader')) {
-                            // get files
-                            var files = this.app._(config.form)
-                                .find('input[type="file"]');
                             if (files.length) {
                                 data = data || {};
                                 var _this = this;
@@ -7432,7 +7741,8 @@
                                         url: this.url,
                                         done: function (_data, cancelUpload) {
                                             if (_data === false) {
-                                                __.callable(config.error).call(this.app);
+                                                __.callable(config.error)
+                                                    .call(this.app);
                                                 return;
                                             }
                                             else if (__.isObject(_data, true)) {
@@ -7444,12 +7754,15 @@
                                 return this;
                             }
                         }
+                        else if (files.length && config.form) {
+                            data = new FormData(config.form);
+                        }
                         finalizeSave.call(this, config, data);
                     }.bind(this));
                 }
             });
             if (__.isObject(attributes)) {
-                __.forEach(attributes, function (key) {
+                __.each(attributes, function (key) {
                     // ignore ext keys
                     if (key.startsWith('__'))
                         return;
@@ -7517,7 +7830,7 @@
                 },
                 /**
                  * Binds the collection to the given element
-                 * @param {string}|{HTMLElement}|{_} elem
+                 * @param {string | HTMLElement | _} elem
                  * @returns {Promise}
                  */
                 bind: function (elem) {
@@ -7563,7 +7876,7 @@
                  * @returns {_Collection}
                  */
                 each: function (callback) {
-                    __.forEach(this.models, function (i, v) {
+                    __.each(this.models, function (i, v) {
                         __.callable(callback)
                             .call(this, i, v);
                     });
@@ -7611,7 +7924,8 @@
                 /**
                  * Loads the collection from given url
                  * @param {string} url
-                 * @param {object} options
+                 * @param {object} options Keys include noDataKey, dataKey,
+                 * error, success, idKey
                  * @returns {Promise}
                  */
                 load: function (url, options) {
@@ -7621,7 +7935,9 @@
                             this.request(url || col.url)
                                 .then(function (data) {
                                     options = options || {};
-                                    var _data = getRealData.call(this, data, options.dataKey);
+                                    var _data = options.noDataKey ?
+                                        data :
+                                        getRealData.call(this, data, options.dataKey);
                                     // reject if _data isn't an object|array
                                     if (!__.isObject(_data, true)) {
                                         __.callable(options.error)
@@ -7629,7 +7945,7 @@
                                         return reject.call(this, _data);
                                     }
                                     // save to store
-                                    if (col.name)
+                                    if (col.name && (options.idKey || col.idKey))
                                         ext.store.call(this, col.name)
                                             .saveMany(_data, options.idKey || col.idKey);
                                     // set up collection
@@ -7652,16 +7968,17 @@
                 },
                 /**
                  * Fetches a model from the collection
-                 * @param {integer}|{string} model_id
+                 * @param {integer | string} model_id
                  * @param {Object} Keys include url (string), success (function),
-                 * error (function), ignoreCache (boolean)
+                 * error (function), ignoreCache (boolean), method (string)
                  * @returns {Promise}
                  */
                 model: function (model_id, options) {
                     var _this = this, url,
                         options = __.extend({
                             success: function () { },
-                            error: function (e) { }
+                            error: function (e) { },
+                            method: 'GET'
                         }, options);
                     if (model_id) {
                         if (options.url) {
@@ -7694,7 +8011,10 @@
                         }
                         else if (url) {
                             return this.app.promise(function (resolve, reject) {
-                                this.app.request(url)
+                                this.app.request({
+                                    url: url,
+                                    type: options.method
+                                })
                                     .then(function (data) {
                                         data = getRealData.call(this.app, data);
                                         if (data && __.isObject(data))
@@ -7739,7 +8059,7 @@
                 },
                 /**
                  * Removes a model
-                 * @param {integer}|{string} model_id
+                 * @param {integer | string} model_id
                  * @param {Object} options @see Model.remove()
                  * @returns {Promise}
                  */
@@ -7874,9 +8194,14 @@
                      * @returns {array}
                      */
                     properties: function () {
+                        var custom = Object.keys(target),
+                            initial = Object.keys(target.__proto__);
+                        __.removeArrayValue(custom, 'parent');
+                        __.removeArrayValue(initial, '__factory');
+                        __.removeArrayValue(initial, '__opts');
                         return {
-                            custom: Object.keys(target),
-                            initial: Object.keys(target.__proto__)
+                            custom: custom,
+                            initial: initial
                         };
                     },
                     /**
@@ -7901,6 +8226,14 @@
         this.version = '1.0';
         if (config && __.isObject(config))
             this.config = __.extend(this.config, config, true);
+        /**
+         * This holds the GET Request parameters for the current page
+         */
+        this.GETParams = {};
+        /**
+         * Holds the app parameters
+         */
+        this.params = {}
         // set default error function
         this.error = function (msg) {
             ext.log.call(this, 'error', msg);
@@ -7912,7 +8245,8 @@
      */
     ThisApp.Transitions = Extender(Transitions);
     /**
-     * Filters are applied to variables before rendering      */
+     * Filters are applied to variables before rendering
+     */
     ThisApp.Filters = Extender(Filters);
     /**
      * Extends the engine
@@ -7920,7 +8254,7 @@
      * @returns {void}
      */
     ThisApp.extend = function (obj) {
-        __.forEach(obj, function (i, v) {
+        __.each(obj, function (i, v) {
             if (!ThisApp.prototype[i])
                 ThisApp.prototype[i] = function () {
                     var args = Array.from(arguments);
@@ -7930,6 +8264,19 @@
             else
                 console.error('ThisApp.' + i + ' already exists!');
         });
+    };
+    var filePathConfig = function (type, dir, ext, min) {
+        if (!this.config.paths)
+            this.config.paths = {};
+        // ensure min is an object
+        min = __.isObject(min) ? min : {};
+        if (min.subdir && !min.subdir.endsWith('/'))
+            min.subdir += '/';
+        this.config.paths[type] = {
+            dir: dir,
+            ext: ext,
+            min: __.extend(this.config.paths[type].min || {}, min)
+        };
     };
     ThisApp.prototype = {
         __: __,
@@ -7987,12 +8334,13 @@
              */
             debug: false,
             /*
+             * The default layout to use with all pages if none is explicitly specified for the page
+             */
+            defaultLayout: null,
+            /*
              * Indicates whether to keep app parameters in the url after processing
              */
             keepParamsInURL: false,
-            /* 			 * The default layout for the application
-             */
-            layout: null,
             /*
              * Default idKey for models and collections if not explicitly defined
              */
@@ -8008,23 +8356,53 @@
                 // FALSE means new data would be appended
                 overwrite: false
             },
-            /*              * Paths to pages, layouts and components
+            /*             
+             * Paths to asset files
              */
             paths: {
                 pages: {
                     dir: './pages',
-                    ext: '.html'
+                    ext: '.html',
+                    min: {
+                        prod: false, // use minified in production
+                        dev: false, // use minified in developement (when debug:true)
+                        subdir: "" // subdirectory containing minified files
+                    }
                 },
                 layouts: {
                     dir: './layouts',
-                    ext: '.html'
+                    ext: '.html',
+                    min: {
+                        prod: false, // use minified in production
+                        dev: false, // use minified in developement (when debug:true)
+                        subdir: "" // subdirectory containing minified files
+                    }
                 },
                 components: {
                     dir: './components',
-                    ext: '.html'
+                    ext: '.html',
+                    min: {
+                        prod: false, // use minified in production
+                        dev: false, // use minified in developement (when debug:true)
+                        subdir: "" // subdirectory containing minified files
+                    }
                 },
-                js: './assets/js',
-                css: './assets/css'
+                js: {
+                    dir: './assets/js',
+                    min: {
+                        prod: false, // use minified in production
+                        dev: false, // use minified in developement (when debug:true)
+                        subdir: "" // subdirectory containing minified files
+                    }
+                },
+                css: {
+                    dir: './assets/css',
+                    min: {
+                        prod: false, // use minified in production
+                        dev: false, // use minified in developement (when debug:true)
+                        subdir: "" // subdirectory containing minified files
+                    }
+                }
             },
             /*
              * ID of the page to start the app with
@@ -8047,17 +8425,9 @@
          */
         events: [],
         /**
-         * This holds the GET Request parameters for the current page
-         */
-        GETParams: {},
-        /**
          * Number of models still loading
          */
         models: 0,
-        /**
-         * Holds the app parameters
-         */
-        params: {},
         /**
          * Object holding element types whose unrequired assets have been removed for the current page
          */
@@ -8081,7 +8451,7 @@
         },
         /**
          * Adds an element to the cache collection for later reuse
-         * @param {_}|{HTMLElement} elem
+         * @param {_ | HTMLElement} elem
          * @returns {ThisApp}
          */
         addToCache: function (elem) {
@@ -8094,7 +8464,7 @@
                 this._(elem).each(function () {
                     var _elem = _this._(this).clone()
                         .removeThis('loaded');
-                    if (_elem.this('type') === 'layout')
+                    if (_elem.is('layout'))
                         _elem.find('[this-content]').html('');
                     _elem.find('style').each(function () {
                         _this._(this)
@@ -8148,7 +8518,7 @@
          */
         before: function (event, callback) {
             return this.tryCatch(function () {
-                __.forEach(event.split(','), function (i, v) {
+                __.each(event.split(','), function (i, v) {
                     if (this.page) {
                         if (!this.beforeCallbacks[this.page.this('id')])
                             this.beforeCallbacks[this.page.this('id')] = {};
@@ -8165,7 +8535,7 @@
         },
         /**
          * Binds an element to an object
-         * @param {_}|{HTMLElement} elem
+         * @param {_ | HTMLElement} elem
          * @param {Object} object
          * @param {Funtion} callback
          * @returns {Promise}
@@ -8195,6 +8565,19 @@
             return history.length > 2;
         },
         /**
+         * Clears all dom cache
+         * 
+         * @returns {ThisApp}
+         */
+        clearDOMCache: function () {
+            // delete cache
+            ext.store.call(this, '___cache')
+                .find(ext.getTemplatePath.call(this));
+            // empty templates
+            this.templates.html('');
+            return this;
+        },
+        /**
          * Clears the cache of all models and collections on the current page
          * @param {boolean} reload Indicates that the elements attached to these
          * models and collections should be reloaded
@@ -8213,7 +8596,7 @@
                     var __this = app._(this),
                         name = __this.this('model') || __this.this('id');
                     ext.store.call(app, name).drop();
-                    if (__this.this('type') === 'page') {
+                    if (__this.is('page')) {
                         did_page = true;
                         return;
                     }
@@ -8263,7 +8646,7 @@
         },
         /**
          * Fills an autocomplete list with the data given
-         * @param {_}|{string} list
+         * @param {_ | string} list
          * @param {object} data
          * @param {string} idKey
          * @param {string} filter
@@ -8277,13 +8660,19 @@
             list = __.isString(list) ?
                 this.container.find('[this-id="' + list + '"]') :
                 this._(list);
-            var _dropdownList = list.this('autocompleting') ?
-                list :
-                this.container.find('list[this-id="'
+            var _dropdownList;
+            if (list.this('autocompleting'))
+                _dropdownList = list;
+            else {
+                var _scope = this.container;
+                if (list.hasThis('scoped')) {
+                    _scope = list.closest('[this-is-scope]');
+                }
+                _dropdownList = _scope.find('list[this-id="'
                     + list.this('parent-list') +
                     '"],[this-type="list"][this-id="'
-                    + list.this('parent-list') +
-                    '"]');
+                    + list.this('parent-list') + '"]');
+            }
             return ext.fillAutocompleteList.call(this, {
                 list: list,
                 data: data,
@@ -8314,7 +8703,7 @@
         },
         /**
          * Fetches a clone of the required elements from the cache collection
-         * @param {string}|{_} selector
+         * @param {string | _} selector
          * @param {string} type The type of element to get. This is the value of
          * the `this-type` of the target element. The attribute is created and
          * appended to the selector.
@@ -8333,7 +8722,7 @@
                     // don't check `this-model` for bounded non-page element
                     if (selector.hasThis('binding')
                         && selector.this('type') !== 'page') {
-                        __.arrayRemoveIndex(2);
+                        __.removeArrayIndex(2);
                     }
                     selector = elemToSelector(selector, {
                         attrs: attrs,
@@ -8342,7 +8731,7 @@
                 }
                 if (type) {
                     var seltr = '';
-                    __.forEach(selector.split(','), function (i, v) {
+                    __.each(selector.split(','), function (i, v) {
                         if (seltr)
                             seltr += ',';
                         var parts = v.split(' '), sel = '';
@@ -8361,7 +8750,7 @@
                             + this.page.this('id') + '"]';
                     }
                     var selectr = '';
-                    __.forEach(selector.split(','), function (i, v) {
+                    __.each(selector.split(','), function (i, v) {
                         if (selectr)
                             selectr += ',';
                         selectr += 'page[this-id="'
@@ -8371,7 +8760,7 @@
                     });
                     elem = this.templates.find(selectr);
                     if (!elem.length)
-                        elem = this.templates.children('[this-type="component"]')
+                        elem = this.templates.children('component,[this-type="component"]')
                             .find(selector);
                     if (!elem.length) {
                         var _layout = this.page.closest('layout,[this-type="layout"]');
@@ -8399,8 +8788,7 @@
                         return this._();
                 }
                 elem = elem.clone();
-                if (elem.this('type') === 'template')
-                    elem.removeThis('type');
+                if (elem.is('template')) elem.removeThis('type');
                 elem.find('[this-src]')
                     .each(function () {
                         var _img = _this._(this);
@@ -8438,7 +8826,7 @@
         },
         /**
          * Loads an element (collection, model, component, or layout)
-         * @param {HTMLElement}|{_}|{string} elem
+         * @param {HTMLElement | _ | string} elem
          * @param {Object} data
          * @param {Function} callback
          * @returns {Promise}
@@ -8582,7 +8970,7 @@
         },
         /**
          * Sets up the function to call when a page is not found
-         * @param {function}|{string} callback or id of page to load
+         * @param {function | string} callback or id of page to load
          * @returns {ThisApp}
          */
         pageNotFound: function (callback) {
@@ -8633,7 +9021,7 @@
         /**
          * Replaces cached elements with the given elem
          * @param {String} selector
-         * @param {_}|{HTMLElement| elem
+         * @param {_ | HTMLElement| elem
          * @returns {ThisApp}
          */
         replaceCached: function (selector, elem) {
@@ -8647,7 +9035,7 @@
         },
         /**
          * Sends an AJAX request
-         * @param {string}|{object} config
+         * @param {string | object} config
          * Keys include:
          * type (string): GET | POST | PATCH | PUT | DELETE
          * url (string): The url to connect to. Default is current url
@@ -8722,7 +9110,7 @@
             return this.tryCatch(function () {
                 if (id) {
                     var selector = '', _this = this;
-                    __.forEach(id.split(','), function (i, v) {
+                    __.each(id.split(','), function (i, v) {
                         if (i)
                             selector += ',';
                         selector += '[this-id="' + v.trim() + '"][this-autocomplete]';
@@ -8774,29 +9162,24 @@
          * Sets the path to components' location
          * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
          * the path is assumed to follow the set base url.
-         * @param (string) ext The extension for components. This should include the dot (.). Default is
+         * @param {string} ext The extension for components. This should include the dot (.). Default is
          * .html
+         * @param {string} min Use minified files options. Keys include (boolean) prod, (boolean) dev, (string) subdir
          * @returns {ThisApp}
          */
-        setComponentsPath: function (path, ext) {
-            if (!this.config.paths)
-                this.config.paths = {};
-            this.config.paths.components = {
-                dir: path,
-                ext: ext || '.html'
-            };
+        setComponentsPath: function (path, ext, min) {
+            filePathConfig.call(this, 'components', path, ext || '.html', min);
             return this;
         },
         /**
          * Sets the path to css styles' location
          * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
          * the path is assumed to follow the set base url.
+         * @param {string} min Use minified files options. Keys include (boolean) prod, (boolean) dev, (string) subdir
          * @returns {ThisApp}
          */
-        setCSSPath: function (path) {
-            if (!this.config.paths)
-                this.config.paths = {};
-            this.config.paths.css = path;
+        setCSSPath: function (path, min) {
+            filePathConfig.call(this, 'css', path, '.css', min);
             return this;
         },
         /**
@@ -8828,19 +9211,18 @@
          * @returns ThisApp
          */
         setDefaultLayout: function (layout) {
-            this.config.layout = layout;
+            this.config.defaultLayout = layout;
             return this;
         },
         /**
          * Sets the path to js scripts' location
          * @param {string} path If path DOES NOT start with ./ or ../ or a protocol (e.g. http://),
          * the path is assumed to follow the set base url.
+         * @param {string} min Use minified files options. Keys include (boolean) prod, (boolean) dev, (string) subdir
          * @returns {ThisApp}
          */
-        setJSPath: function (path) {
-            if (!this.config.paths)
-                this.config.paths = {};
-            this.config.paths.js = path;
+        setJSPath: function (path, min) {
+            filePathConfig.call(this, 'js', path, '.js', min);
             return this;
         },
         /**
@@ -8849,15 +9231,11 @@
          * the path is assumed to follow the set base url.
          * @param (string) ext The extension for layouts. This should include the dot (.). Default is
          * .html
+         * @param {string} min Use minified files options. Keys include (boolean) prod, (boolean) dev, (string) subdir
          * @returns {ThisApp}
          */
-        setLayoutsPath: function (path, ext) {
-            if (!this.config.paths)
-                this.config.paths = {};
-            this.config.paths.layouts = {
-                dir: path,
-                ext: ext || '.html'
-            };
+        setLayoutsPath: function (path, ext, min) {
+            filePathConfig.call(this, 'layouts', path, ext || '.html', min);
             return this;
         },
         /**
@@ -8866,15 +9244,11 @@
          * the path is assumed to follow the set base url.
          * @param (string) ext The extension for pages. This should include the dot (.). Default is
          * .html
+         * @param {string} min Use minified files options. Keys include (boolean) prod, (boolean) dev, (string) subdir
          * @returns {ThisApp}
          */
-        setPagesPath: function (path, ext) {
-            if (!this.config.paths)
-                this.config.paths = {};
-            this.config.paths.pages = {
-                dir: path,
-                ext: ext || '.html'
-            };
+        setPagesPath: function (path, ext, min) {
+            filePathConfig.call(this, 'pages', path, ext || '.html', min);
             return this;
         },
         /**
@@ -9044,7 +9418,7 @@
             });
         }
     };
-    __.forEach(ThisApp.prototype, function (i, v) {
+    __.each(ThisApp.prototype, function (i, v) {
         if (__.isFunction(v)) {
             v.toString = function () {
                 return 'See https://this-js.github.com/#/methods?lookup=' + i;
@@ -9054,15 +9428,14 @@
     ThisApp.toString = function () {
         return 'See https://this-js.github.com';
     };
-    __.forEach(['Transitions', 'Filters', 'extend', 'toString'], function (i, v) {
+    __.each(['Transitions', 'Filters', 'extend', 'toString'], function (i, v) {
         ThisApp[v].toString = function () {
             return v === 'toString' ?
                 'toString() { [custom code] }'
-                :
-                'See https://this-js.github.com/#/advanced?lookup=' + v;
+                : 'See https://this-js.github.com/#/advanced?lookup=' + v;
         };
     });
-    __.forEach(__.__proto__, function (i, v) {
+    __.each(__.__proto__, function (i, v) {
         v.toString = function () {
             return 'See https://this-js.github.com/#/__util?lookup=' + i;
         };

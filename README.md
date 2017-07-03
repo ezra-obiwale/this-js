@@ -62,7 +62,7 @@ Apps use different features and `ThisJS` provides the following features:
     
 -   #### [Components](./doc/md/features/components.md)
 
-### Others
+### Helpers
 
 -   #### [Forms](./doc/md/others/forms.md)
     
@@ -72,4 +72,6 @@ Apps use different features and `ThisJS` provides the following features:
     
 -   #### [Branching](./doc/md/others/branching.md)
     
--   #### [Helpers](./doc/md/others/helpers.md)
+-   #### [Miscellaneous](./doc/md/attributes.md#helper-attributes)
+
+### [Finally](./doc/md/finally.md)

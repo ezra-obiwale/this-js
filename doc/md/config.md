@@ -2,10 +2,10 @@
 
 The default config object is below and can be changed as seen fit.
 
-````javascript
+```javascript
 
 {
-    /* 			 
+    /*
     * The base url which api urls extend
     */
     baseURL: location.origin + location.pathname,

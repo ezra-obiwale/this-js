@@ -79,6 +79,12 @@ Navigate to any specific attributes with these links:
 
     To load multiple files, provide a comma-separated list of file names.
 
+-   ### this-model
+    The name of the model to bind an element to. This is necessary to clearly
+    differentiate entity types from one another.
+
+    On a collection, if the attribute is not provided, the `this-id` value is assumed.
+
 -   ### this-load-js-first
     Applicable to pages and layouts, loads the given js file **before** the feature is been loaded.
 
@@ -106,8 +112,9 @@ Navigate to any specific attributes with these links:
     It takes no value.
 
 -   ### this-layout
-    The id of the layout a page should use. If none is specified, the default
-    layout specified [in the config](./config.md) is used if specified. And if that isn't specified either, the page is loaded without a layout.
+    The id of the layout a page should use. If none is specified, [`config.defaultLayout`](./config.md#defaultlayout)
+    is used if specified. And if that isn't specified either, the page is loaded
+    without a layout.
 
 -   ### this-path
     The url from which the page content should be loaded. DO NOT USE `this-url`.
@@ -115,8 +122,8 @@ Navigate to any specific attributes with these links:
 -   ### this-no-layout
     Indicates that the page should be loaded without a layout. It takes no value.
 
-    This is more important when a default layout has been set [in the config](./config.md)
-    but is not needed for the page.
+    This is more important when [`config.defaultLayout`](./config.md#defaultlayout)
+    has been set but is not needed for the page.
 
 -    ### this-title
     Holds the title of the page
@@ -133,25 +140,27 @@ Navigate to any specific attributes with these links:
 
 ## Model Attributes
 
--    ### this-in-collection
-     **For internal use only**
+-   ### this-in-collection
+    **For internal use only**
 
-     Indicates that a model element is within a collection element.
+    Indicates that a model element is within a collection element.
 
--    ### this-mid
-     **For internal use only**
+-   ### this-mid
+    **For internal use only**
 
-     The unique id of a particular model.
+    The unique id of a particular model, usually used on collection model elements.
 
--    ### this-read
-     Used together with `this-goto` within a model, it indicates that the page
-     being link would read the model within which is the current element. This is the R in CRUD.
+-   ### this-read
 
-     The value then can be empty.
+    This is the R in CRUD.
 
-     However, if another model is to be read and not the one within which the
-     link is, then the value is the url of the model and the model name must be
-     also provided with the attribute `this-model`.
+    Used together with `this-goto` within a model, it indicates that the page
+    being link would read the model within which is the current element.
+    The value then can be empty.
+
+    However, if another model is to be read and not the one within which the
+    link is, then the value is the url of the model and the model name must be
+    also provided with the attribute `this-model`.
 
 
 ## Collection Attributes
@@ -178,6 +187,10 @@ Navigate to any specific attributes with these links:
      Used on a **child of a collection**, it indicates that the child be the
      last element of the collection.
 
+-   ### this-no-data-key
+    Used when a [`config.dataKey`](./config.md#dataKey) is set but the current
+    collection does not use any data key.
+
 -    ### this-on-emptied
      Used on a **child of a collection**, it indicates that the child should be
      shown if all models in the collection have been deleted.
@@ -191,7 +204,8 @@ Navigate to any specific attributes with these links:
 
      Value is the number of results to show per page.
 
-     If no value is provided, the [`config.pagination.limit`](./config.md) applies.
+     If no value is provided, [`config.pagination.limit`](./config.md#pagination)
+    applies.
 
 -    ### this-pagination-overwrite
      Indicates that new page results should overwrite existing collection content
@@ -482,7 +496,19 @@ Navigate to any specific attributes with these links:
     Defaults to `q` if not provided.
 
 -   ### this-remove
-    Placed on a link within a selection list, it removes the list option and triggers `list.option.removed` on it.
+    Placed on a link within a selection list, it removes the list option and
+    triggers `list.option.removed` on it.
+
+-   ### this-scoped
+    Adding this atribute to the autocomplete input element indicates the scope
+    within which autocomplete lists should be found.
+
+    The value of the attribute should be the selector of the element which contains
+    both the autocomplete input element and its lists. By default, this is the
+    app container.
+
+    If the value is empty, the immediate parent of the autocomplete input element
+    is assumed.
 
 -   ### this-value-key
     The key in the data object whose value should be set into the autocomplete
@@ -495,7 +521,7 @@ Navigate to any specific attributes with these links:
 
 Lists are used with autocomplete to list items found.
 
--   ### this-refill
+-   ### this-fill
     Used on selection lists for autocomplete input elements and contains the
     name of the function to call to get the data to process from.
 
@@ -505,7 +531,7 @@ Lists are used with autocomplete to list items found.
     For this to happen, the autocomplete input element must have a `this-is`
     attribute whose value holds the key which holds a list of already selected ids.
 
--   ### this-refill-url
+-   ### this-fill-url
     Used on selection lists for autocomplete input elements and holds the url
     from which the data to load as default when loading form elements from a model.
 
@@ -541,11 +567,14 @@ Lists are used with autocomplete to list items found.
     Makes the element hidden when loaded.
 
 -   ### this-hide
-    When an element with this attribute is clicked, the target element is hidden
+    When an element with this attribute is clicked, the target element is hidden.
 
     The value is the id of the target element.
 
-    Multiple elements can also be targeted by separating their id's with comma
+    Multiple elements can also be targeted by separating their id's with comma.
+
+    This can also be used with select options. They must however have attribute
+    `value` set. 
 
 -   ### this-ignore
     Indicates that the feature should not be loaded when loading the
@@ -557,13 +586,7 @@ Lists are used with autocomplete to list items found.
 -   ### this-loaded
     **For internal use only**
 
-    Indicates a loaded [feature](../../README.md#features) element
-
--   ### this-model
-    The name of the model to bind an element to. This is necessary to clearly
-    differentiate entity types from one another.
-
-    On a collection, if the attribute is not provided, the `this-id` value is assumed.
+    Indicates a loaded [feature](../../README.md#features) element.
 
 -   ### this-not-with
     This indicates the container's content should not be loaded with the specified model.
@@ -586,9 +609,14 @@ Lists are used with autocomplete to list items found.
     By default, models and collections are reset.
 
 -   ### this-show
-    Shows the target element. The value is the id of the element.
+    When an element with this attribute is clicked, the target element is shown.
 
-    Multiple elements can also be targeted by separating their id's with comma
+    The value is the id of the target element.
+
+    Multiple elements can also be targeted by separating their id's with comma.
+
+    This can also be used with select options. They must however have attribute
+    `value` set.
 
 -   ### this-tar
     **For internal use only**
@@ -597,4 +625,18 @@ Lists are used with autocomplete to list items found.
     to the parsed element after which it is removed.
 
 -   ### this-toggle
-    Toggles the display of the target element on/off. The value is the id of the element.
+    Toggles the display of the target element on/off. The value is the id of the
+    element. This can also be used with select options.
+
+-   ### this-trigger
+    Triggers an event when the element is clicked. The value contains two parts
+    separated my a colon (:) - `event:target`.
+
+    The event is the event that should be triggered while target is the element
+    on which the event should be triggered. If no target is specified, the current
+    element is the target.
+
+    The target description is the same as the selector described with [`ThisApp.when()`](./methods.md#when).
+
+    Multiple events can be triggered by separating each `event:target` pair by
+    a semi-colon (;), i.e. `event:target;event2:target2;...`

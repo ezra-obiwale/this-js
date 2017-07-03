@@ -8,7 +8,7 @@ These run **before** actions occur. Listeners are attached with [`ThisApp.before
 
 They include:
     
-### Pages
+### Pages (before)
 
 -   #### page.leave
 
@@ -27,30 +27,35 @@ They include:
 
     Where the function returns nothing, boolean `TRUE` is assumed.
     
-### Models
+### Models (before)
 
 -   #### model.create
-    Called before a create request is sent after a form is submitted.. The context is the form which was submitted or passed into [`save()`](./js-model.md#save).
+    Called before a create request is sent after a form is submitted.. The context
+    is the form which was submitted or passed into [`Model.save()`](./js-model.md#save).
 
-    The function receives a parameter - the data object passed into [`save()`](./js-model.md#save).
+    The function receives a parameter - the data object passed into [`Model.save()`](./js-model.md#save).
 
-    The expected return is either an object which appended to the form data before sending the request or a boolean where false means sending should be canceled.
+    The expected return is either an object which appended to the form data
+    before sending the request or a boolean where false means sending should be canceled.
 
-    If an object is returned, existing data in the form may be overwritten if keys exist as names
+    If an object is returned, existing data in the form may be overwritten if
+    keys exist as names
 
     Where the function returns nothing, boolean `TRUE` is assumed.
 
 -   #### model.delete
-    Called before a delete request is sent on a model. The context is the HTMLElement of the model within which the delete button was clicked.
+    Called before a delete request is sent on a model. The context is the HTMLElement
+    of the model within which the delete button was clicked.
 
-    The expected return is a boolean where false means rendering should continue with the received data
+    The expected return is a boolean where false means rendering should continue
+    with the received data.
 
     Where the function returns nothing, boolean `TRUE` is assumed.
 
 -   #### model.update
-    Called before an update request is sent after a form is submitted. The context is the form which was submitted or passed into [`save()`](./js-model.md#save).
+    Called before an update request is sent after a form is submitted. The context is the form which was submitted or passed into [`Model.save()`](./js-model.md#save).
 
-    The function receives a parameter - the data object passed into [`save()`](./js-model.md#save)
+    The function receives a parameter - the data object passed into [`Model.save()`](./js-model.md#save)
 
     The expected return is either an object which appended to the form data before sending the request or a boolean where false means sending should be canceled.
 
@@ -67,14 +72,17 @@ They include:
 
     Where the function returns nothing, boolean `TRUE` is assumed.
 
-### Collections
+### Collections (before)
 
 -   #### collection.model.render
-    Called before each model in a collection is rendered. The context is the HTMLElement of the model to be rendered.
+    Called before each model in a collection is rendered. The context is the
+    HTMLElement of the model to be rendered.
 
-    The function receives two (2) parameters - the object to be loaded into the collection and the HTMLElement of the collection
+    The function receives two (2) parameters - the object to be loaded into the
+    collection and the HTMLElement of the collection.
 
-    The expected return is either an object which overrides the given object or a boolean where false means rendering should continue with the received data
+    The expected return is either an object which overrides the given object or
+    a boolean where false means rendering should continue with the received data.
 
     Where the function returns nothing, boolean `TRUE` is assumed.
 
@@ -87,7 +95,7 @@ They include:
 
     Where the function returns nothing, boolean `TRUE` is assumed.
     
-### Forms
+### Forms (before)
 
 -   #### form.send
     Called when a form that's not bound to any model but has attribute [`this-handle-submit`](./attributes.md#this-handle-submit) is submitted with valid field entries.
@@ -106,7 +114,7 @@ These run **after** actions occur. Listeners are attached with [`ThisApp.on()`](
 
 They include:
 
-### Pages
+### Pages (after)
 
 -   #### page.load.failed
     Triggered when the requested page is found but cannot be loaded
@@ -114,7 +122,12 @@ They include:
 -   #### page.loaded
     Triggered when a page has been fully loaded
 
-### Models
+### Layouts (after)
+
+-   #### layout.loaded
+    Triggered when a loayout has been loaded.
+
+### Models (after)
 
 -   #### delete.complete
     Triggered on a model when a delete request to the server/backend is completed, whether successful or not.
@@ -134,6 +147,9 @@ They include:
 -   #### expired.model.cache.loaded
     Triggered on a model when an expired model cache was loaded because the device is offline and newer data could not be fetched
 
+-   #### model.bind.failed
+    Triggered on a model when a model could not be binded to an element
+
 -   #### model.binded
     Triggered on a model when a model has been binded to an element
 
@@ -146,7 +162,7 @@ They include:
 -   #### model.loaded
     Triggered on a model when it is loaded from url or within a collection
 
-### Collections
+### Collections (after)
 
 -   #### collection.cache.loaded
     Triggered on a collection when it is loaded from cache
@@ -160,12 +176,12 @@ They include:
 -   #### expired.collection.cache.loaded
     Triggered when an expired collection cache was loaded because the device is offline and newer data could not be fetched
         
-### Components
+### Components (after)
 
 -   #### component.loaded
     Triggered on a component when it is loaded
         
-### Forms
+### Forms (after)
 
 -   #### create.form.cleared
     Triggered when a link with `this-create` and `this-form` attributes is clicked.
@@ -193,7 +209,7 @@ They include:
 -   #### form.valid.submission
     Triggered on a form when it is submitted and all required fields are filled properly
 
-### AJAX
+### AJAX (after)
 
 -   #### invalid.response
     Triggered when the response from an AJAX request does not match the expected type.
@@ -207,7 +223,7 @@ They include:
 -   #### load.content.success
     Triggered when an AJAX response status IS greater or equal to 200 and and less than 400
 
-### Lists
+### Lists (after)
 -   #### list.emptied
     Triggered on a list when it has been emptied for whatever reasons
 
@@ -223,7 +239,7 @@ They include:
 -   #### list.option.selected
     Triggered on a list option when it has been selected
 
-### Misc
+### Misc (after)
 
 -   #### dom.updated
     Triggered on the app container when a collection's or model's dom element has be updated.
