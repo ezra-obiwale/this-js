@@ -121,7 +121,7 @@ as a parameter type, the actual HTMLElement can be used instead.
     
     The config should extend the JSON object below:
     
-    ```json
+    ```javascript
     {
         "type': "GET", // POST | PATCH | PUT | DELETE
         "url": location.href, // The url to connect to. Default is current url
@@ -160,7 +160,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     The minification object has the following defaults:
 
-    ```json
+    ```javascript
     {
         "prod": false, // use minified in production
         "dev": false, // use minified in developement (when debug:true)
@@ -174,7 +174,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     The minification object has the following defaults:
 
-    ```json
+    ```javascript
     {
         "prod": false, // use minified in production
         "dev": false, // use minified in developement (when debug:true)
@@ -193,7 +193,7 @@ as a parameter type, the actual HTMLElement can be used instead.
     The function would be passed an `object` parameter which has the following keys
     in addition to those in `request()`:
     
-    ```json
+    ```javascript
     {
         // ...
         "action": "", // create | read | update | delete | autocomplete | handled-submit
@@ -214,7 +214,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     The minification object has the following defaults:
 
-    ```json
+    ```javascript
     {
         "prod": false, // use minified in production
         "dev": false, // use minified in developement (when debug:true)
@@ -229,7 +229,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     The minification object has the following defaults:
 
-    ```json
+    ```javascript
     {
         "prod": false, // use minified in production
         "dev": false, // use minified in developement (when debug:true)
@@ -244,7 +244,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     The minification object has the following defaults:
 
-    ```json
+    ```javascript
     {
         "prod": false, // use minified in production
         "dev": false, // use minified in developement (when debug:true)
@@ -275,7 +275,7 @@ as a parameter type, the actual HTMLElement can be used instead.
     
     The function is called with an object parameter:
     
-    ```json
+    ```javascript
     {
         "modelName": "", // the model on which the upload action is being carried out
         "files": [], // ann array of all file elements in the form,
@@ -339,7 +339,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
     -  `object` **config** - The config representing the endpoint to be watched
 
-        ```json
+        ```javascript
         {
             "type": "...", // model or collection
             "url": "...", // the url for the model or collection
@@ -355,7 +355,7 @@ as a parameter type, the actual HTMLElement can be used instead.
 
         The function expects a single object parameter:
 
-        ```json
+        ```javascript
         {
             "event": "...", // created, updated, deleted
             "id": "..", // the id of the model acted upon. This must be returned for all events

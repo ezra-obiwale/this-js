@@ -94,6 +94,16 @@ They include:
     The expected return is either an object which overrides the given object or a boolean where false means rendering should continue with the received data
 
     Where the function returns nothing, boolean `TRUE` is assumed.
+
+### Components (before)
+
+-   ### component.load
+    Called before a component is loaded, whether from cache or url. The context is
+    component placeholder.
+
+-   ### component.render
+    Called before a loaded component is rendered. The method receives the `HTMLElement`
+    of loaded component. The context is the component placeholder.
     
 ### Forms (before)
 
