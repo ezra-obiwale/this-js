@@ -12,7 +12,7 @@ is good enough!
 
 The following is an example of a JSON object model which represents a user:
 
-````json
+````js
 {
     "id": 1,
     "firstName": "John",

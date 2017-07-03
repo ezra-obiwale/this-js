@@ -69,15 +69,31 @@ Navigate to any specific attributes with these links:
 -   ### this-id
     The id of the element. On a collection, if `this-model` is not provided, this is assumed as it.
 
+-   ### this-load-css-async
+    Applicable to pages and layouts, it holds css files to load with it.
+
+    To load multiple files, provide a comma-separated list of filenames and they'd
+    be loaded asychronously.
+
 -   ### this-load-css
     Applicable to pages and layouts, it holds css files to load with it.
 
-    To load multiple files, provide a comma-separated list of file names.
+    To load multiple files, provide a comma-separated list of filenames and they'd
+    be loaded sychronously.
+
+-   ### this-load-js-async
+    Applicable to pages and layouts, loads the given js file **after** the feature
+    has been loaded.
+
+    To load multiple files, provide a comma-separated list of filenames and they'd
+    be loaded asychronously.
 
 -   ### this-load-js
-    Applicable to pages and layouts, loads the given js file **after** the feature has been loaded.
+    Applicable to pages and layouts, loads the given js file **after** the feature
+    has been loaded.
 
-    To load multiple files, provide a comma-separated list of file names.
+    To load multiple files, provide a comma-separated list of filenames and they'd
+    be loaded sychronously.
 
 -   ### this-model
     The name of the model to bind an element to. This is necessary to clearly
@@ -85,16 +101,26 @@ Navigate to any specific attributes with these links:
 
     On a collection, if the attribute is not provided, the `this-id` value is assumed.
 
--   ### this-load-js-first
-    Applicable to pages and layouts, loads the given js file **before** the feature is been loaded.
+-   ### this-load-js-first-async
+    Applicable to pages and layouts, loads the given js file **before** the feature
+    is been loaded.
 
-    To load multiple files, provide a comma-separated list of file names.
+    To load multiple files, provide a comma-separated list of filenames and they'd
+    be loaded asychronously.
+
+-   ### this-load-js-first
+    Applicable to pages and layouts, loads the given js file **before** the feature
+    is been loaded.
+
+    To load multiple files, provide a comma-separated list of filenames and they'd
+    be loaded sychronously.
 
 -   ### this-prepend
     Indicates that each model/item in the collection/loop/list should be prepended to the container.
 
 -   ### this-type
-    The type of element it is. The may be any of `page`, `layout`, `model`, `collection`, `component` or `list`
+    The type of element it is. The may be any of `page`, `layout`, `model`, `collection`,
+    `component` or `list`
 
 -   ### this-url
     This is the url from which the content of an element should be loaded. This
@@ -573,8 +599,7 @@ Lists are used with autocomplete to list items found.
 
     Multiple elements can also be targeted by separating their id's with comma.
 
-    This can also be used with select options. They must however have attribute
-    `value` set. 
+    This can also be used with select options.
 
 -   ### this-ignore
     Indicates that the feature should not be loaded when loading the
@@ -615,8 +640,7 @@ Lists are used with autocomplete to list items found.
 
     Multiple elements can also be targeted by separating their id's with comma.
 
-    This can also be used with select options. They must however have attribute
-    `value` set.
+    This can also be used with select options.
 
 -   ### this-tar
     **For internal use only**

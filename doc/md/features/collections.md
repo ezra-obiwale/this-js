@@ -22,7 +22,7 @@ the value of attribute [`this-id`](../attributes.md#this-id) doubles as it.
 
 The following is an example of a JSON object collection of user models:
 
-````json
+````js
 [
     {
         "id": 1,
