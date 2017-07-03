@@ -76,7 +76,8 @@
     {
         "id": "page.load",
         "description": [
-            "Called before pages are loaded. The context is the HTMLElement of the page.",
+            "Called before pages are loaded.",
+            "The function receives a single parameter - the id or url of the page to load",
             "The expected return is boolean where false means the page should not be loaded.",
             "Where the function returns nothing, boolean `TRUE` is assumed."
         ]

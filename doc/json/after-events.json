@@ -217,6 +217,16 @@
         ]
     },
     {
+        "id": "list.option.removed",
+        "description": "Triggered on a list option when it is removed by pressing it's descendant with attribute `this-remove`",
+        "on": "lists",
+        "links": [
+            "attributes/this-list",
+            "attributes/this-autocomplete",
+            "attributes/this-remove"
+        ]
+    },
+    {
         "id": "list.option.selected",
         "description": "Triggered on a list option when it has been selected",
         "on": "lists",
@@ -320,8 +330,8 @@
     },
     {
         "id": "dom.updated",
-        "description": "Indicates that a collection's or model's dom element has be updated. Event details will contain event and response",
-        "on": "collections, models"
+        "description": "Indicates that a collection's or model's dom element has be updated.",
+        "on": "app container"
     },
     {
         "id": "model.binded",

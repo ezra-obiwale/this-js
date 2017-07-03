@@ -103,9 +103,8 @@
     },
     {
         "id": "this-ignore",
-        "description": "Used to temporarily ignore children branching when processing parent branching",
-        "internal": true,
-        "on": "branching",
+        "description": "Indicates that the feature should not be loaded when loading the page.",
+        "on": "collections,models,components",
         "links": [
             "this-if",
             "this-else-if",
