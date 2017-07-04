@@ -1,0 +1,10 @@
+[
+    {
+        "id": "this-component",
+        "value": "component ID",
+        "description": [
+            "Indicates a placeholder for a component. The value is the ID of the component to load",
+            "If the component needs to be loaded from file, leave value has empty and add attribute `this-url` instead."
+        ]
+    }
+]

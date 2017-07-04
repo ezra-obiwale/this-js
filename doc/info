@@ -1,0 +1,12 @@
+Pages:
+    pages
+    layouts
+    collections
+    models
+    lists
+    components
+    misc
+        features
+            autocompleting
+            searching
+        attributes

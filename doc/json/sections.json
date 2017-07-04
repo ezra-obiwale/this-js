@@ -1,0 +1,40 @@
+[
+    {
+        "title": "Pages",
+        "description": "",
+        "link": "pages"
+    },
+    {
+        "title": "Layouts",
+        "description": "",
+        "link": "layouts"
+    },
+    {
+        "title": "Collections",
+        "description": "",
+        "link": "collections"
+    },
+    {
+        "title": "Models",
+        "description": "",
+        "link": "models"
+    },
+    {
+        "title": "Components",
+        "description": "",
+        "link": "components"
+    },
+    {
+        "title": "Forms",
+        "description": "",
+        "link": "forms"
+    },
+    {
+        "title": "Misc",
+        "description": "",
+        "link": "misc",
+        "target": [
+            "branching, looping, autocomplete"
+        ]
+    }
+]

@@ -1,0 +1,157 @@
+[
+    {
+        "id": "this-action",
+        "value": "URL",
+        "description": "Indicates where the form should submit to. Value must be a URL",
+        "links": [
+            "this-create",
+            "this-update",
+            "this-url"
+        ],
+        "on": "forms"
+    },
+    {
+        "id": "this-autocomplete",
+        "description": "Indicates that the input field should be autocompleted from the given url",
+        "on": "input",
+        "links": [
+            "this-delay",
+            "this-list",
+            "this-min-chars",
+            "this-multiple",
+            "this-selection-list",
+            "this-query-key"
+        ]
+    },
+    {
+        "id": "this-delay",
+        "value": "integer",
+        "description": "This is the amount of time to wait after the user stops typing before trying to autocompleting entry. This is in milliseconds",
+        "on": "input",
+        "links": [
+            "this-autocomplete",
+            "this-min-chars"
+        ]
+    },
+    {
+        "id": "this-handle-submit",
+        "description": [
+            "Used on forms that are not bound to any model, it indicates that the submission should be handled via ajax with the appropriate form events triggered."
+        ],
+        "on": "forms",
+        "links": [
+            "this-ignore-submit",
+            "this-do"
+        ]
+    },
+    {
+        "id": "this-ignore-dom",
+        "description": "Indicates that the model element in the dom should not be updated on successful create or update.",
+        "links": [
+            "this-create",
+            "this-update"
+        ],
+        "on": "forms"
+    },
+    {
+        "id": "this-ignore-submit",
+        "description": "Indicates that the form should not be processed when submitted",
+        "links": [
+            "this-create",
+            "this-update",
+            "this-handle-submit"
+        ],
+        "on": "forms"
+    },
+    {
+        "id": "this-is",
+        "value": "model property",
+        "description": [
+            "Bind a property of the model to the form element. The value should be the property of the model.",
+            "If the value of the property is an object or array, children value can be targeted by connecting the propertys with dots (.).",
+            "For example, say there's an object `{name:{first:\"John\", last:\"Doe\"},hobbies:[\"Reading\",\"Playing the guitar\"]}`, `this-is` values could be `name.first`, `name.last`, `hobbies.0`, `hobbies.1`",
+            "The form must be bound to a model with attribute `this-model`."
+        ],
+        "this-links": [
+            "this-model"
+        ],
+        "on": "forms, input, select, textarea, button"
+    },
+    {
+        "id": "this-key",
+        "value": [
+            "string",
+            "integer"
+        ],
+        "description": [
+            "This holds the unique key that identifies each suggested item when autcompleting. This is usually the uid of the model applied to the suggestion item from the array list gotten from the server"
+        ],
+        "links": [
+            "this-autocomplete",
+            "this-selection-list"
+        ]
+    },
+    {
+        "id": "this-list",
+        "value": "ID",
+        "description": "This is the id of target list element to hold the list of found suggestions",
+        "on": "input",
+        "links": [
+            "this-autocomplete",
+            "this-type"
+        ]
+    },
+    {
+        "id": "this-min-chars",
+        "value": "integer",
+        "description": "This is the minimum number of characters the user must have entered before trying to autocomplete entry",
+        "on": "input",
+        "links": [
+            "this-autocomplete",
+            "this-delay"
+        ]
+    },
+    {
+        "id": "this-multiple",
+        "description": "This indicates that multiple suggestions can be selected instead of the default one",
+        "on": "input",
+        "links": [
+            "this-autocomplete"
+        ]
+    },
+    {
+        "id": "this-resettable",
+        "value": "string",
+        "description": [
+            "Used on any element within a form and indicates that the element should be reset when other form elements are being reset.",
+            "Value can be a semi-colon separated string of attribute:value to be set when resetting the form.",
+            "For example, on an image, the value may be 'src:/path/to/default/image.jpg;class:default",
+            "If value is empty, it is treated like other forms and the `value` attribute is set to empty"
+        ],
+        "on": "img"
+    },
+    {
+        "id": "this-search",
+        "value": "string",
+        "description": [
+            "Input element's form parent/ancestor must have `this-do` with value of 'search'",
+            "The value is a string in the format COLLECTION_ID:comma,separated,keys,to,search"
+        ],
+        "links": [
+            "this-do",
+            "this-query"
+        ],
+        "on": "forms, input"
+    },
+    {
+        "id": "this-value-key",
+        "value": "string",
+        "description": "The key in the data object whose value should be set into the autocomplete input field as its value.",
+        "on": "input",
+        "links": [
+            "this-autocomplete",
+            "this-type",
+            "this-selection-list"
+        ]
+    }
+]

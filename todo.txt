@@ -1,30 +1,15 @@
-collection pagination
-stash away templates from dom, probably in the localStorage
-Use FormData on form submission
-Check CORS
-
-
 Further minimize JS
 Write documentation
     - Make header fixed
 Write tests
 use indexdb for caching
 
+Use builder for request to achieve
 
-before
-    page.load (DomElement):Boolean
-    collection.render (Object, DomElement):Object|Boolean
-    collection.model.render (Object, DomElement):Object|Boolean
-    model.delete (Model, DomElement):Boolean
-    model.create (Model):Boolean
-    model.update (Model):Boolean
-    model.render (Object, DomElement):Object|Boolean
-
-Events (element => event name)
-    page => page.load.canceled
-    collection => collection.render.canceled
-    collection => collection.model.render.canceled
-    form => model.create.canceled
-    form => model.update.canceled
-    model => model.delete.canceled
-    model => model.render.canceled
+app.request(url)
+    .get() // replaceable with post, put, delete all taking param data
+    .then()
+    .catch();
+Allow use with jQuery
+Merge this.__ and this._ into one like JQuery
+Refactor bindToObject and loadModel - doing the same thing?
